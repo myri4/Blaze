@@ -5,7 +5,7 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
-#define WC_GRAPHICS_DEBUGGER 1
+#define WC_GRAPHICS_VALIDATION 0
 #define WC_SYNCHRONIZATION_VALIDATION 1
 #define WC_SHADER_DEBUG_PRINT 0
 
@@ -190,14 +190,14 @@ namespace VulkanContext
 	inline auto GetProperties() { return physicalDevice.GetProperties(); }
 	inline auto GetSupportedFeatures() { return physicalDevice.GetFeatures(); }		
 
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 	inline bool bValidationLayers = false;
 	inline VkDebugUtilsMessengerEXT debug_messenger;
 #endif	
 
 	inline void BeginLabel(VkCommandBuffer cmd, const char* labelName, const glm::vec4& color = glm::vec4(1.f))
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			VkDebugUtilsLabelEXT label = { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
@@ -213,7 +213,7 @@ namespace VulkanContext
 
 	inline void InsertLabel(VkCommandBuffer cmd, const char* labelName, const glm::vec4& color = glm::vec4(1.f))
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			VkDebugUtilsLabelEXT label = { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
@@ -229,7 +229,7 @@ namespace VulkanContext
 
 	inline void EndLabel(VkCommandBuffer cmd) 
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers) vkCmdEndDebugUtilsLabelEXT(cmd);
 #endif
 	}
@@ -237,7 +237,7 @@ namespace VulkanContext
 
 	inline void BeginLabel(VkQueue queue, const char* labelName, const glm::vec4& color = glm::vec4(1.f))
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			VkDebugUtilsLabelEXT label = { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
@@ -253,7 +253,7 @@ namespace VulkanContext
 
 	inline void InsertLabel(VkQueue queue, const char* labelName, const glm::vec4& color = glm::vec4(1.f))
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			VkDebugUtilsLabelEXT label = { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
@@ -269,14 +269,14 @@ namespace VulkanContext
 
 	inline void EndLabel(VkQueue queue) 
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers) vkQueueEndDebugUtilsLabelEXT(queue);
 #endif
 	}
 
 	inline void SetObjectName(VkObjectType type, uint64_t handle, const char* name)
 	{
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			VkDebugUtilsObjectNameInfoEXT name_info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
@@ -302,7 +302,7 @@ namespace VulkanContext
 			return false;
 		}
 		// Create Instance
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 		uint32_t layerCount = 0;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -341,7 +341,7 @@ namespace VulkanContext
 
 		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
 		if (bValidationLayers)
 		{
@@ -444,7 +444,7 @@ namespace VulkanContext
 
 		const std::vector<const char*> deviceExtensions = {	VK_KHR_SWAPCHAIN_EXTENSION_NAME, };
 
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
 		{
 			debugCreateInfo.pNext = nullptr; // by spec definition
@@ -559,14 +559,17 @@ namespace VulkanContext
 			VkPhysicalDeviceFeatures deviceFeatures = {};
 			if (physicalDevice.GetFeatures().samplerAnisotropy) deviceFeatures.samplerAnisotropy = true;
 
-			VkPhysicalDeviceVulkan12Features features12 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+			VkPhysicalDeviceVulkan12Features features12 = { 
+				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 
-			features12.shaderSampledImageArrayNonUniformIndexing = true;
-			features12.runtimeDescriptorArray = true;
-			features12.descriptorBindingVariableDescriptorCount = true;
-			features12.descriptorBindingPartiallyBound = true;
-			features12.bufferDeviceAddress = true;
-			features12.scalarBlockLayout = true;
+				.shaderSampledImageArrayNonUniformIndexing = true,
+				.descriptorBindingPartiallyBound = true,
+				.descriptorBindingVariableDescriptorCount = true,
+				.runtimeDescriptorArray = true,
+				.scalarBlockLayout = true,
+				.timelineSemaphore = true,
+				.bufferDeviceAddress = true,
+			};
 
 			VkDeviceCreateInfo createInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 
@@ -599,7 +602,7 @@ namespace VulkanContext
 
 			createInfo.pNext = &features12;
 
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 			if (bValidationLayers)
 			{
 				createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -654,7 +657,7 @@ namespace VulkanContext
 		vmaDestroyAllocator(MemoryAllocator);
 		logicalDevice.Destroy();
 
-#if WC_GRAPHICS_DEBUGGER
+#if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers) vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, VulkanContext::GetAllocator());
 #endif
 		vkDestroyInstance(instance, nullptr);
