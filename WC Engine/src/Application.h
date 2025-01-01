@@ -56,7 +56,7 @@ namespace wc
 			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 			io.IniFilename = nullptr;
 			io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-			io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/ST-SimpleSquare.ttf", 50.f);
+			io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/ST-SimpleSquare.ttf", 25.f);
 
 			ImGui_ImplGlfw_Init(Globals.window, false);
 

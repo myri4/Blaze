@@ -4,6 +4,11 @@
 
 namespace wc
 {
+	ImVec2 ImConv(glm::vec2 v)
+	{
+		return ImVec2(v.x, v.y);
+	}
+
 	namespace Widgets
 	{
 		
