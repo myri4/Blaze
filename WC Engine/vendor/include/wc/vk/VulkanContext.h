@@ -67,19 +67,19 @@ namespace vk
 	public:
 		VkObject() = default;
 		VkObject(T handle) { m_Handle = handle; }
-	
+
 		operator bool() const { return m_Handle != VK_NULL_HANDLE; }
 		VkObjectType GetType() const { return GetObjectType<T>(); }
-	
+
 		void SetName(const char* name) const { VulkanContext::SetObjectName(GetType(), (uint64_t)m_Handle, name); }
 		void SetName(const std::string& name) const { SetName(name.c_str()); }
-	
+
 		operator T& () { return m_Handle; }
 		operator const T& () const { return m_Handle; }
-	
+
 		T* operator*() { return &m_Handle; }
 		T const* operator*() const { return &m_Handle; }
-	
+
 		T* operator&() { return &m_Handle; }
 		const T* operator&() const { return &m_Handle; }
 	};
@@ -146,13 +146,13 @@ namespace vk
 	};
 
 
-	struct LogicalDevice : public VkObject<VkDevice> 
+	struct LogicalDevice : public VkObject<VkDevice>
 	{
 		VkResult Create(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo& createInfo) { return vkCreateDevice(physicalDevice, &createInfo, nullptr, &m_Handle); }
 
 		PFN_vkVoidFunction GetProcAddress(const char* pName) { return vkGetDeviceProcAddr(m_Handle, pName); }
 
-		void WaitIdle()	{ vkDeviceWaitIdle(m_Handle); }
+		void WaitIdle() { vkDeviceWaitIdle(m_Handle); }
 
 		void Destroy() { vkDestroyDevice(m_Handle, nullptr); }
 	};
@@ -188,7 +188,7 @@ namespace VulkanContext
 	inline auto& GetMemoryAllocator() { return MemoryAllocator; }
 	inline VkAllocationCallbacks* GetAllocator() { return nullptr; }
 	inline auto GetProperties() { return physicalDevice.GetProperties(); }
-	inline auto GetSupportedFeatures() { return physicalDevice.GetFeatures(); }		
+	inline auto GetSupportedFeatures() { return physicalDevice.GetFeatures(); }
 
 #if WC_GRAPHICS_VALIDATION
 	inline bool bValidationLayers = false;
@@ -227,7 +227,7 @@ namespace VulkanContext
 #endif
 	}
 
-	inline void EndLabel(VkCommandBuffer cmd) 
+	inline void EndLabel(VkCommandBuffer cmd)
 	{
 #if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers) vkCmdEndDebugUtilsLabelEXT(cmd);
@@ -267,7 +267,7 @@ namespace VulkanContext
 #endif
 	}
 
-	inline void EndLabel(VkQueue queue) 
+	inline void EndLabel(VkQueue queue)
 	{
 #if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers) vkQueueEndDebugUtilsLabelEXT(queue);
@@ -292,7 +292,7 @@ namespace VulkanContext
 	inline void SetObjectName(T handle, const char* name) { SetObjectName(GetObjectType<T>(), (uint64_t)handle, name); }
 
 	template<class T>
-	inline void SetObjectName(T handle, const std::string& name) { SetObjectName(handle, name.c_str()); }	
+	inline void SetObjectName(T handle, const std::string& name) { SetObjectName(handle, name.c_str()); }
 
 	inline bool Create()
 	{
@@ -367,18 +367,18 @@ namespace VulkanContext
 					std::string type;
 					switch (messageType)
 					{
-						case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
-							type = "General";
-							break;
-						case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
-							type = "Validation";
-							break;
-						case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
-							type = "Performance";
-							break;
-						default:
-							type = "Unknown";
-							break;
+					case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
+						type = "General";
+						break;
+					case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
+						type = "Validation";
+						break;
+					case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
+						type = "Performance";
+						break;
+					default:
+						type = "Unknown";
+						break;
 					}
 
 					switch (severity)
@@ -419,7 +419,7 @@ namespace VulkanContext
 				.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
 				.pNext = nullptr,
 				.enabledValidationFeatureCount = (uint32_t)std::size(enabledFeatures),
-				.pEnabledValidationFeatures = enabledFeatures,			
+				.pEnabledValidationFeatures = enabledFeatures,
 				//.disabledValidationFeatureCount = (uint32_t)std::size(disabledFeatures);
 				//.pDisabledValidationFeatures = disabledFeatures;
 			};
@@ -440,9 +440,9 @@ namespace VulkanContext
 			return false;
 		}
 
-		volkLoadInstance(instance);		
+		volkLoadInstance(instance);
 
-		const std::vector<const char*> deviceExtensions = {	VK_KHR_SWAPCHAIN_EXTENSION_NAME, };
+		const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, };
 
 #if WC_GRAPHICS_VALIDATION
 		if (bValidationLayers)
@@ -488,10 +488,10 @@ namespace VulkanContext
 				computeFamily.reset();
 				transferFamily.reset();
 			}
-		} indices;							
+		} indices;
 
 		for (const auto& physDevice : devices)
-		{				
+		{
 			uint32_t extensionCount;
 			vkEnumerateDeviceExtensionProperties(physDevice, nullptr, &extensionCount, nullptr);
 
@@ -517,7 +517,7 @@ namespace VulkanContext
 					break;
 				}
 			}
-						
+
 			indices.Reset();
 			uint32_t queueFamilyCount = 0;
 			vkGetPhysicalDeviceQueueFamilyProperties(physDevice, &queueFamilyCount, nullptr);
@@ -554,12 +554,12 @@ namespace VulkanContext
 			WC_CORE_ERROR("Failed to find a suitable GPU!");
 			return false;
 		}
-		
+
 		{ // Create Logical Device	
 			VkPhysicalDeviceFeatures deviceFeatures = {};
 			if (physicalDevice.GetFeatures().samplerAnisotropy) deviceFeatures.samplerAnisotropy = true;
 
-			VkPhysicalDeviceVulkan12Features features12 = { 
+			VkPhysicalDeviceVulkan12Features features12 = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 
 				.shaderSampledImageArrayNonUniformIndexing = true,
