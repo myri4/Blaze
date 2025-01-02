@@ -386,6 +386,8 @@ namespace wc
 
         bool IsOpen() const { return !glfwWindowShouldClose(m_Window); }
 
+		bool IsMinimized() const { return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED); }
+
         bool HasFocus() const { return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED); }
 
         void SetCursorPos(glm::ivec2 pos) { glfwSetCursorPos(m_Window, pos.x, pos.y); }
@@ -395,6 +397,8 @@ namespace wc
             if (maximized) glfwMaximizeWindow(m_Window);
             else glfwRestoreWindow(m_Window);
         }
+
+		bool IsMaximized() const { return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED); }
 
         void SetPosition(glm::ivec2 pos) { glfwSetWindowPos(m_Window, pos.x, pos.y); }
 
