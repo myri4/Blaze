@@ -39,6 +39,11 @@ namespace wc
 		RenderData m_RenderData;
 		Renderer2D m_Renderer;
 		Font font;
+	
+		Texture t_Close;
+		Texture t_Minimize;
+		Texture t_Collapse;
+
 	public:	
 
 		std::string text;
@@ -47,6 +52,7 @@ namespace wc
 		{
 			m_RenderData.Create();
 			font.Load("assets/fonts/ST-SimpleSquare.ttf", m_RenderData);
+			
 
 			m_Renderer.bloom.Init();
 			m_Renderer.composite.Init();
@@ -62,6 +68,10 @@ namespace wc
 			}
 
 			text = "myri4\nmyri4";
+
+			t_Close.Load("assets/textures/menu/close.png");
+			t_Minimize.Load("assets/textures/menu/minimize.png");
+			t_Collapse.Load("assets/textures/menu/collapse.png");
 		}
 		
 		void InputGame()
@@ -104,8 +114,32 @@ namespace wc
 		void Update()
 		{
 			
-
 			RenderGame();
+		}	
+
+		void UI_Scene()
+		{
+
+		}
+
+		void UI_Editor()
+		{
+
+		}
+
+		void UI_Settings()
+		{
+
+		}
+
+		void UI_Entities()
+		{
+
+		}
+
+		void UI_Properties()
+		{
+
 		}
 
 		void UI()
@@ -119,55 +153,60 @@ namespace wc
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 			
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.140f, 0.140f, 0.140f, 1.000f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 1.f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 			
-			ImGui::Begin("Screen Render", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+			ImGui::Begin("Screen Render", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
 
 			// Main Menu Bar
-			if (ImGui::BeginMainMenuBar())
 			{
-				if (ImGui::BeginMenu("File"))
+				//ImGui::SetWindowFontScale(2.f);
+				if (ImGui::BeginMenuBar())
 				{
-					if (ImGui::MenuItem("Exit"))
+					if (ImGui::BeginMenu("File"))
+					{
+						if (ImGui::MenuItem("Exit"))
+						{
+							Globals.window.Close();
+						}
+						ImGui::EndMenu();
+					}
+
+					// Buttons
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+					float buttonSize = ImGui::GetFrameHeightWithSpacing();
+					float spacing = 5.0f;
+
+					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + spacing));
+					if (ImGui::ImageButton(t_Collapse, { buttonSize, buttonSize }))
+					{
+						//Globals.window.Collapse();
+					}
+
+					ImGui::SameLine();
+					if (ImGui::ImageButton(t_Minimize, { buttonSize, buttonSize }))
+					{
+						Globals.HandleWindowState();
+					}
+
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+					ImGui::SameLine();
+					if (ImGui::ImageButton(t_Close, { buttonSize, buttonSize }))
 					{
 						Globals.window.Close();
 					}
-					ImGui::EndMenu();
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+
+					ImGui::PopStyleVar(2);
+
+					ImGui::EndMenuBar();
 				}
-
-				// Buttons
-				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 5.0f));
-
-				float buttonWidth = 45.0f;
-				float spacing = 5.0f;
-
-				ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonWidth + spacing));
-
-				if (ImGui::Button("_", { buttonWidth, ImGui::GetContentRegionMax().y }))
-				{
-					// Collapse
-				}
-
-				ImGui::SameLine();
-				if (ImGui::Button("[]", { buttonWidth, ImGui::GetContentRegionMax().y }))
-				{
-					// Maximize / Minimize
-				}
-
-				ImGui::SameLine();
-				if (ImGui::Button("X", { buttonWidth, ImGui::GetContentRegionMax().y }))
-				{
-					Globals.window.Close();
-				}
-
-				ImGui::PopStyleVar();
-
-
-
-				ImGui::EndMainMenuBar();
 			}
+
+
 
 			auto windowPos = (glm::vec2)Globals.window.GetPos();
 			ImGui::GetBackgroundDrawList()->AddImage(m_Renderer.GetImguiImageID(), ImVec2(windowPos.x, windowPos.y), ImVec2((float)Globals.window.GetSize().x + windowPos.x, (float)Globals.window.GetSize().y + windowPos.y));
