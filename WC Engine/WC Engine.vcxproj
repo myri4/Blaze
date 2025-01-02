@@ -179,6 +179,7 @@
     </CustomBuild>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="vendor\include\flecs\flecs.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Rendering\Font.cpp" />
     <ClCompile Include="vendor\include\glm\glm.cppm" />
@@ -265,10 +266,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
+    <ClInclude Include="src\Scene\Components.h" />
+    <ClInclude Include="src\Scene\Scene.h" />
+    <ClInclude Include="vendor\include\flecs\flecs.h" />
     <ClInclude Include="src\EntryPoint.h" />
-    <ClInclude Include="src\game\Game.h" />
+    <ClInclude Include="src\Scene\Game.h" />
     <ClInclude Include="src\Globals.h" />
     <ClInclude Include="src\Rendering\BloomEffect.h" />
+    <ClInclude Include="vendor\include\ft2build.h" />
+    <ClInclude Include="vendor\include\lodepng.h" />
+    <ClInclude Include="vendor\include\magic_enum.hpp" />
+    <ClInclude Include="vendor\include\miniaudio.h" />
+    <ClInclude Include="vendor\include\tinyxml2.h" />
     <ClInclude Include="vendor\include\wc\CommandEncoder.h" />
     <ClInclude Include="src\Rendering\Font.h" />
     <ClInclude Include="src\Rendering\Rendergraph.h" />
@@ -336,6 +345,25 @@
     <CustomBuild Include="src\shaders\background.comp">
       <FileType>Document</FileType>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="assets\fonts\ST-SimpleSquare.ttf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assets\shaders\background.comp" />
+    <None Include="assets\shaders\bloom.comp" />
+    <None Include="assets\shaders\chromaticAberration.comp" />
+    <None Include="assets\shaders\composite.comp" />
+    <None Include="assets\shaders\crt.comp" />
+    <None Include="assets\shaders\imgui.frag" />
+    <None Include="assets\shaders\imgui.vert" />
+    <None Include="assets\shaders\Line.frag" />
+    <None Include="assets\shaders\Line.vert" />
+    <None Include="assets\shaders\Renderer2D.frag" />
+    <None Include="assets\shaders\Renderer2D.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="log\log.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

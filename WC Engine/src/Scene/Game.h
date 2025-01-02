@@ -17,6 +17,10 @@
 #include <wc/Utils/Window.h>
 #include <wc/Utils/YAML.h>
 
+//ECS
+#include "Scene.h"
+#include "Components.h"
+
 // GUI
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -26,7 +30,7 @@
 
 #include "../Globals.h"
 #include "../Rendering/Renderer2D.h"
-#include "UI/Widgets.h"
+#include "../UI/Widgets.h"
 
 namespace wc
 {
@@ -42,6 +46,10 @@ namespace wc
 	public:	
 
 		std::string text;
+
+		//ECS testing
+		Scene scene;
+		flecs::entity ent1, ent2;
 
 		void Create(glm::vec2 renderSize)
 		{
@@ -62,6 +70,28 @@ namespace wc
 			}
 
 			text = "myri4\nmyri4";
+
+			ent1 = scene.AddEntity();
+
+			ent1.add<PositionComponent>();
+			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
+
+			ent1.add<VelocityComponent>();
+			ent1.set<VelocityComponent>({ { 0.0f, 0.0f } });
+
+			ent1.add<ScaleComponent>();
+			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
+
+			ent2 = scene.AddEntity();
+
+			ent2.add<PositionComponent>();
+			ent2.set<PositionComponent>({ { -10.0f, 0.0f } });
+
+			ent2.add<VelocityComponent>();
+			ent2.set<VelocityComponent>({ { 0.0f, 0.0f } });
+
+			ent2.add<ScaleComponent>();
+			ent2.set<ScaleComponent>({ { 1.0f, 1.0f } });
 		}
 		
 		void InputGame()
@@ -70,6 +100,60 @@ namespace wc
 			{
 				VulkanContext::GetLogicalDevice().WaitIdle();
 				Resize(Globals.window.GetSize());
+			}
+
+			if (Key::GetKey(Key::Up) != GLFW_RELEASE)
+			{
+				ent1.set<VelocityComponent>({ {0.0f, 0.005f} });
+				ent2.set<VelocityComponent>({ {0.0f, 0.005f} });
+			}
+
+			if (Key::GetKey(Key::Left) != GLFW_RELEASE)
+			{
+				ent1.set<VelocityComponent>({ {-0.01f, 0.0f} });
+				ent2.set<VelocityComponent>({ {-0.01f, 0.0f} });
+			}
+
+			if (Key::GetKey(Key::Down) != GLFW_RELEASE)
+			{
+				ent1.set<VelocityComponent>({ {0.0f, -0.005f} });
+				ent2.set<VelocityComponent>({ {0.0f, -0.005f} });
+			}
+
+			if (Key::GetKey(Key::Right) != GLFW_RELEASE)
+			{
+				ent1.set<VelocityComponent>({ {0.01f, 0.0f} });
+				ent2.set<VelocityComponent>({ {0.01f, 0.0f} });
+			}
+
+			if (Key::GetKey(Key::Space) != GLFW_RELEASE)
+			{
+				ent1.set<VelocityComponent>({ {0.0f, 0.0f} });
+				ent2.set<VelocityComponent>({ {0.0f, 0.0f} });
+			}
+
+			if (Key::GetKey(Key::W) != GLFW_RELEASE)
+			{
+				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
+				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
+			}
+
+			if (Key::GetKey(Key::A) != GLFW_RELEASE)
+			{
+				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
+				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
+			}
+
+			if (Key::GetKey(Key::S) != GLFW_RELEASE)
+			{
+				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
+				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
+			}
+
+			if (Key::GetKey(Key::D) != GLFW_RELEASE)
+			{
+				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
+				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
 			}
 		}
 
@@ -93,7 +177,15 @@ namespace wc
 			//m_RenderData.DrawCircle({ p3.x, p3.y, 0.f }, 0.1f);
 
 			//m_RenderData.DrawBezierCurve(p0, p1, p2, p3, color);
-			m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, {0.f, 0.f});
+
+			//m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, {0.0f, 0.0f});
+
+			scene.GetWorld().each([](PositionComponent& p, VelocityComponent& v) {
+				p.position += v.velocity;
+			});
+
+			m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, ent1.get<PositionComponent>()->position, ent1.get<ScaleComponent>()->scale, 0.0f, color);
+			m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, ent2.get<PositionComponent>()->position, ent2.get<ScaleComponent>()->scale, 0.0f, color);
 
 			m_Renderer.Flush(m_RenderData);
 
