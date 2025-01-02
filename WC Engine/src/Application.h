@@ -55,9 +55,9 @@ namespace wc
 			ImGuiIO& io = ImGui::GetIO();
 			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 			io.IniFilename = nullptr;
-			io.IniFilename = "assets/imgui.ini";
+			io.IniFilename = "assets/imgui.ini"; // TODO - remove and find alternative
 			//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-			io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/ST-SimpleSquare.ttf", 25.f);
+			//io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/ST-SimpleSquare.ttf", 25.f);
 
 			ImGui_ImplGlfw_Init(Globals.window, false);
 

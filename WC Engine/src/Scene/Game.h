@@ -213,19 +213,76 @@ namespace wc
 
 		void UI_Scene()
 		{
+			ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoBackground);
+
+			// Get the position and size of the Scene window
+			ImVec2 windowPos = ImGui::GetWindowPos();
+			ImVec2 windowSize = ImGui::GetWindowSize();
+
+			// Draw the image within the Scene window
+			ImGui::GetWindowDrawList()->AddImage(
+				m_Renderer.GetImguiImageID(),
+				ImVec2(windowPos.x, windowPos.y),
+				ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y)
+			);
+
+			ImGui::End();
 		}
+
 		void UI_Editor()
 		{
+			ImGui::Begin("Editor");
+
+			ImGui::Separator();
+
+			ImGui::End();
 		}
+
 		void UI_Settings()
 		{
+			ImGui::Begin("Settings");
+
+			ImGui::Separator();
+
+			ImGui::End();
 		}
+
 		void UI_Entities()
 		{
+			ImGui::Begin("Entities");
+
+			ImGui::Separator();
+
+			ImGui::End();
 		}
+
 		void UI_Properties()
 		{
+			ImGui::Begin("Properties");
+
+			ImGui::Separator();
+
+			ImGui::End();
 		}
+
+		void UI_Console()
+		{
+			ImGui::Begin("Console");
+			
+			ImGui::Separator();
+
+			ImGui::End();
+		}
+
+		void UI_FileExplorer()
+		{
+			ImGui::Begin("File Explorer");
+
+			ImGui::Separator();
+
+			ImGui::End();
+		}
+
 
 			//auto windowPos = (glm::vec2)Globals.window.GetPos();
 			//ImGui::GetBackgroundDrawList()->AddImage(m_Renderer.GetImguiImageID(), ImVec2(windowPos.x, windowPos.y), ImVec2((float)Globals.window.GetSize().x + windowPos.x, (float)Globals.window.GetSize().y + windowPos.y));
@@ -246,7 +303,16 @@ namespace wc
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 
-			ImGui::Begin("Screen Render", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+			ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
+				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground);
+
+			ImGuiIO& io = ImGui::GetIO();
+			if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+			{
+				ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+				ImGui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
+			}
 
 			// Main Menu Bar
 			{
@@ -293,10 +359,13 @@ namespace wc
 				}
 			}
 
-
-
-			auto windowPos = (glm::vec2)Globals.window.GetPos();
-			ImGui::GetBackgroundDrawList()->AddImage(m_Renderer.GetImguiImageID(), ImVec2(windowPos.x, windowPos.y), ImVec2((float)Globals.window.GetSize().x + windowPos.x, (float)Globals.window.GetSize().y + windowPos.y));
+			UI_Scene();
+			UI_Editor();
+			UI_Settings();
+			UI_Entities();
+			UI_Properties();
+			UI_Console();
+			UI_FileExplorer();
 
 			ImGui::End();
 
