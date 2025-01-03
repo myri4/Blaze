@@ -82,7 +82,7 @@ namespace wc
 			t_Collapse.Load("assets/textures/menu/collapse.png");
 
 			// Entity Loading
-			ent1 = scene.AddEntity();
+			ent1 = scene.AddEntity("Entity 1");
 
 			ent1.add<PositionComponent>();
 			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
@@ -93,7 +93,7 @@ namespace wc
 			ent1.add<ScaleComponent>();
 			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
 
-			ent2 = scene.AddEntity();
+			ent2 = scene.AddEntity("Entity 2");
 
 			ent2.add<PositionComponent>();
 			ent2.set<PositionComponent>({ { -10.0f, 0.0f } });
@@ -103,7 +103,10 @@ namespace wc
 
 			ent2.add<ScaleComponent>();
 			ent2.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent2.child_of(ent1);
+
 		}
+
 		
 		void InputGame()
 		{
@@ -173,7 +176,6 @@ namespace wc
 		glm::vec2 p2 = glm::vec2(2.7f, -2.5f);
 		glm::vec2 p3 = glm::vec2(5.f, 0.f);
 
-		
 		void RenderGame()
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
@@ -206,7 +208,9 @@ namespace wc
 
 		void Update()
 		{
-			
+			//scene.GetWorld().each([](PositionComponent& p) {
+			//	WC_CORE_INFO("penis");
+			//});
 
 			RenderGame();
 		}
@@ -247,20 +251,94 @@ namespace wc
 			ImGui::End();
 		}
 
-		void UI_Entities()
-		{
+		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent) {
+			static int selection_mask = 0;  // This is used to track the selected entity
+			static flecs::entity selected_entity = flecs::entity::null();  // Track the selected entity
+
+			// If the entity is a child, it should only be shown under its parent in the tree
+			// Check if it's part of the parent
+			if (parent != flecs::entity::null() && !e.is_a(flecs::ChildOf)) {
+				return flecs::entity::null(); // Skip if the entity is not a child of the current parent
+			}
+
+			// Get the children of the entity
+			std::vector<flecs::entity> children;
+			e.children([&children](flecs::entity child) {
+				children.push_back(child);
+				});
+
+			bool is_selected = (selection_mask & (1 << e.id())) != 0;
+
+			// Check if any child is selected, in which case we keep the parent open
+			bool keep_open = false;
+			for (const auto& child : children) {
+				if ((selection_mask & (1 << child.id())) != 0) {
+					keep_open = true;
+					break;
+				}
+			}
+
+			if (keep_open) {
+				ImGui::SetNextItemOpen(true);  // Keep the parent open if a child is selected
+			}
+
+			ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+
+			if (is_selected) {
+				node_flags |= ImGuiTreeNodeFlags_Selected;
+			}
+
+			bool is_open = ImGui::TreeNodeEx(e.name().c_str(), node_flags);
+			if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+				selection_mask = (1 << e.id());  // Select the current node
+				selected_entity = e;  // Update the selected entity
+			}
+
+			if (is_open) {
+				// If the node is open, recursively show its children
+				for (const auto& child : children) {
+					flecs::entity child_selected = ShowEntityTree(child, e);  // Pass the current entity as the parent for the child
+					if (child_selected != flecs::entity::null()) {
+						selected_entity = child_selected;  // Update the selected entity if a child is selected
+					}
+				}
+				if (!children.empty()) {
+					ImGui::TreePop();  // Close the tree node
+				}
+			}
+
+			return selected_entity;  // Return the selected entity
+		}
+
+
+		void UI_Entities() {
 			ImGui::Begin("Entities");
 
-			ImGui::Separator();
+			flecs::entity selected_entity = flecs::entity::null();  // Initialize the selected entity
+
+			scene.GetWorld().each([this, &selected_entity](flecs::entity e, PositionComponent& p) {
+				// Only call ShowEntityTree for the root entities (i.e., entities with no parent)
+				if (e.parent() == flecs::entity::null()) {
+					flecs::entity root_selected = this->ShowEntityTree(e, flecs::entity::null());
+					if (root_selected != flecs::entity::null()) {
+						selected_entity = root_selected;  // Update the selected entity if a root entity is selected
+					}
+				}
+				});
 
 			ImGui::End();
+
+			// Use the selected entity as needed
+			if (selected_entity != flecs::entity::null()) {
+				WC_CORE_INFO("Selected entity: {0}", selected_entity.name());
+			}
 		}
 
 		void UI_Properties()
 		{
 			ImGui::Begin("Properties");
 
-			ImGui::Separator();
+			ImGui::ShowStyleEditor();
 
 			ImGui::End();
 		}
@@ -268,8 +346,6 @@ namespace wc
 		void UI_Console()
 		{
 			ImGui::Begin("Console");
-			
-			ImGui::Separator();
 
 			ImGui::End();
 		}
@@ -282,7 +358,6 @@ namespace wc
 
 			ImGui::End();
 		}
-
 
 			//auto windowPos = (glm::vec2)Globals.window.GetPos();
 			//ImGui::GetBackgroundDrawList()->AddImage(m_Renderer.GetImguiImageID(), ImVec2(windowPos.x, windowPos.y), ImVec2((float)Globals.window.GetSize().x + windowPos.x, (float)Globals.window.GetSize().y + windowPos.y));
@@ -297,12 +372,6 @@ namespace wc
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 1.f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-
 			ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
 				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
 				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground);
@@ -314,8 +383,13 @@ namespace wc
 				ImGui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
 			}
 
+			ImGui::PopStyleVar(3);
+
 			// Main Menu Bar
 			{
+				//ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+				//ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
 				//ImGui::SetWindowFontScale(2.f);
 				if (ImGui::BeginMenuBar())
 				{
@@ -330,6 +404,11 @@ namespace wc
 
 					// Buttons
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 1.f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+					
 					float buttonSize = ImGui::GetFrameHeightWithSpacing();
 					float spacing = 5.0f;
 
@@ -353,10 +432,13 @@ namespace wc
 					}
 					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
 
-					ImGui::PopStyleVar(2);
+					ImGui::PopStyleVar(1);
+					ImGui::PopStyleColor(5);
 
 					ImGui::EndMenuBar();
 				}
+
+				//ImGui::PopStyleColor(5);
 			}
 
 			UI_Scene();

@@ -285,6 +285,8 @@ namespace wc
 
             glfwWindowHint(GLFW_RESIZABLE, info.Resizeable);
 
+            glfwWindowHint(GLFW_DECORATED, info.Decorated);
+
             m_Window = glfwCreateWindow(info.Width, info.Height, info.AppName.c_str(), m_Monitor, nullptr);
             glfwSetWindowUserPointer(m_Window, this);
 

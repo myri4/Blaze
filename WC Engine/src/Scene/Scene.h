@@ -17,7 +17,7 @@ public:
 		return world.entity();
 	}
 
-	flecs::entity AddEntity(const char& name)
+	flecs::entity AddEntity(const char* name)
 	{
 		return world.entity(name);
 	}
