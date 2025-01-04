@@ -180,28 +180,28 @@ namespace wc
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
 
-			//m_RenderData.DrawQuad({ 0.f, 0.f, 0.f }, { 1.f, 1.f }, 0u, { 1.f, 1.f, 1.f, 1.f });
 			auto color = glm::vec4(0.f, 1.f, 0.5f, 1.f) * 2.5f;
-			//m_RenderData.DrawLine(p0, p1, color);
-			//m_RenderData.DrawLine(p2, p3, color);
-			//m_RenderData.DrawCircle({ p0.x, p0.y, 0.f }, 0.1f);
-			//m_RenderData.DrawCircle({ p1.x, p1.y, 0.f }, 0.1f);
-			//m_RenderData.DrawCircle({ p2.x, p2.y, 0.f }, 0.1f);
-			//m_RenderData.DrawCircle({ p3.x, p3.y, 0.f }, 0.1f);
 
-			//m_RenderData.DrawBezierCurve(p0, p1, p2, p3, color);
+			// Draw horizontal lines across the whole screen
+			float windowHeight = Globals.window.GetSize().y;
+			float windowWidth = Globals.window.GetSize().x;
+			m_RenderData.DrawQuad({ 0.f, 0.f, 0.f }, { windowWidth, windowHeight }, 0u, { 1.f, 1.f, 1.f, 1.f });
 
-			//m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, {0.0f, 0.0f});
+			for (float y = windowHeight / 2.0f; y >= -windowHeight / 2.0f; y -= 1.0f)
+			{
+				glm::vec3 p0 = { -windowWidth / 2.0f, y, 0.0f };
+				glm::vec3 p1 = { windowWidth / 2.0f, y, 0.0f };
+				m_RenderData.DrawLine(p0, p1, color);
+			}
 
 			scene.GetWorld().each([](PositionComponent& p, VelocityComponent& v) {
 				p.position += v.velocity;
-			});
+				});
 
 			m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, ent1.get<PositionComponent>()->position, ent1.get<ScaleComponent>()->scale, 0.0f, color);
 			m_RenderData.DrawString(std::format("{}", 1.f / Globals.deltaTime), font, ent2.get<PositionComponent>()->position, ent2.get<ScaleComponent>()->scale, 0.0f, color);
 
 			m_Renderer.Flush(m_RenderData);
-
 
 			m_RenderData.Reset();
 		}
@@ -217,21 +217,54 @@ namespace wc
 
 		void UI_Scene()
 		{
+			// TODO - ADD MENU BAR!
 			ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoBackground);
 
 			// Get the position and size of the Scene window
 			ImVec2 windowPos = ImGui::GetWindowPos();
 			ImVec2 windowSize = ImGui::GetWindowSize();
 
-			// Draw the image within the Scene window
-			ImGui::GetWindowDrawList()->AddImage(
+			// Add padding and account for the tab height
+			const float padding = 10.0f; // Adjust padding as needed
+			float tabHeight = ImGui::GetFrameHeight(); // Height of the window tab bar
+			ImVec2 availableSize = ImVec2(windowSize.x - 2 * padding, windowSize.y - tabHeight - 2 * padding);
+
+			// Get the aspect ratio of the image
+			float imageAspectRatio = m_Renderer.GetAspectRatio();
+
+			// Calculate the maximum size while maintaining aspect ratio
+			ImVec2 drawSize;
+			float availableAspectRatio = availableSize.x / availableSize.y;
+
+			if (availableAspectRatio > imageAspectRatio)
+			{
+				// Available area is wider than the image aspect ratio, fit to height
+				drawSize.y = availableSize.y;
+				drawSize.x = drawSize.y * imageAspectRatio;
+			}
+			else
+			{
+				// Available area is taller than the image aspect ratio, fit to width
+				drawSize.x = availableSize.x;
+				drawSize.y = drawSize.x / imageAspectRatio;
+			}
+
+			// Center the image within the available space
+			ImVec2 drawPos = ImVec2(
+				windowPos.x + padding + (availableSize.x - drawSize.x) * 0.5f,
+				windowPos.y + tabHeight + padding + (availableSize.y - drawSize.y) * 0.5f
+			);
+
+			// Draw the image
+			ImGui::GetBackgroundDrawList()->AddImage(
 				m_Renderer.GetImguiImageID(),
-				ImVec2(windowPos.x, windowPos.y),
-				ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y)
+				drawPos,
+				ImVec2(drawPos.x + drawSize.x, drawPos.y + drawSize.y)
 			);
 
 			ImGui::End();
 		}
+
 
 		void UI_Editor()
 		{
@@ -251,8 +284,9 @@ namespace wc
 			ImGui::End();
 		}
 
-		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent) {
-			static int selection_mask = 0;  // This is used to track the selected entity
+		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent) 
+		{
+			static int selection_mask = 0;  // selected entity
 			static flecs::entity selected_entity = flecs::entity::null();  // Track the selected entity
 
 			// If the entity is a child, it should only be shown under its parent in the tree
@@ -310,8 +344,8 @@ namespace wc
 			return selected_entity;  // Return the selected entity
 		}
 
-
-		void UI_Entities() {
+		void UI_Entities() 
+		{
 			ImGui::Begin("Entities");
 
 			flecs::entity selected_entity = flecs::entity::null();  // Initialize the selected entity
@@ -338,7 +372,7 @@ namespace wc
 		{
 			ImGui::Begin("Properties");
 
-			ImGui::ShowStyleEditor();
+			//ImGui::ShowStyleEditor();
 
 			ImGui::End();
 		}
