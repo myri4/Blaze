@@ -38,7 +38,7 @@ namespace wc
 			windowInfo.Resizeable = true;
 			windowInfo.AppName = "WC Engine";
 			windowInfo.StartMode = WindowMode::Normal;
-			windowInfo.Decorated = true;
+			windowInfo.Decorated = false;
 			Globals.window.Create(windowInfo);
 			Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h) 
 			{ 

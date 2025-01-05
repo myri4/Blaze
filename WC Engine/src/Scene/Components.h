@@ -4,6 +4,8 @@
 
 namespace wc
 {
+	struct LookupTag {};
+
 	struct PositionComponent
 	{
 		glm::vec2 position;

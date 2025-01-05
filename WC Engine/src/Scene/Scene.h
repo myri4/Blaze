@@ -1,29 +1,33 @@
 #pragma once
 
 #include "flecs/flecs.h"
+#include "Components.h"
 
-class Scene
+namespace wc
 {
-private:
-	flecs::world world;
-public:
-	flecs::world GetWorld()
+	struct Scene
 	{
-		return world;
-	}
-
-	flecs::entity AddEntity()
-	{
-		return world.entity();
-	}
-
-	flecs::entity AddEntity(const char* name)
-	{
-		return world.entity(name);
-	}
-
-	void KillEntity(flecs::entity& ent)
-	{
-		ent.destruct();
-	}
-};
+	private:
+		flecs::world world;
+	public:
+		flecs::world GetWorld()
+		{
+			return world;
+		}
+	
+		flecs::entity AddEntity()
+		{
+			return world.entity();
+		}
+	
+		flecs::entity AddEntity(const std::string& name)
+		{
+			return world.entity(name.c_str()).add<LookupTag>();
+		}
+	
+		void KillEntity(flecs::entity& ent)
+		{
+			ent.destruct();
+		}
+	};
+}

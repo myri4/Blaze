@@ -256,7 +256,7 @@ namespace wc
 			);
 
 			// Draw the image
-			ImGui::GetBackgroundDrawList()->AddImage(
+			ImGui::GetWindowDrawList()->AddImage(
 				m_Renderer.GetImguiImageID(),
 				drawPos,
 				ImVec2(drawPos.x + drawSize.x, drawPos.y + drawSize.y)
@@ -264,7 +264,6 @@ namespace wc
 
 			ImGui::End();
 		}
-
 
 		void UI_Editor()
 		{
@@ -289,13 +288,10 @@ namespace wc
 			static int selection_mask = 0;  // selected entity
 			static flecs::entity selected_entity = flecs::entity::null();  // Track the selected entity
 
-			// If the entity is a child, it should only be shown under its parent in the tree
-			// Check if it's part of the parent
-			if (parent != flecs::entity::null() && !e.is_a(flecs::ChildOf)) {
-				return flecs::entity::null(); // Skip if the entity is not a child of the current parent
-			}
+			if (parent != flecs::entity::null() && !e.is_a(flecs::ChildOf))  
+				return flecs::entity::null(); // Skip if entity is not a child 
 
-			// Get the children of the entity
+			// Get children
 			std::vector<flecs::entity> children;
 			e.children([&children](flecs::entity child) {
 				children.push_back(child);
@@ -303,7 +299,7 @@ namespace wc
 
 			bool is_selected = (selection_mask & (1 << e.id())) != 0;
 
-			// Check if any child is selected, in which case we keep the parent open
+			// check if a child is selected - keep parent node open
 			bool keep_open = false;
 			for (const auto& child : children) {
 				if ((selection_mask & (1 << child.id())) != 0) {
@@ -312,9 +308,8 @@ namespace wc
 				}
 			}
 
-			if (keep_open) {
-				ImGui::SetNextItemOpen(true);  // Keep the parent open if a child is selected
-			}
+			if(keep_open)
+				ImGui::SetNextItemOpen(true); // set node open
 
 			ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
 
@@ -337,43 +332,144 @@ namespace wc
 					}
 				}
 				if (!children.empty()) {
-					ImGui::TreePop();  // Close the tree node
+					ImGui::TreePop();  // Close node
 				}
 			}
 
-			return selected_entity;  // Return the selected entity
+			return selected_entity;
 		}
 
-		void UI_Entities() 
+		flecs::entity selected_entity = flecs::entity::null(); 
+		void UI_Entities()
 		{
-			ImGui::Begin("Entities");
-
-			flecs::entity selected_entity = flecs::entity::null();  // Initialize the selected entity
-
-			scene.GetWorld().each([this, &selected_entity](flecs::entity e, PositionComponent& p) {
-				// Only call ShowEntityTree for the root entities (i.e., entities with no parent)
+			ImGui::Begin("Entities", NULL);
+	
+			scene.GetWorld().each([this](flecs::entity e, LookupTag p) {
+				// Only call ShowEntityTree for root entities (entities with no parent)
 				if (e.parent() == flecs::entity::null()) {
 					flecs::entity root_selected = this->ShowEntityTree(e, flecs::entity::null());
 					if (root_selected != flecs::entity::null()) {
-						selected_entity = root_selected;  // Update the selected entity if a root entity is selected
+						selected_entity = root_selected;  // Update the selected entity if selected
 					}
 				}
 				});
 
-			ImGui::End();
+			// Get the window size
+			ImVec2 windowSize = ImGui::GetWindowSize();
 
-			// Use the selected entity as needed
-			if (selected_entity != flecs::entity::null()) {
-				WC_CORE_INFO("Selected entity: {0}", selected_entity.name());
+			// Set the cursor position to the bottom-right corner
+			ImGui::SetCursorPos(ImVec2(windowSize.x - 40, windowSize.y - 40));
+
+			// Create the button
+			if (ImGui::Button("+", { 30, 30 }))
+			{
+				ImGui::OpenPopup("AddEntityModal");
 			}
+
+			// Declare a name buffer for InputText
+			static char name[128] = "";  // Use a char array for InputText compatibility
+
+			// Begin the modal popup
+			if (ImGui::BeginPopupModal("AddEntityModal", NULL))
+			{
+				ImGui::InputText("Name", name, sizeof(name));
+				if (ImGui::Button("Create") && name != "")
+				{
+					// Add logic to create the entity with the given name
+					scene.AddEntity(std::string(name));  // Convert char array to std::string
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel"))
+				{
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+
+			ImGui::End();
 		}
 
 		void UI_Properties()
 		{
 			ImGui::Begin("Properties");
+			
+			if (selected_entity != flecs::entity::null()) 
+			{
+				static char nameBuffer[256]; // Buffer to hold the entity's name
 
-			//ImGui::ShowStyleEditor();
+				// Copy the entity's name into the buffer (ensure the buffer is large enough)
+				strncpy(nameBuffer, selected_entity.name().c_str(), sizeof(nameBuffer) - 1);
+				nameBuffer[sizeof(nameBuffer) - 1] = '\0'; // Null-terminate the string
 
+				// Allow the user to edit the name in the buffer
+				if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+					// Update the entity's name if it has changed
+					selected_entity.set_name(nameBuffer);
+				}
+
+				// Display the entity's ID
+				//ImGui::Text("ID: %u", selected_entity.id());
+
+				if (ImGui::Button("Delete")) {
+					// Delete the entity
+					scene.KillEntity(selected_entity);
+					selected_entity = flecs::entity::null(); // Clear the selected entity
+				}
+
+				//NOTE: for every new component, a new if is needed
+				ImGui::SeparatorText("Components");
+
+				if (selected_entity.has<PositionComponent>())
+				{
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Position"))
+					{
+						auto& p = *selected_entity.get<PositionComponent>();
+						float position[2] = { p.position.x, p.position.y };
+
+						if (ImGui::InputFloat2("Position", position))
+						{
+							// Use const_cast to modify the original position
+							const_cast<glm::vec2&>(p.position) = glm::vec2(position[0], position[1]);
+						}
+						
+					}
+				}
+
+				if (selected_entity.has<VelocityComponent>())
+				{
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Velocity"))
+					{
+						auto& v = *selected_entity.get<VelocityComponent>();
+						float velocity[2] = { v.velocity.x, v.velocity.y };
+
+						if (ImGui::InputFloat2("Velocity", velocity))
+						{
+							// Use const_cast to modify the original velocity
+							const_cast<glm::vec2&>(v.velocity) = glm::vec2(velocity[0], velocity[1]);
+						}
+					}
+				}
+
+				if (selected_entity.has<ScaleComponent>())
+				{
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Scale"))
+					{
+						auto& s = *selected_entity.get<ScaleComponent>();
+						float scale[2] = { s.scale.x, s.scale.y };
+
+						if (ImGui::InputFloat2("Scale", scale))
+						{
+							// Use const_cast to modify the original scale
+							const_cast<glm::vec2&>(s.scale) = glm::vec2(scale[0], scale[1]);
+						}
+					}
+				}
+			}
+			
 			ImGui::End();
 		}
 
@@ -395,6 +491,8 @@ namespace wc
 
 			//auto windowPos = (glm::vec2)Globals.window.GetPos();
 			//ImGui::GetBackgroundDrawList()->AddImage(m_Renderer.GetImguiImageID(), ImVec2(windowPos.x, windowPos.y), ImVec2((float)Globals.window.GetSize().x + windowPos.x, (float)Globals.window.GetSize().y + windowPos.y));
+		glm::vec2 mousePos = { 0.f, 0.f };
+
 		void UI()
 		{
 			const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -421,28 +519,61 @@ namespace wc
 
 			// Main Menu Bar
 			{
-				//ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-				//ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-
-				//ImGui::SetWindowFontScale(2.f);
 				if (ImGui::BeginMenuBar())
 				{
+
+					//// TODO - Window dragging - FIX THIS FUCKING SHIT
+					//if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+					//{
+					//	// Get the mouse drag delta
+					//	ImVec2 dragDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+					//
+					//	// Get the current window position
+					//	glm::vec2 currentPos = Globals.window.GetPos();
+					//
+					//	// Calculate the new window position
+					//	glm::vec2 newWindowPos = { currentPos.x + dragDelta.x, currentPos.y + dragDelta.y };
+					//
+					//	// Set the GLFW window position to the new position
+					//	Globals.window.SetPosition(newWindowPos);
+					//
+					//	// Reset the mouse drag delta to avoid cumulative effect
+					//	ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
+					//}
+
+
+
 					if (ImGui::BeginMenu("File"))
 					{
-						if (ImGui::MenuItem("Exit"))
+						if (ImGui::MenuItem("New"))
 						{
-							Globals.window.Close();
+							WC_CORE_INFO("New");
 						}
+
+						if (ImGui::MenuItem("Open"))
+						{
+							WC_CORE_INFO("Open");
+						}
+
+						if (ImGui::MenuItem("Save"))
+						{
+							WC_CORE_INFO("Save");
+						}
+
+						if (ImGui::MenuItem("Save As"))
+						{
+							WC_CORE_INFO("Save As");
+						}
+
 						ImGui::EndMenu();
 					}
 
 					// Buttons
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 1.f));
 					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
 					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-					
+
 					float buttonSize = ImGui::GetFrameHeightWithSpacing();
 					float spacing = 5.0f;
 
@@ -471,8 +602,6 @@ namespace wc
 
 					ImGui::EndMenuBar();
 				}
-
-				//ImGui::PopStyleColor(5);
 			}
 
 			UI_Scene();
