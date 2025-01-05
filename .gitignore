@@ -2,8 +2,6 @@
 *.db
 *.ipch
 *.log
-*.txt
 *.properties
-bin/
+out/
 .vs/
-WC Playground/assets/shaders
