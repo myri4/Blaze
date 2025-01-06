@@ -38,7 +38,7 @@ namespace wc
 			windowInfo.Resizeable = true;
 			windowInfo.AppName = "WC Engine";
 			windowInfo.StartMode = WindowMode::Normal;
-			windowInfo.Decorated = false;
+			windowInfo.Decorated = true;
 			Globals.window.Create(windowInfo);
 			Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h) 
 			{ 
@@ -120,8 +120,8 @@ namespace wc
 
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+			ImGuizmo::BeginFrame();
 			game.UI();
-			//ImGui::ShowDemoWindow();
 			ImGui::EndFrame();
 			ImGui::Render();			
 
