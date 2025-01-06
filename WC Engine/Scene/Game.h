@@ -55,6 +55,8 @@ namespace wc
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
 
+		bool allowInput = true;
+
 		ImGuizmo::OPERATION m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
 
 		bool showEditor = true;
@@ -125,75 +127,72 @@ namespace wc
 
 		void InputGame()
 		{
-			if (Key::GetKey(Key::F) != GLFW_RELEASE)
+			if (allowInput)
 			{
-				VulkanContext::GetLogicalDevice().WaitIdle();
-				Resize(Globals.window.GetSize());
+				if (Key::GetKey(Key::F) != GLFW_RELEASE)
+				{
+					VulkanContext::GetLogicalDevice().WaitIdle();
+					Resize(Globals.window.GetSize());
+				}
+
+				if (Key::GetKey(Key::Up) != GLFW_RELEASE)
+				{
+					ent1.set<VelocityComponent>({ {0.0f, 0.005f} });
+					ent2.set<VelocityComponent>({ {0.0f, 0.005f} });
+				}
+
+				if (Key::GetKey(Key::Left) != GLFW_RELEASE)
+				{
+					ent1.set<VelocityComponent>({ {-0.01f, 0.0f} });
+					ent2.set<VelocityComponent>({ {-0.01f, 0.0f} });
+				}
+
+				if (Key::GetKey(Key::Down) != GLFW_RELEASE)
+				{
+					ent1.set<VelocityComponent>({ {0.0f, -0.005f} });
+					ent2.set<VelocityComponent>({ {0.0f, -0.005f} });
+				}
+
+				if (Key::GetKey(Key::Right) != GLFW_RELEASE)
+				{
+					ent1.set<VelocityComponent>({ {0.01f, 0.0f} });
+					ent2.set<VelocityComponent>({ {0.01f, 0.0f} });
+				}
+
+				if (Key::GetKey(Key::Space) != GLFW_RELEASE)
+				{
+					ent1.set<VelocityComponent>({ {0.0f, 0.0f} });
+					ent2.set<VelocityComponent>({ {0.0f, 0.0f} });
+				}
+
+				if (Key::GetKey(Key::W) != GLFW_RELEASE)
+				{
+					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
+					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
+				}
+
+				if (Key::GetKey(Key::A) != GLFW_RELEASE)
+				{
+					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
+					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
+				}
+
+				if (Key::GetKey(Key::S) != GLFW_RELEASE)
+				{
+					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
+					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
+				}
+
+				if (Key::GetKey(Key::D) != GLFW_RELEASE)
+				{
+					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
+					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
+				}
+
+				if (ImGui::IsKeyPressed(ImGuiKey_W)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
+				//if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
 			}
-
-			if (Key::GetKey(Key::Up) != GLFW_RELEASE)
-			{
-				ent1.set<VelocityComponent>({ {0.0f, 0.005f} });
-				ent2.set<VelocityComponent>({ {0.0f, 0.005f} });
-			}
-
-			if (Key::GetKey(Key::Left) != GLFW_RELEASE)
-			{
-				ent1.set<VelocityComponent>({ {-0.01f, 0.0f} });
-				ent2.set<VelocityComponent>({ {-0.01f, 0.0f} });
-			}
-
-			if (Key::GetKey(Key::Down) != GLFW_RELEASE)
-			{
-				ent1.set<VelocityComponent>({ {0.0f, -0.005f} });
-				ent2.set<VelocityComponent>({ {0.0f, -0.005f} });
-			}
-
-			if (Key::GetKey(Key::Right) != GLFW_RELEASE)
-			{
-				ent1.set<VelocityComponent>({ {0.01f, 0.0f} });
-				ent2.set<VelocityComponent>({ {0.01f, 0.0f} });
-			}
-
-			if (Key::GetKey(Key::Space) != GLFW_RELEASE)
-			{
-				ent1.set<VelocityComponent>({ {0.0f, 0.0f} });
-				ent2.set<VelocityComponent>({ {0.0f, 0.0f} });
-			}
-
-			if (Key::GetKey(Key::W) != GLFW_RELEASE)
-			{
-				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
-				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
-			}
-
-			if (Key::GetKey(Key::A) != GLFW_RELEASE)
-			{
-				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
-				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
-			}
-
-			if (Key::GetKey(Key::S) != GLFW_RELEASE)
-			{
-				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
-				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
-			}
-
-			if (Key::GetKey(Key::D) != GLFW_RELEASE)
-			{
-				ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
-				ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
-			}
-
-			if (ImGui::IsKeyPressed(ImGuiKey_W)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
-			//if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
-
 		}
-
-		glm::vec2 p0 = glm::vec2(0.f, 0.f);
-		glm::vec2 p1 = glm::vec2(2.5f, 2.5f);
-		glm::vec2 p2 = glm::vec2(2.7f, -2.5f);
-		glm::vec2 p3 = glm::vec2(5.f, 0.f);
 
 		void RenderGame()
 		{
@@ -240,6 +239,7 @@ namespace wc
 			// TODO - ADD MENU BAR!
 			ImGui::Begin("Editor", &showEditor);
 
+			allowInput = ImGui::IsWindowFocused();
 
 			ImVec2 drawPos, drawSize;
 			// Render Game
@@ -473,17 +473,14 @@ namespace wc
 
 			if (selected_entity != flecs::entity::null())
 			{
-				static char nameBuffer[256]; // Buffer to hold the entity's name
-
-				// Copy the entity's name into the buffer (ensure the buffer is large enough)
-				strncpy(nameBuffer, selected_entity.name().c_str(), sizeof(nameBuffer) - 1);
-				nameBuffer[sizeof(nameBuffer) - 1] = '\0'; // Null-terminate the string
+				std::string nameBuffer = selected_entity.name().c_str(); // Buffer to hold the entity's name
 
 				// Allow the user to edit the name in the buffer
-				if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+				if (ImGui::InputText("Name", &nameBuffer)) {
 					// Update the entity's name if it has changed
-					selected_entity.set_name(nameBuffer);
+					selected_entity.set_name(nameBuffer.c_str());
 				}
+
 
 				// Display the entity's ID
 				//ImGui::Text("ID: %u", selected_entity.id());
@@ -544,9 +541,62 @@ namespace wc
 			ImGui::End();
 		}
 
+		// @TODO fix this
 		void UI_Console()
 		{
 			ImGui::Begin("Console", &showConsole);
+
+			if (ImGui::Button("Clear"))
+			{
+				//Globals.console.Clear();
+				Log::GetConsoleSink()->messages.clear();
+				
+			}
+			
+			ImGui::SameLine();
+			if (ImGui::Button("Copy"))
+			{
+				WC_INFO("TODO - IMPLEMENT COPY");
+			}
+
+			ImGui::SameLine();
+			ImGui::InputText("Input", const_cast<char*>(""), 0);
+
+			ImGui::Separator();
+
+			const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+			if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
+			{
+				static const std::unordered_map<spdlog::level::level_enum, std::pair<glm::vec4, std::string>> level_colors = {
+					{spdlog::level::debug, {glm::vec4(58.f, 150.f, 221.f, 255.f) / 255.f, "[debug] "}},
+					{spdlog::level::info, {glm::vec4(19.f, 161.f, 14.f, 255.f) / 255.f, "[info] "}},
+					{spdlog::level::warn, {glm::vec4(249.f, 241.f, 165.f, 255.f) / 255.f, "[warn!] "}},
+					{spdlog::level::err, {glm::vec4(231.f, 72.f, 86.f, 255.f) / 255.f, "[-ERROR-] "}},
+					{spdlog::level::critical, {glm::vec4(139.f, 0.f, 0.f, 255.f) / 255.f, "[!CRITICAL!] "}}
+				};
+
+				for (auto& msg : Log::GetConsoleSink()->messages)
+				{
+					auto it = level_colors.find(msg.level);
+					if (it != level_colors.end())
+					{
+						const auto& [color, prefix] = it->second;
+						ImGui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
+						UI::Text(prefix + msg.payload);
+						ImGui::PopStyleColor();
+					}
+					else
+					{
+						UI::Text(msg.payload);
+					}
+				}
+
+				if (/*ScrollToBottom ||*/
+					(/*m_ConsoleAutoScroll && */ ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
+					ImGui::SetScrollHereY(1.f);
+
+				ImGui::EndChild();
+			}
 
 			ImGui::End();
 		}
