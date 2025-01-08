@@ -125,7 +125,7 @@ namespace wc
 				if (scroll != 0.f)
 				{
 					camera.Zoom += -scroll * ZoomSpeed;
-					camera.Zoom = glm::max(camera.Zoom, 0.1f);
+					camera.Zoom = glm::max(camera.Zoom, 0.05f);
 					camera.Update(m_Renderer.GetHalfSize());
 				}
 
@@ -442,13 +442,9 @@ namespace wc
 					if (ImGui::CollapsingHeader("Position"))
 					{
 						auto& p = *selected_entity.get<PositionComponent>();
-						float position[2] = { p.position.x, p.position.y };
+						auto& position = const_cast<glm::vec2&>(p.position);
 
-						if (ImGui::InputFloat2("Position", position))
-						{
-							// Use const_cast to modify the original position
-							const_cast<glm::vec2&>(p.position) = glm::vec2(position[0], position[1]);
-						}
+						Widgets::PositionUI(position);
 
 					}
 				}
@@ -459,13 +455,9 @@ namespace wc
 					if (ImGui::CollapsingHeader("Scale"))
 					{
 						auto& s = *selected_entity.get<ScaleComponent>();
-						float scale[2] = { s.scale.x, s.scale.y };
+						auto& scale = const_cast<glm::vec2&>(s.scale);
 
-						if (ImGui::InputFloat2("Scale", scale))
-						{
-							// Use const_cast to modify the original scale
-							const_cast<glm::vec2&>(s.scale) = glm::vec2(scale[0], scale[1]);
-						}
+						Widgets::ScaleUI(scale);
 					}
 				}
 			}
@@ -577,8 +569,6 @@ namespace wc
 						//WC_CORE_INFO("Empty space on main menu bar is hovered)"
 					}
 
-
-
 					if (ImGui::BeginMenu("File"))
 					{
 						if (ImGui::MenuItem("New"))
@@ -634,7 +624,7 @@ namespace wc
 					ImGui::SameLine();
 					if (ImGui::ImageButton(t_Minimize, { buttonSize, buttonSize }))
 					{
-						Globals.HandleWindowState();
+						//Globals.window.Maximize();
 					}
 
 					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
