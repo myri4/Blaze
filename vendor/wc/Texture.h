@@ -108,8 +108,13 @@ namespace wc
             int32_t width = 0, height = 0, fnrComponents;
             auto data = stbi_load(filepath.c_str(), &width, &height, &fnrComponents, 4);
             
-            if (data) 
+            if (data)
+            {
                 Load(data, width, height, mipMapping);
+                image.SetName(filepath);
+                view.SetName(filepath);
+                sampler.SetName(filepath);
+            }
             else
                 WC_CORE_ERROR("Could not find file at location {}", filepath);
 

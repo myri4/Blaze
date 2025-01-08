@@ -204,9 +204,9 @@ namespace wc
     {
         uint32_t Width = 0;
         uint32_t Height = 0;
+        std::string Name;
         WindowMode StartMode = WindowMode::Normal;
         bool VSync = false;
-        std::string AppName;
         bool Decorated = true;
         bool Resizeable = true;
     };
@@ -287,7 +287,7 @@ namespace wc
 
             glfwWindowHint(GLFW_DECORATED, info.Decorated);
 
-            m_Window = glfwCreateWindow(info.Width, info.Height, info.AppName.c_str(), m_Monitor, nullptr);
+            m_Window = glfwCreateWindow(info.Width, info.Height, info.Name.c_str(), m_Monitor, nullptr);
             glfwSetWindowUserPointer(m_Window, this);
 
             glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xoffset, double yoffset) {

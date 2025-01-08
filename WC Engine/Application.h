@@ -31,14 +31,15 @@ namespace wc
 		//----------------------------------------------------------------------------------------------------------------------
 		bool OnCreate() 
 		{
-			WindowCreateInfo windowInfo;
-			windowInfo.Width = 1280;
-			windowInfo.Height = 720;
-			windowInfo.VSync = false;
-			windowInfo.Resizeable = true;
-			windowInfo.AppName = "WC Engine";
-			windowInfo.StartMode = WindowMode::Normal;
-			windowInfo.Decorated = false;
+			WindowCreateInfo windowInfo = {
+				.Width = 1280,
+				.Height = 720,
+				.Name = "WC Engine",
+				.StartMode = WindowMode::Normal,
+				.VSync = false,
+				.Resizeable = true,
+			};
+			//windowInfo.Decorated = false;
 			Globals.window.Create(windowInfo);
 			Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h) 
 			{ 

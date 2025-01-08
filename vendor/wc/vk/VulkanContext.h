@@ -5,7 +5,7 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
-#define WC_GRAPHICS_VALIDATION 0
+#define WC_GRAPHICS_VALIDATION 1
 #define WC_SYNCHRONIZATION_VALIDATION 1
 #define WC_SHADER_DEBUG_PRINT 0
 
@@ -17,6 +17,7 @@
 #include <magic_enum.hpp>
 #include <set>
 #include <unordered_set>
+#include <source_location>
 #include <glm/glm.hpp>
 #include "../Utils/Log.h"
 
@@ -325,12 +326,14 @@ namespace VulkanContext
 		}
 #endif
 
-		VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-		appInfo.pApplicationName = "WC Application";
-		appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 2, 0);
-		appInfo.pEngineName = "WC Engine";
-		appInfo.engineVersion = VK_MAKE_API_VERSION(0, 1, 2, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_2;
+		VkApplicationInfo appInfo = { 
+			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+			.pApplicationName = "WC Application",
+			.applicationVersion = VK_MAKE_API_VERSION(0, 1, 2, 0),
+			.pEngineName = "WC Engine",
+			.engineVersion = VK_MAKE_API_VERSION(0, 1, 2, 0),
+			.apiVersion = VK_API_VERSION_1_2,
+		};
 
 		VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 		instanceCreateInfo.pApplicationInfo = &appInfo;
@@ -343,6 +346,16 @@ namespace VulkanContext
 
 #if WC_GRAPHICS_VALIDATION
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+		VkValidationFeaturesEXT validationFeatures;
+		VkValidationFeatureEnableEXT enabledFeatures[] = {
+#if WC_SHADER_DEBUG_PRINT
+				VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
+#endif
+#if WC_SYNCHRONIZATION_VALIDATION
+				VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+#endif
+				//VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT
+		};
 		if (bValidationLayers)
 		{
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -405,19 +418,10 @@ namespace VulkanContext
 					return true;
 				};
 
-			VkValidationFeatureEnableEXT enabledFeatures[] = {
-				VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
-#if WC_SYNCHRONIZATION_VALIDATION
-				VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
-#endif
-				//VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT
-			};
-
 			//VkValidationFeatureDisableEXT disabledFeatures[] = {};
 
-			VkValidationFeaturesEXT validationFeatures = {
+			validationFeatures = {
 				.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-				.pNext = nullptr,
 				.enabledValidationFeatureCount = (uint32_t)std::size(enabledFeatures),
 				.pEnabledValidationFeatures = enabledFeatures,
 				//.disabledValidationFeatureCount = (uint32_t)std::size(disabledFeatures);

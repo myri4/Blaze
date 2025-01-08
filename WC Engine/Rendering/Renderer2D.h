@@ -32,6 +32,11 @@ namespace wc
 
 		auto GetOutput() { return m_Buffers[2].imageViews[0]; }
 
+		void Init()
+		{
+			m_Shader.Create("assets/shaders/bloom.comp");
+		}
+
 		void CreateImages(glm::vec2 renderSize, uint32_t mipLevelCount)
 		{
 			glm::ivec2 bloomTexSize = renderSize * 0.5f;
@@ -49,6 +54,7 @@ namespace wc
 			};
 
 			m_Sampler.Create(samplerSpec);
+			m_Sampler.SetName("BloomSampler");
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -106,11 +112,6 @@ namespace wc
 					for (int i = 0; i < 3; i++)
 						m_Buffers[i].image.SetLayout(cmd, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, range);
 				});
-		}
-
-		void Init()
-		{
-			m_Shader.Create("assets/shaders/bloom.comp");
 		}
 
 		void SetUp(const vk::ImageView& input)

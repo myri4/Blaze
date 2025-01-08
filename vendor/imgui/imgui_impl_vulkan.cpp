@@ -201,7 +201,8 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
         .mipLevels = 1,
         .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     };
-    bd->FontImage.Create(imageSpec);
+	bd->FontImage.Create(imageSpec);
+	bd->FontImage.SetName("imgui_font_image");
 
     // Create the Image View:
     VkImageViewCreateInfo viewInfo = { 
@@ -216,6 +217,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
         }
     };
     bd->FontView.Create(viewInfo);
+    bd->FontView.SetName("imgui_font_image_view");
 
     // Create the Descriptor Set:
     bd->FontDescriptorSet = (VkDescriptorSet)MakeImGuiDescriptor(bd->FontDescriptorSet, { bd->FontSampler, bd->FontView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
@@ -421,6 +423,7 @@ bool ImGui_ImplVulkan_Init(VkRenderPass rp)
 		.maxLod = 1000,
 	};
 	bd->FontSampler.Create(samplerSpec);
+    bd->FontSampler.SetName("imgui_font_sampler");
 
 	//color_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	wc::ShaderCreateInfo createInfo;

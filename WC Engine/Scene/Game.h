@@ -625,6 +625,9 @@ namespace wc
 
 		void Destroy()
 		{
+			t_Close.Destroy();
+			t_Collapse.Destroy();
+			t_Minimize.Destroy();
 			m_Renderer.Deinit();
 
 			m_RenderData.Destroy();

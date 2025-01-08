@@ -167,6 +167,7 @@ namespace vk
 
 				if (imageViews[i].Create(viewCreateInfo) != VK_SUCCESS)
 					return false;
+				imageViews[i].SetName(std::format("Swapchain::ImageViews[{}]", i));
 			}
 
 			// Create Render pass
