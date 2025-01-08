@@ -11,7 +11,93 @@ namespace wc
 
 	namespace Widgets
 	{
-		
+
+		static void HelpMarker(const char* desc, bool sameLine = true)
+		{
+			if (sameLine) ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::BeginItemTooltip())
+			{
+				ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+				ImGui::TextUnformatted(desc);
+				ImGui::PopTextWrapPos();
+				ImGui::EndTooltip();
+			}
+		}
+
+		void PositionUI(glm::vec2& pos)
+		{
+			float position[2] = { pos.x, pos.y };
+
+			// Define a fixed width for the buttons
+			const float buttonWidth = 20.0f;
+
+			// Calculate the available width for the input fields
+			float totalWidth = ImGui::GetContentRegionAvail().x;
+			float labelWidth = buttonWidth * 2 + ImGui::CalcTextSize("(?)").x + ImGui::GetStyle().ItemSpacing.x * 2;
+			float inputWidth = (totalWidth - labelWidth) / 2;
+
+			ImGui::AlignTextToFramePadding();
+
+			// Draw colored button for "X"
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.6f)); // Red color
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 0.75f)); // Red color
+			if (ImGui::Button("X", ImVec2(buttonWidth, 0)))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { pos.x -= 1.0f; }
+				else { pos.x += 1.0f; }
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine(0, 0);
+
+			ImGui::PushItemWidth(inputWidth);
+			if (ImGui::InputFloat("##XPosition", &position[0], 1.0f, 0.1f, "%.3f")) { pos.x = position[0]; }
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+
+			ImGui::AlignTextToFramePadding();
+
+			// Draw colored button for "Y"
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 0.5f)); // Green color
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 1.0f, 0.0f, 0.6f)); // Green color
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.0f, 0.75f)); // Green color
+			if (ImGui::Button("Y", ImVec2(buttonWidth, 0)))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { pos.y -= 1.0f; }
+				else { pos.y += 1.0f; }
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine(0, 0);
+
+			ImGui::PushItemWidth(inputWidth);
+			if (ImGui::InputFloat("##YPosition", &position[1], 1.0f, 0.1f, "%.3f")) { pos.y = position[1]; }
+			ImGui::PopItemWidth();
+
+			HelpMarker("HOLD Ctrl for less step");
+
+			return;
+		}
+
+		void ScaleUI(glm::vec2& scale)
+		{
+			float scaleValue[2] = { scale.x, scale.y };
+
+			ImGui::Text("Scale");
+			ImGui::SameLine();
+
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+
+			if (ImGui::DragFloat2("##Scale", scaleValue))
+			{
+				scale.x = scaleValue[0];
+				scale.y = scaleValue[1];
+			}
+
+			ImGui::PopItemWidth();
+			return;
+		}
+
 	}
 
 	namespace UI
