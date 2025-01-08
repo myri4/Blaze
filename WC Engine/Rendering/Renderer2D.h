@@ -322,8 +322,6 @@ namespace wc
 
 	struct Renderer2D
 	{
-		glm::vec2 m_TileSize = glm::vec2(16.f, 9.f); // @TODO: maybe rename?
-
 		glm::vec2 m_RenderSize;
 
 		// Rendering
@@ -364,7 +362,7 @@ namespace wc
 		auto GetRenderSize() const { return m_RenderSize; }
 		auto GetAspectRatio() const { return m_OutputImage.GetAspectRatio(); }
 
-		auto GetHalfSize() const { return m_TileSize * camera->Zoom; }
+		auto GetHalfSize() const { return (m_RenderSize / 128.f) * camera->Zoom; }
 		auto GetHalfSize(glm::vec2 size) const { return size * camera->Zoom; }
 
 		auto ScreenToWorld(glm::vec2 coords) const
@@ -386,6 +384,16 @@ namespace wc
 
 		void Init(RenderData& renderData)
 		{
+			bloom.Init();
+			composite.Init();
+			crt.Init();
+
+			for (uint32_t i = 0; i < FRAME_OVERLAP; i++)
+			{
+				vk::SyncContext::GraphicsCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_Cmd[i]);
+				vk::SyncContext::ComputeCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_ComputeCmd[i]);
+			}
+
 			{
 				VkAttachmentDescription attachmentDescription = {
 					.format = VK_FORMAT_R32G32B32A32_SFLOAT, // @WARNING: if the image format is changed this should also be changed

@@ -39,12 +39,16 @@ namespace wc
 	struct Editor
 	{
 	private:
+		// Panning variables
+		glm::vec2 m_StartPan;
+		glm::vec2 m_BeginCameraPosition;
+		bool m_Panning = false;
+
 
 		OrthographicCamera camera;
 
 		RenderData m_RenderData;
 		Renderer2D m_Renderer;
-		Font font;
 
 		Texture t_Close;
 		Texture t_Minimize;
@@ -52,6 +56,8 @@ namespace wc
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
+
+		glm::vec2 ViewPortSize = glm::vec2(1.f);
 
 		bool allowInput = true;
 
@@ -69,6 +75,10 @@ namespace wc
 		enum class PlayState { Paused, Simulate, Play };
 
 		Scene scene;
+
+		// Settings
+
+		float ZoomSpeed = 2.f;
 	public:
 
 		//ECS testing
@@ -77,20 +87,10 @@ namespace wc
 		void Create(glm::vec2 renderSize)
 		{
 			m_RenderData.Create();
-			font.Load("assets/fonts/ST-SimpleSquare.ttf", m_RenderData);
 
-			m_Renderer.bloom.Init();
-			m_Renderer.composite.Init();
-			m_Renderer.crt.Init();
 			m_Renderer.camera = &camera;
 			m_Renderer.Init(m_RenderData);
 			m_Renderer.CreateScreen(renderSize);
-
-			for (uint32_t i = 0; i < FRAME_OVERLAP; i++)
-			{
-				vk::SyncContext::GraphicsCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_Renderer.m_Cmd[i]);
-				vk::SyncContext::ComputeCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_Renderer.m_ComputeCmd[i]);
-			}
 
 			// Load Textures
 			t_Close.Load("assets/textures/menu/close.png");
@@ -103,6 +103,7 @@ namespace wc
 			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
 
 			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent1.set<CircleRendererComponent>({});
 
 			ent2 = scene.AddEntity("Entity 2");
 
@@ -119,6 +120,35 @@ namespace wc
 			{
 				if (ImGui::IsKeyPressed(ImGuiKey_W)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
 				if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
+
+				float scroll = Mouse::GetMouseScroll().y;
+				if (scroll != 0.f)
+				{
+					camera.Zoom += -scroll * ZoomSpeed;
+					camera.Zoom = glm::max(camera.Zoom, 0.1f);
+					camera.Update(m_Renderer.GetHalfSize());
+				}
+
+				glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPos()) - WindowPos;
+				glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos);
+
+				if (Mouse::GetMouse(Mouse::RIGHT))
+				{
+					if (!m_Panning)
+					{
+						m_StartPan = mouseFinal;
+						m_BeginCameraPosition = camera.Position;
+					}
+
+					camera.Position = glm::vec3(m_BeginCameraPosition + (m_StartPan - mouseFinal), camera.Position.z);
+					m_Panning = true;
+				}
+				else
+				{
+					m_StartPan = glm::vec2(0.f);
+					m_BeginCameraPosition = camera.Position;
+					m_Panning = false;
+				}
 			}
 		}
 
@@ -167,64 +197,46 @@ namespace wc
 		void UI_Editor()
 		{
 			// TODO - ADD MENU BAR!
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 			ImGui::Begin("Editor", &showEditor);
 
 			allowInput = ImGui::IsWindowFocused();
 
-			ImVec2 drawPos, drawSize;
-			// Render Game
+			ImVec2 viewPortSize = ImGui::GetContentRegionAvail();
+			if (ViewPortSize != *((glm::vec2*)&viewPortSize))
 			{
-				// Add padding and account for the tab height
-				const float padding = 10.0f; // Adjust padding as needed
-				float tabHeight = ImGui::GetFrameHeight(); // Height of the window tab bar
-				ImVec2 availableSize = ImVec2(ImGui::GetWindowSize().x - 2 * padding, ImGui::GetWindowSize().y - tabHeight - 2 * padding);
+				ViewPortSize = { viewPortSize.x, viewPortSize.y };
 
-				// Get the aspect ratio of the image
-				float imageAspectRatio = m_Renderer.GetAspectRatio();
-
-				// Calculate the maximum size while maintaining aspect ratio
-				float availableAspectRatio = availableSize.x / availableSize.y;
-
-				if (availableAspectRatio > imageAspectRatio)
-				{
-					// Available area is wider than the image aspect ratio, fit to height
-					drawSize.x = drawSize.y * imageAspectRatio;
-					drawSize.y = availableSize.y;
-				}
-				else
-				{
-					// Available area is taller than the image aspect ratio, fit to width
-					drawSize.x = availableSize.x;
-					drawSize.y = drawSize.x / imageAspectRatio;
-				}
-
-				// Center the image within the available space
-				drawPos = ImVec2(
-					ImGui::GetWindowPos().x + padding + (availableSize.x - drawSize.x) * 0.5f,
-					ImGui::GetWindowPos().y + tabHeight + padding + (availableSize.y - drawSize.y) * 0.5f
-				);
-
-				// Draw the image
-				ImGui::GetWindowDrawList()->AddImage(
-					m_Renderer.GetImguiImageID(),
-					drawPos,
-					ImVec2(drawPos.x + drawSize.x, drawPos.y + drawSize.y)
-				);
+				VulkanContext::GetLogicalDevice().WaitIdle();
+				Resize(ViewPortSize);
 			}
+
+			auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
+			auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
+			auto viewportOffset = ImGui::GetWindowPos();
+			ImVec2 viewportBounds[2];
+			viewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
+			viewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+
+			WindowPos = *((glm::vec2*)&viewportBounds[0]);
+			RenderSize = *((glm::vec2*)&viewportBounds[1]) - WindowPos;
+
+			auto image = m_Renderer.GetImguiImageID();
+			ImGui::Image(image, viewPortSize);
 
 			glm::mat4 projection = camera.GetProjectionMatrix();
 			projection[1][1] *= -1;
 
 			ImGuizmo::SetOrthographic(true);
 			ImGuizmo::SetDrawlist();
-			ImGuizmo::SetRect(drawPos.x, drawPos.y, drawSize.x, drawSize.y);
+			ImGuizmo::SetRect(WindowPos.x, WindowPos.y, RenderSize.x, RenderSize.y);
 
 			if (selected_entity != flecs::entity::null() && selected_entity.has<PositionComponent>())
 			{
 				auto position = selected_entity.get<PositionComponent>()->position;
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(position, 0.f));
 
-				ImGuizmo::Manipulate(glm::value_ptr(camera.GetViewMatrix()), glm::value_ptr(projection), m_GuizmoOp, ImGuizmo::MODE::LOCAL, glm::value_ptr(transform));
+				ImGuizmo::Manipulate(glm::value_ptr(camera.GetViewMatrix()), glm::value_ptr(projection), m_GuizmoOp, ImGuizmo::MODE::WORLD, glm::value_ptr(transform));
 
 				if (ImGuizmo::IsUsing())
 				{
@@ -246,7 +258,7 @@ namespace wc
 			ImGui::End();
 		}
 
-		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent, flecs::entity& selected_entity) 
+		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent) 
 		{
 			static int selection_mask = 0;  // selected entity
 
@@ -295,7 +307,7 @@ namespace wc
 			if (is_open) {
 				// If the node is open, recursively show its children
 				for (const auto& child : children) {
-					ShowEntityTree(child, e, selected_entity);  // Pass the current entity as the parent for the child
+					ShowEntityTree(child, e);  // Pass the current entity as the parent for the child
 				}
 				if (!children.empty()) {
 					ImGui::TreePop();  // Close node
@@ -313,7 +325,7 @@ namespace wc
 				{
 					// Only call ShowEntityTree for root entities (entities with no parent)
 					if (e.parent() == flecs::entity::null()) {
-						ShowEntityTree(e, flecs::entity::null(), selected_entity);
+						ShowEntityTree(e, flecs::entity::null());
 					}
 				});
 
@@ -331,9 +343,10 @@ namespace wc
 				static std::string name = "";
 				ImGui::InputText("Name", &name);
 
-				if (ImGui::Button("Create")) {
-					if (!name.empty()) {
-						// create entity with name
+				if (ImGui::Button("Create")) 
+				{
+					if (!name.empty()) 
+					{
 						scene.AddEntity(name);
 						name.clear();
 						ImGui::CloseCurrentPopup();

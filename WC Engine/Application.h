@@ -17,11 +17,9 @@ namespace wc
 
 		void Resize()
 		{
-			WC_CORE_INFO("resize")
 			auto size = Globals.window.GetFramebufferSize();
 			while (size.x == 0 || size.y == 0) {
 				size = Globals.window.GetFramebufferSize();
-				WC_CORE_INFO("Waiting for unminimizing");
 				glfwWaitEvents();
 			}
 
