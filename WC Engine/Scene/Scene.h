@@ -28,7 +28,7 @@ namespace wc
 		void CreatePhysicsWorld()
 		{
 			b2WorldDef worldDef = b2DefaultWorldDef();
-			worldDef.gravity = b2Vec2{ 0.0f, -10.0f };
+			worldDef.gravity = b2Vec2{ 0.0f, -9.8f };
 			m_PhysicsWorld.Create(worldDef);
 
 			m_World.each([this](PhysicsComponent& p, PositionComponent& pos) {

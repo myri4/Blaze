@@ -17,6 +17,14 @@ namespace wc
 
 		void Resize()
 		{
+			WC_CORE_INFO("resize")
+			auto size = Globals.window.GetFramebufferSize();
+			while (size.x == 0 || size.y == 0) {
+				size = Globals.window.GetFramebufferSize();
+				WC_CORE_INFO("Waiting for unminimizing");
+				glfwWaitEvents();
+			}
+
 			VulkanContext::GetLogicalDevice().WaitIdle();
 			swapchain.Destroy();
 			swapchain.Create(Globals.window);
@@ -43,8 +51,7 @@ namespace wc
 			Globals.window.Create(windowInfo);
 			Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h) 
 			{ 
-				if (w > 0 && h > 0) 
-					Resize();
+				Resize();
 			});
 			swapchain.Create(Globals.window);
 
@@ -79,18 +86,10 @@ namespace wc
 		{
 			while (Globals.window.IsOpen())
 			{
-				if (SwapChainOk)
-				{
-					Globals.window.PoolEvents();
+				Globals.window.PoolEvents();
 
-					if (Globals.window.HasFocus())
-						editor.Input();
-				}
-				else
-				{
-					glfwWaitEvents(); // If minimized, block until unminimized
-					continue;
-				}
+				if (Globals.window.HasFocus())
+					editor.Input();
 
 				OnUpdate();
 			}			

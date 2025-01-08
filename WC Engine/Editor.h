@@ -636,12 +636,12 @@ namespace wc
 				}
 			}
 
-			if (showEditor)UI_Editor();
-			if (showSettings)UI_Settings();
-			if (showEntities)UI_Entities();
-			if (showProperties)UI_Properties();
-			if (showConsole)UI_Console();
-			if (showFileExplorer)UI_FileExplorer();
+			if (showEditor) UI_Editor();
+			if (showSettings) UI_Settings();
+			if (showEntities) UI_Entities();
+			if (showProperties) UI_Properties();
+			if (showConsole) UI_Console();
+			if (showFileExplorer) UI_FileExplorer();
 
 			ImGui::End();
 

@@ -651,7 +651,7 @@ namespace wc
 				rpInfo.framebuffer = m_Framebuffer;
 				rpInfo.clearValueCount = 1;
 				VkClearValue clearValue;
-				clearValue.color = { 0.f, 0.f, 0.f, 0.f };
+				clearValue.color = { 0.f, 0.f, 0.f, 1.f };
 				rpInfo.pClearValues = &clearValue;
 
 				rpInfo.renderArea.extent = { (uint32_t)m_RenderSize.x, (uint32_t)m_RenderSize.y };

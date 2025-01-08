@@ -43,7 +43,7 @@ namespace wc
 	struct CircleRendererComponent
 	{
 		glm::vec4 Color = glm::vec4(1.f);
-		float Thickness = 1.0f;
+		float Thickness = 1.f;
 		float Fade = 0.005f;
 	};
 
