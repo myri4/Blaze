@@ -246,6 +246,7 @@ namespace wc
 				}
 			}
 
+			ImGui::PopStyleVar();
 			ImGui::End();
 		}
 
@@ -282,36 +283,37 @@ namespace wc
 
 			// check if a child is selected - keep parent node open
 			bool keep_open = false;
-			for (const auto& child : children) {
-				if ((selection_mask & (1 << child.id())) != 0) {
+			for (const auto& child : children) 
+				if ((selection_mask & (1 << child.id())) != 0) 
+				{
 					keep_open = true;
 					break;
 				}
-			}
-
+			
 			if (keep_open)
 				ImGui::SetNextItemOpen(true); // set node open
 
 			ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
 
-			if (is_selected) {
+			if (is_selected) 
 				node_flags |= ImGuiTreeNodeFlags_Selected;
-			}
+			
 
 			bool is_open = ImGui::TreeNodeEx(e.name().c_str(), node_flags);
-			if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+			if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) 
+			{
 				selection_mask = (1 << e.id());  // Select the current node
 				selected_entity = e;  // Update the selected entity
 			}
 
-			if (is_open) {
+			if (is_open) 
+			{
 				// If the node is open, recursively show its children
-				for (const auto& child : children) {
+				for (const auto& child : children) 
 					ShowEntityTree(child, e);  // Pass the current entity as the parent for the child
-				}
-				if (!children.empty()) {
-					ImGui::TreePop();  // Close node
-				}
+				
+				if (!children.empty()) 
+					ImGui::TreePop();  // Close node				
 			}
 
 			return selected_entity;
@@ -358,7 +360,8 @@ namespace wc
 				}
 
 				ImGui::SameLine();
-				if (ImGui::Button("Cancel")) {
+				if (ImGui::Button("Cancel")) 
+				{
 					//ImGui::ClosePopupsOverWindow(ImGui::FindWindowByName("Entities"), true); 
 					ImGui::CloseCurrentPopup();
 				}
