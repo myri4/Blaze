@@ -78,118 +78,74 @@ namespace wc
 
 		void Save(const std::string& filepath)
 		{
-			YAML::Emitter out;
-			out << YAML::BeginMap;
-			out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
+			YAML::Node metaData;
+			YAML::Node entitiesData;
 
 			m_World.each([&](flecs::entity entity, EntityTag) {
-				out << YAML::BeginMap; // Entity
-				out << YAML::Key << "Name" << YAML::Value << entity.name();
-				out << YAML::Key << "ID" << YAML::Value << entity.id();
-
-				/*
-				if (entity.has<EntityTag>())
-				{
-					out << YAML::Key << "TagComponent";
-					out << YAML::BeginMap; // TagComponent
-
-					auto tag = entity.get<EntityTag>();
-					out << YAML::Key << "Tag" << YAML::Value << tag;
-
-					out << YAML::EndMap; // TagComponent
-				}
-				*/
+				YAML::Node entityData;
+				entityData["Name"] = std::string(entity.name().c_str());
+				entityData["ID"] = entity.id();
 
 				if (entity.has<PositionComponent>())
 				{
-					out << YAML::Key << "PositionComponent";
-					out << YAML::BeginMap; // PositionComponent
-
-					auto pos = entity.get<PositionComponent>()->position;
-					out << YAML::Key << "Position" << YAML::Flow;
-					out << YAML::BeginSeq << pos.x << pos.y << YAML::EndSeq; // glm::vec2 support
-
-					out << YAML::EndMap; // PositionComponent
+					YAML::Node componentData;
+					componentData["Position"] = entity.get<PositionComponent>()->position;
+					entityData["PositionComponent"] = componentData;
 				}
 
 				if (entity.has<ScaleComponent>())
 				{
-					out << YAML::Key << "ScaleComponent";
-					out << YAML::BeginMap; // ScaleComponent
-
-					auto sc = entity.get<ScaleComponent>()->scale;
-					out << YAML::Key << "Scale" << YAML::Flow;
-					out << YAML::BeginSeq << sc.x << sc.y << YAML::EndSeq; // glm::vec2 support
-
-					out << YAML::EndMap; // ScaleComponent
+					YAML::Node componentData;
+					componentData["Scale"] = entity.get<ScaleComponent>()->scale;
+					entityData["ScaleComponent"] = componentData;
 				}
 
 				if (entity.has<RotationComponent>())
 				{
-					out << YAML::Key << "RotationComponent";
-					out << YAML::BeginMap; // RotationComponent
-
-					auto rot = entity.get<RotationComponent>()->rotation;
-					out << YAML::Key << "Rotation" << YAML::Value << rot;
-
-					out << YAML::EndMap; // RotationComponent
+					YAML::Node componentData;
+					componentData["Rotation"] = entity.get<RotationComponent>()->rotation;
+					entityData["RotationComponent"] = componentData;
 				}
 
 				if (entity.has<SpriteRendererComponent>())
 				{
-					out << YAML::Key << "SpriteRendererComponent";
-					out << YAML::BeginMap; // SpriteRendererComponent
-
-					auto col = entity.get<SpriteRendererComponent>()->Color;
-					out << YAML::Key << "Color" << YAML::Flow;
-					out << YAML::BeginSeq << col.r << col.g << col.b << col.a << YAML::EndSeq; // glm::vec4 support
-
-					auto tex = entity.get<SpriteRendererComponent>()->Texture;
-					out << YAML::Key << "Texture" << YAML::Value << tex;
-
-					out << YAML::EndMap; // SpriteRendererComponent
+					YAML::Node componentData;
+					componentData["Color"] = entity.get<SpriteRendererComponent>()->Color;
+					componentData["Texture"] = entity.get<SpriteRendererComponent>()->Texture; // @TODO: this should be in text form
+					entityData["SpriteRendererComponent"] = componentData;
 				}
 
 				if (entity.has<CircleRendererComponent>())
 				{
-					out << YAML::Key << "CircleRendererComponent";
-					out << YAML::BeginMap; // CircleRendererComponent
-
-					auto col = entity.get<CircleRendererComponent>()->Color;
-					out << YAML::Key << "Color" << YAML::Flow;
-					out << YAML::BeginSeq << col.r << col.g << col.b << col.a << YAML::EndSeq; // glm::vec4 support
-
-					auto thicc = entity.get<CircleRendererComponent>()->Thickness;
-					out << YAML::Key << "Thickness" << YAML::Value << thicc;
-
-					auto fade = entity.get<CircleRendererComponent>()->Fade;
-					out << YAML::Key << "Fade" << YAML::Value << fade;
-
-					out << YAML::EndMap; // CircleRendererComponent
+					YAML::Node componentData;
+					componentData["Color"] = entity.get<CircleRendererComponent>()->Color;
+					componentData["Thickness"] = entity.get<CircleRendererComponent>()->Thickness; 
+					componentData["Fade"] = entity.get<CircleRendererComponent>()->Fade;
+					entityData["CircleRendererComponent"] = componentData;
 				}
 
-				out << YAML::EndMap; // Entity
-				});
+				entitiesData.push_back(entityData);
+			});
 
-			out << YAML::EndSeq;
-			out << YAML::EndMap;
+			metaData["Entities"] = entitiesData;
 
-			YAMLUtils::SaveFile(filepath, out);
+			YAMLUtils::SaveFile(filepath, metaData);
 		}
 
 		bool Load(const std::string& filepath)
 		{
-			std::ifstream stream(filepath);
-			std::stringstream strStream;
-			strStream << stream.rdbuf();
+			if (!std::filesystem::exists(filepath))
+			{
+				WC_CORE_ERROR("{} does not exist.", filepath);
+				return false;
+			}
 
-			YAML::Node data = YAML::Load(strStream.str());
-			if (!data["Scene"]) return false;
+			YAML::Node data = YAML::LoadFile(filepath);
 
 			auto entities = data["Entities"];
 			if (entities)
 			{
-				for (auto entity : entities)
+				for (const auto& entity : entities)
 				{
 					std::string name = entity["Name"].as<std::string>();
 					std::string id = entity["ID"].as<std::string>();
@@ -222,7 +178,7 @@ namespace wc
 							});
 					}
 
-					auto spriteRendererComponent = entity["RotationComponent"];
+					auto spriteRendererComponent = entity["SpriteRendererComponent"];
 					if (spriteRendererComponent)
 					{
 						deserializedEntity.set<SpriteRendererComponent>({
@@ -231,7 +187,7 @@ namespace wc
 							});
 					}
 
-					auto circleRendererComponent = entity["RotationComponent"];
+					auto circleRendererComponent = entity["CircleRendererComponent"];
 					if (circleRendererComponent)
 					{
 						deserializedEntity.set<CircleRendererComponent>({
