@@ -4,13 +4,13 @@
 #include <imgui/imgui_impl_vulkan.h>
 #include <imgui/ImGuizmo.h>
 
-#include "Scene/Game.h"
+#include "Editor.h"
 
 #include <wc/Swapchain.h>
 
 namespace wc
 {
-		GameInstance game;
+		Editor editor;
 		
 		vk::Swapchain swapchain;
 		bool SwapChainOk = true;
@@ -22,7 +22,7 @@ namespace wc
 			swapchain.Create(Globals.window);
 
 			// Resize renderers
-			game.Resize(Globals.window.GetSize());
+			editor.Resize(Globals.window.GetSize());
 			Globals.window.resized = false;
 			SwapChainOk = true;
 		}
@@ -34,7 +34,7 @@ namespace wc
 			WindowCreateInfo windowInfo = {
 				.Width = 1280,
 				.Height = 720,
-				.Name = "WC Engine",
+				.Name = "WC Engine Editor",
 				.StartMode = WindowMode::Normal,
 				.VSync = false,
 				.Resizeable = true,
@@ -68,7 +68,7 @@ namespace wc
 
 			auto& style = ImGui::GetStyle();
 			style.WindowMenuButtonPosition = ImGuiDir_None;
-			game.Create(Globals.window.GetSize());
+			editor.Create(Globals.window.GetSize());
 
 			return true;
 		}
@@ -84,7 +84,7 @@ namespace wc
 					Globals.window.PoolEvents();
 
 					if (Globals.window.HasFocus())
-						game.InputGame();
+						editor.Input();
 				}
 				else
 				{
@@ -121,13 +121,13 @@ namespace wc
 
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
-			game.UI();
+			editor.UI();
 			//ImGui::ShowDemoWindow();
 			ImGui::EndFrame();
 			ImGui::Render();			
 
 			vkResetCommandBuffer(vk::SyncContext::GetMainCommandBuffer(), 0);
-			game.Update();
+			editor.Update();
 			if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 			{
 				ImGui::UpdatePlatformWindows();
@@ -197,7 +197,7 @@ namespace wc
 			ImGui_ImplGlfw_Shutdown();
 
 			vk::descriptorAllocator.Destroy();
-			game.Destroy();
+			editor.Destroy();
 			
 			vk::SyncContext::Destroy();
 			swapchain.Destroy();

@@ -80,7 +80,8 @@ add_subdirectory("vendor/spdlog")
 add_subdirectory("vendor/yaml-cpp")
 add_subdirectory("vendor/glm")
 add_subdirectory("vendor/freetype")
-#add_subdirectory("vendor/box2d")
+add_subdirectory("vendor/box2d")
+
 
 target_link_libraries(${PROJECT_NAME} 
 Vulkan::Vulkan
@@ -89,6 +90,10 @@ spdlog::spdlog
 yaml-cpp 
 glm::glm 
 freetype
+box2d::box2d
 )
-target_include_directories(${PROJECT_NAME} PUBLIC "vendor/")
+target_include_directories(${PROJECT_NAME} PUBLIC 
+"vendor/"
+"vendor/box2d/include" # mad funny box2d
+)
 target_link_directories(${PROJECT_NAME} PUBLIC ${VULKAN_LIBRARY_DIRS})

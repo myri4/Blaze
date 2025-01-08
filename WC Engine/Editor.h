@@ -20,8 +20,7 @@
 #include <wc/Utils/YAML.h>
 
 //ECS
-#include "Scene.h"
-#include "Components.h"
+#include "Scene/Scene.h"
 
 // GUI
 #include <imgui/imgui.h>
@@ -31,16 +30,15 @@
 #include <imgui/imgui_stdlib.h>
 #include <imgui/ImGuizmo.h>
 
-#include "../Globals.h"
-#include "../Rendering/Renderer2D.h"
-#include "../UI/Widgets.h"
+#include "Globals.h"
+#include "Rendering/Renderer2D.h"
+#include "UI/Widgets.h"
 
 namespace wc
 {
-
-	struct GameInstance
+	struct Editor
 	{
-	protected:
+	private:
 
 		OrthographicCamera camera;
 
@@ -66,12 +64,14 @@ namespace wc
 		bool showConsole = true;
 		bool showFileExplorer = true;
 
+		flecs::entity selected_entity = flecs::entity::null();
+
+		enum class PlayState { Paused, Simulate, Play };
+
+		Scene scene;
 	public:
 
-		std::string text;
-
 		//ECS testing
-		Scene scene;
 		flecs::entity ent1, ent2;
 
 		void Create(glm::vec2 renderSize)
@@ -92,8 +92,6 @@ namespace wc
 				vk::SyncContext::ComputeCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_Renderer.m_ComputeCmd[i]);
 			}
 
-			text = "myri4\nmyri4";
-
 			// Load Textures
 			t_Close.Load("assets/textures/menu/close.png");
 			t_Minimize.Load("assets/textures/menu/minimize.png");
@@ -102,122 +100,59 @@ namespace wc
 			// Entity Loading
 			ent1 = scene.AddEntity("Entity 1");
 
-			ent1.add<PositionComponent>();
 			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
 
-			ent1.add<VelocityComponent>();
-			ent1.set<VelocityComponent>({ { 0.0f, 0.0f } });
-
-			ent1.add<ScaleComponent>();
 			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
 
 			ent2 = scene.AddEntity("Entity 2");
 
-			ent2.add<PositionComponent>();
 			ent2.set<PositionComponent>({ { -10.0f, 0.0f } });
 
-			ent2.add<VelocityComponent>();
-			ent2.set<VelocityComponent>({ { 0.0f, 0.0f } });
-
-			ent2.add<ScaleComponent>();
 			ent2.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent2.set<SpriteRendererComponent>({});
 			ent2.child_of(ent1);
-
 		}
 
-		void InputGame()
+		void Input()
 		{
 			if (allowInput)
 			{
-				if (Key::GetKey(Key::F) != GLFW_RELEASE)
-				{
-					VulkanContext::GetLogicalDevice().WaitIdle();
-					Resize(Globals.window.GetSize());
-				}
-
-				if (Key::GetKey(Key::Up) != GLFW_RELEASE)
-				{
-					ent1.set<VelocityComponent>({ {0.0f, 0.005f} });
-					ent2.set<VelocityComponent>({ {0.0f, 0.005f} });
-				}
-
-				if (Key::GetKey(Key::Left) != GLFW_RELEASE)
-				{
-					ent1.set<VelocityComponent>({ {-0.01f, 0.0f} });
-					ent2.set<VelocityComponent>({ {-0.01f, 0.0f} });
-				}
-
-				if (Key::GetKey(Key::Down) != GLFW_RELEASE)
-				{
-					ent1.set<VelocityComponent>({ {0.0f, -0.005f} });
-					ent2.set<VelocityComponent>({ {0.0f, -0.005f} });
-				}
-
-				if (Key::GetKey(Key::Right) != GLFW_RELEASE)
-				{
-					ent1.set<VelocityComponent>({ {0.01f, 0.0f} });
-					ent2.set<VelocityComponent>({ {0.01f, 0.0f} });
-				}
-
-				if (Key::GetKey(Key::Space) != GLFW_RELEASE)
-				{
-					ent1.set<VelocityComponent>({ {0.0f, 0.0f} });
-					ent2.set<VelocityComponent>({ {0.0f, 0.0f} });
-				}
-
-				if (Key::GetKey(Key::W) != GLFW_RELEASE)
-				{
-					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
-					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, 0.002f} });
-				}
-
-				if (Key::GetKey(Key::A) != GLFW_RELEASE)
-				{
-					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
-					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{-0.002f, 0.0f} });
-				}
-
-				if (Key::GetKey(Key::S) != GLFW_RELEASE)
-				{
-					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
-					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.0f, -0.002f} });
-				}
-
-				if (Key::GetKey(Key::D) != GLFW_RELEASE)
-				{
-					ent1.set<ScaleComponent>({ ent1.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
-					ent2.set<ScaleComponent>({ ent2.get<ScaleComponent>()->scale + glm::vec2{0.002f, 0.0f} });
-				}
-
 				if (ImGui::IsKeyPressed(ImGuiKey_W)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
-				//if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
 			}
 		}
 
-		void RenderGame()
+		void Render()
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
 
-			auto color = glm::vec4(0.f, 1.f, 0.5f, 1.f) * 2.5f;
+			scene.GetWorld().each([&](flecs::entity entt, PositionComponent& p) {
+				glm::vec2 scale = glm::vec2(1.f);
+				float rotation = 0.f;
 
-			//m_RenderData.DrawQuad({ 0.f, 0.f, 0.f }, { 50, 50 }, 0u, { 1.f, 1.f, 1.f, 1.f });
+				if (entt.has<ScaleComponent>()) scale = entt.get<ScaleComponent>()->scale;
+				if (entt.has<RotationComponent>()) rotation = entt.get<RotationComponent>()->rotation;
+				
+				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(p.position, 0.f)) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { scale.x, scale.y, 1.f });
+				
+				if (entt.has<SpriteRendererComponent>())
+				{
+					auto& data = *entt.get<SpriteRendererComponent>();
 
-			//for (float y = windowHeight / 2.0f; y >= -windowHeight / 2.0f; y -= 1.0f)
-			//{
-			//	glm::vec3 p0 = { -windowWidth / 2.0f, y, 0.0f };
-			//	glm::vec3 p1 = { windowWidth / 2.0f, y, 0.0f };
-			//	m_RenderData.DrawLine(p0, p1, color);
-			//}
+					m_RenderData.DrawQuad(transform, data.Texture, data.Color);
+				}
+				else if (entt.has<CircleRendererComponent>())
+				{
+					auto& data = *entt.get<CircleRendererComponent>();
+					m_RenderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
+				}
+				else if (entt.has<TextRendererComponent>())
+				{
+					auto& data = *entt.get<TextRendererComponent>();
 
-			scene.GetWorld().each([](PositionComponent& p, VelocityComponent& v) {
-				p.position += v.velocity;
-				});
-
-			m_RenderData.DrawString("Entity 1", font, ent1.get<PositionComponent>()->position, ent1.get<ScaleComponent>()->scale, 0.0f, color);
-			m_RenderData.DrawString("Entity 2", font, ent2.get<PositionComponent>()->position, ent2.get<ScaleComponent>()->scale, 0.0f, color);
-
-			// fps = std::format("{}", 1.f / Globals.deltaTime
-
+					m_RenderData.DrawString(data.Text, data.Font, transform, data.Color);
+				}
+			});
 
 			m_Renderer.Flush(m_RenderData);
 
@@ -226,14 +161,9 @@ namespace wc
 
 		void Update()
 		{
-			//scene.GetWorld().each([](flecs::entity e, LookupTag t) {
-			//	WC_CORE_INFO(e.name());
-			//});
-
-			RenderGame();
+			Render();
 		}
 
-		flecs::entity selected_entity = flecs::entity::null();
 		void UI_Editor()
 		{
 			// TODO - ADD MENU BAR!
@@ -258,8 +188,8 @@ namespace wc
 				if (availableAspectRatio > imageAspectRatio)
 				{
 					// Available area is wider than the image aspect ratio, fit to height
-					drawSize.y = availableSize.y;
 					drawSize.x = drawSize.y * imageAspectRatio;
+					drawSize.y = availableSize.y;
 				}
 				else
 				{
@@ -289,7 +219,7 @@ namespace wc
 			ImGuizmo::SetDrawlist();
 			ImGuizmo::SetRect(drawPos.x, drawPos.y, drawSize.x, drawSize.y);
 
-			if (selected_entity != flecs::entity::null())
+			if (selected_entity != flecs::entity::null() && selected_entity.has<PositionComponent>())
 			{
 				auto position = selected_entity.get<PositionComponent>()->position;
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(position, 0.f));
@@ -316,11 +246,13 @@ namespace wc
 			ImGui::End();
 		}
 
-		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent, flecs::entity& selected_entity) {
+		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent, flecs::entity& selected_entity) 
+		{
 			static int selection_mask = 0;  // selected entity
 
 			// Check if the mouse is clicked outside the tree nodes
-			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused()) {
+			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused()) 
+			{
 				selection_mask = 0;
 				selected_entity = flecs::entity::null();
 			}
@@ -377,7 +309,7 @@ namespace wc
 		{
 			ImGui::Begin("Entities", &showEntities);
 
-			scene.GetWorld().each([this](flecs::entity e, LookupTag p)
+			scene.GetWorld().each([this](flecs::entity e, EntityTag p)
 				{
 					// Only call ShowEntityTree for root entities (entities with no parent)
 					if (e.parent() == flecs::entity::null()) {
@@ -502,22 +434,6 @@ namespace wc
 							const_cast<glm::vec2&>(p.position) = glm::vec2(position[0], position[1]);
 						}
 
-					}
-				}
-
-				if (selected_entity.has<VelocityComponent>())
-				{
-					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					if (ImGui::CollapsingHeader("Velocity"))
-					{
-						auto& v = *selected_entity.get<VelocityComponent>();
-						float velocity[2] = { v.velocity.x, v.velocity.y };
-
-						if (ImGui::InputFloat2("Velocity", velocity))
-						{
-							// Use const_cast to modify the original velocity
-							const_cast<glm::vec2&>(v.velocity) = glm::vec2(velocity[0], velocity[1]);
-						}
 					}
 				}
 

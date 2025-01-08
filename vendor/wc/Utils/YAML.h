@@ -93,6 +93,13 @@ namespace YAMLUtils
 		file << node;
 		file.close();
 	}
+
+	void SaveFile(const std::string& fileName, YAML::Emitter& emitter)
+	{
+		std::ofstream file(fileName);
+		file << emitter.c_str();
+		file.close();
+	}
 	
 	YAML::Emitter& operator<<(YAML::Emitter& out, glm::vec2 v)
 	{
