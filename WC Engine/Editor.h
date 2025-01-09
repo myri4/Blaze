@@ -345,7 +345,7 @@ namespace wc
 				static std::string name = "";
 				ImGui::InputText("Name", &name);
 
-				if (ImGui::Button("Create")) 
+				if (ImGui::Button("Create") || ImGui::IsKeyPressed(ImGuiKey_Enter)) 
 				{
 					if (!name.empty()) 
 					{
@@ -429,43 +429,227 @@ namespace wc
 					selected_entity.set_name(nameBuffer.c_str());
 				}
 
-
 				// Display the entity's ID
 				//ImGui::Text("ID: %u", selected_entity.id());
 
-				//NOTE: for every new component, a new if is needed
+				//NOTE: for every new component, a new if statement is needed
 				ImGui::SeparatorText("Components");
 
 				if (selected_entity.has<PositionComponent>())
 				{
+					bool visible = true;
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					if (ImGui::CollapsingHeader("Position"))
+					if (ImGui::CollapsingHeader("Position##header", &visible, ImGuiTreeNodeFlags_None))
 					{
 						auto& p = *selected_entity.get<PositionComponent>();
 						auto& position = const_cast<glm::vec2&>(p.position);
 
+						// Draw position UI
 						Widgets::PositionUI(position);
-
 					}
+
+					if (!visible) selected_entity.remove<PositionComponent>(); // add modal popup
 				}
 
 				if (selected_entity.has<ScaleComponent>())
 				{
+					bool visible = true;
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					if (ImGui::CollapsingHeader("Scale"))
+					if (ImGui::CollapsingHeader("Scale##header", &visible, ImGuiTreeNodeFlags_None))
 					{
 						auto& s = *selected_entity.get<ScaleComponent>();
 						auto& scale = const_cast<glm::vec2&>(s.scale);
 
-						Widgets::ScaleUI(scale);
+						ImGui::DragFloat2("Scale", glm::value_ptr(scale), 0.1f);
+					}
+
+					if (!visible) selected_entity.remove<ScaleComponent>();
+				}
+
+				if (selected_entity.has<RotationComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Rotation##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& r = *selected_entity.get<RotationComponent>();
+						auto& rotation = const_cast<float&>(r.rotation);
+						// Draw rotation UI
+						ImGui::SliderFloat("Rotation", &rotation, 0.0f, 360.0f);
+					}
+					if (!visible) selected_entity.remove<RotationComponent>();
+				}
+
+				if (selected_entity.has<SpriteRendererComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Sprite Renderer##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& s = *selected_entity.get<SpriteRendererComponent>();
+						auto& color = const_cast<glm::vec4&>(s.Color);
+						ImGui::ColorEdit4("color", glm::value_ptr(color));
+					}
+
+					if (!visible) selected_entity.remove<SpriteRendererComponent>();
+				}
+
+				if (selected_entity.has<CircleRendererComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Circle Renderer##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& c = *selected_entity.get<CircleRendererComponent>();
+						auto& thickness = const_cast<float&>(c.Thickness);
+						auto& fade = const_cast<float&>(c.Fade);
+						auto& color = const_cast<glm::vec4&>(c.Color);
+
+						// Draw circle renderer UI
+						ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
+						ImGui::SliderFloat("Fade", &fade, 0.0f, 1.0f);
+						ImGui::ColorEdit4("Color", glm::value_ptr(color));
+					}
+
+					if (!visible) selected_entity.remove<CircleRendererComponent>(); // add modal popup
+				}
+
+				if (selected_entity.has<TextRendererComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Text Renderer##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& t = *selected_entity.get<TextRendererComponent>();
+						auto& text = const_cast<std::string&>(t.Text);
+						//auto& font = const_cast<std::string&>(t.Font);
+						auto& color = const_cast<glm::vec4&>(t.Color);
+						// Draw text renderer UI
+						ImGui::InputText("Text", &text);
+						//ImGui::InputText("Font", &font);
+						ImGui::ColorEdit4("Color", glm::value_ptr(color));
+					}
+					if (!visible) selected_entity.remove<TextRendererComponent>(); // add modal popup
+				}
+				
+
+				ImGui::Separator();
+				static bool showAddComponent = false;
+				if (ImGui::Button("Add Component")) showAddComponent = true;
+
+				if (showAddComponent)
+				{
+					{
+					// Calculate the desired position for the popup
+					ImVec2 popupPos = ImGui::GetItemRectMin();
+					popupPos.y = ImGui::GetItemRectMax().y + 5;
+					ImVec2 popupSize = { 200, 200 }; // Desired size of the popup
+
+					// Get the view port's boundaries
+					const ImGuiViewport* viewport = ImGui::GetWindowViewport();
+					ImVec2 viewportMin = viewport->Pos;
+					ImVec2 viewportMax = { viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
+
+					// Adjust the position to ensure the popup doesn't go outside the viewport
+					popupPos.x = std::clamp(popupPos.x, viewportMin.x, viewportMax.x - popupSize.x);
+					popupPos.y = std::clamp(popupPos.y, viewportMin.y, viewportMax.y - popupSize.y);
+
+					// Set the position and size of the popup
+					ImGui::SetNextWindowPos(popupPos);
+					ImGui::SetNextWindowSize(popupSize, ImGuiCond_Once);
+					}
+
+					// Begin the popup window
+					if (ImGui::Begin("Components", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize| ImGuiWindowFlags_NoDocking))
+					{
+						if (!ImGui::IsWindowFocused()) showAddComponent = false;
+
+						if (ImGui::CollapsingHeader("Physics"))
+						{
+							bool hasPosition = selected_entity.has<PositionComponent>();
+							if (ImGui::Checkbox("Position", &hasPosition))
+							{
+								if (hasPosition) selected_entity.add<PositionComponent>();
+								else selected_entity.remove<PositionComponent>();
+							}
+
+							bool hasScale = selected_entity.has<ScaleComponent>();
+							if (ImGui::Checkbox("Scale", &hasScale))
+							{
+								if (hasScale)
+								{
+									selected_entity.add<ScaleComponent>();
+									selected_entity.set<ScaleComponent>({ { 1.0f, 1.0f } });
+								}
+								else selected_entity.remove<ScaleComponent>();
+							}
+
+							bool hasRotation = selected_entity.has<RotationComponent>();
+							if (ImGui::Checkbox("Rotation", &hasRotation))
+							{
+								if (hasRotation) selected_entity.add<RotationComponent>();
+								else selected_entity.remove<RotationComponent>();
+							}
+
+						}
+
+						if (ImGui::CollapsingHeader("Render"))
+						{
+							bool hasSpriteRenderer = selected_entity.has<SpriteRendererComponent>();
+							bool hasCircleRenderer = selected_entity.has<CircleRendererComponent>();
+							bool hasTextRenderer = selected_entity.has<TextRendererComponent>();
+
+							if (ImGui::RadioButton("Sprite Renderer", hasSpriteRenderer))
+							{
+								if (!hasSpriteRenderer)
+								{
+									selected_entity.add<SpriteRendererComponent>();
+									selected_entity.remove<CircleRendererComponent>();
+									selected_entity.remove<TextRendererComponent>();
+								}
+								else selected_entity.remove<SpriteRendererComponent>();
+							}
+
+							if (ImGui::RadioButton("Circle Renderer", hasCircleRenderer))
+							{
+								if (!hasCircleRenderer)
+								{
+									selected_entity.add<CircleRendererComponent>();
+									selected_entity.remove<SpriteRendererComponent>();
+									selected_entity.remove<TextRendererComponent>();
+								}
+								else selected_entity.remove<CircleRendererComponent>();
+							}
+
+							if (ImGui::RadioButton("Text Renderer", hasTextRenderer)) // Crashes
+							{
+								if (!hasTextRenderer)
+								{
+									selected_entity.add<TextRendererComponent>();
+									selected_entity.remove<SpriteRendererComponent>();
+									selected_entity.remove<CircleRendererComponent>();
+								}
+								else selected_entity.remove<TextRendererComponent>();
+							}
+
+						}
+
+						if (ImGui::CollapsingHeader("Music"))
+						{
+
+						}
+
+						ImGui::EndTabBar();
+
+						ImGui::End();
 					}
 				}
+
 			}
 
 			ImGui::End();
 		}
 
-		// @TODO fix this
 		void UI_Console()
 		{
 			ImGui::Begin("Console", &showConsole);
