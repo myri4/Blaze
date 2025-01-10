@@ -9,9 +9,8 @@ namespace wc
 		return ImVec2(v.x, v.y);
 	}
 
-	namespace Widgets
+	namespace UI
 	{
-
 		static void HelpMarker(const char* desc, bool sameLine = true)
 		{
 			if (sameLine) ImGui::SameLine();
@@ -25,88 +24,58 @@ namespace wc
 			}
 		}
 
-		void PositionUI(glm::vec2& pos)
+		void DragButton2(const char* txt, glm::vec2& v)
 		{
-			float position[2] = { pos.x, pos.y };
+			float position[2] = { v.x, v.y };
 
 			// Define a fixed width for the buttons
 			const float buttonWidth = 20.0f;
 
 			// Calculate the available width for the input fields
-			float totalWidth = ImGui::GetContentRegionAvail().x;
-			float labelWidth = buttonWidth * 2 + ImGui::CalcTextSize("Position").x + ImGui::GetStyle().ItemSpacing.x * 2;
-			float inputWidth = (totalWidth - labelWidth) / 2;
-
-			ImGui::AlignTextToFramePadding();
+			float inputWidth = (ImGui::GetContentRegionAvail().x - 2 - ImGui::GetStyle().ItemSpacing.x - buttonWidth * 2) * 0.65f / 2;
 
 			// Draw colored button for "X"
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.6f)); // Red color
 			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 0.75f)); // Red color
-			if (ImGui::Button("X", ImVec2(buttonWidth, 0)))
+			if (ImGui::Button((std::string("X##X") + txt).c_str(), ImVec2(buttonWidth, 0)))
 			{
-				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { pos.x -= 1.0f; }
-				else { pos.x += 1.0f; }
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.x -= 1.0f; }
+				else { v.x += 1.0f; }
 			}
 			ImGui::PopStyleColor(3);
 			ImGui::SameLine(0, 0);
 
-			ImGui::PushItemWidth(inputWidth);
-			if (ImGui::DragFloat("##XPosition", &position[0], 0.1f)) { pos.x = position[0]; }
-			ImGui::PopItemWidth();
-			ImGui::SameLine();
+			ImGui::SetNextItemWidth(inputWidth);
+			if (ImGui::DragFloat((std::string("##X") + txt).c_str(), &position[0], 0.1f)) { v.x = position[0]; }
 
-			ImGui::AlignTextToFramePadding();
+			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 
 			// Draw colored button for "Y"
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 0.5f)); // Green color
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 1.0f, 0.0f, 0.6f)); // Green color
 			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.0f, 0.75f)); // Green color
-			if (ImGui::Button("Y", ImVec2(buttonWidth, 0)))
+			if (ImGui::Button((std::string("Y##Y") + txt).c_str(), ImVec2(buttonWidth, 0)))
 			{
-				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { pos.y -= 1.0f; }
-				else { pos.y += 1.0f; }
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.y -= 1.0f; }
+				else { v.y += 1.0f; }
 			}
 			ImGui::PopStyleColor(3);
 			ImGui::SameLine(0, 0);
 
-			ImGui::PushItemWidth(inputWidth);
-			if (ImGui::DragFloat("##YPosition", &position[1], 0.1f)) { pos.y = position[1]; }
-			ImGui::PopItemWidth();
+			ImGui::SetNextItemWidth(inputWidth);
+			if (ImGui::DragFloat((std::string("##Y") + txt).c_str(), &position[1], 0.1f)) { v.y = position[1]; }
 
-			ImGui::SameLine();
+
+			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 			ImGui::AlignTextToFramePadding();
-			ImGui::Text("Position");
+			ImGui::Text(txt);
 
 			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
 
-
 			return;
 		}
 
-		void ScaleUI(glm::vec2& scale)
-		{
-			float scaleValue[2] = { scale.x, scale.y };
-
-			ImGui::Text("Scale");
-			ImGui::SameLine();
-
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-
-			if (ImGui::DragFloat2("##Scale", scaleValue))
-			{
-				scale.x = scaleValue[0];
-				scale.y = scaleValue[1];
-			}
-
-			ImGui::PopItemWidth();
-			return;
-		}
-
-	}
-
-	namespace UI
-	{
 		void Separator()
 		{
 			ImGui::Separator();

@@ -301,6 +301,53 @@ namespace wc
 				selected_entity = e;  // Update the selected entity
 			}
 
+			// Check for right-click and open popup
+			if (ImGui::IsWindowHovered())
+			{
+				if (ImGui::IsItemHovered())
+				{
+					if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ImGui::OpenPopup(std::to_string(e.id()).c_str());
+				}
+				else
+				{
+					if (selected_entity != flecs::entity::null() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ImGui::OpenPopup(std::to_string(selected_entity.id()).c_str());
+				}
+			}
+
+			// Display the popup
+			if (ImGui::BeginPopup(std::to_string(e.id()).c_str()))
+			{
+				ImGui::Text("% s", e.name().c_str());
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Clone"))
+				{
+					WC_CORE_INFO("Implement Clone");
+					ImGui::CloseCurrentPopup();
+				}
+
+				if (ImGui::MenuItem("Export"))
+				{
+					WC_CORE_INFO("Implement Export");
+					ImGui::CloseCurrentPopup();
+				}
+
+				ImGui::Separator();
+
+				ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+				if (ImGui::MenuItem("Delete"))
+				{
+					scene.KillEntity(e);
+					selected_entity = flecs::entity::null();
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::PopStyleColor();
+
+
+
+				ImGui::EndPopup();
+			}
+
 			if (is_open) 
 			{
 				// If the node is open, recursively show its children
@@ -335,7 +382,7 @@ namespace wc
 			ImGui::SetItemTooltip("Add Entity");
 			ImGui::PopStyleVar();
 
-			if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize))
+			if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize)) 
 			{
 				static std::string name = "";
 				ImGui::InputText("Name", &name);
@@ -373,40 +420,6 @@ namespace wc
 				ImGui::EndPopup();
 			}
 
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsWindowHovered() && selected_entity != flecs::entity::null())
-			{
-				ImGui::OpenPopup("RightClickPopup");
-			}
-
-			if (ImGui::BeginPopup("RightClickPopup"))
-			{
-				ImGui::Text("Selected Entity");
-
-				if (ImGui::Button("Add Child"))
-				{
-					//scene.AddEntity("Child Entity", selected_entity); TODO
-				}
-
-				if (ImGui::Button("Add Component"))
-				{
-					//ImGui::OpenPopup("AddComponent"); TODO
-				}
-
-				if (ImGui::Button("Copy"))
-				{
-					// copies components but not children + asks to rename TODO
-
-				}
-
-				if (ImGui::Button("Delete"))
-				{
-					scene.KillEntity(selected_entity);
-					selected_entity = flecs::entity::null();
-				}
-
-				ImGui::EndPopup();
-			}
-
 			ImGui::End();
 		}
 
@@ -439,8 +452,8 @@ namespace wc
 						auto& rotation = const_cast<float&>(p.rotation);
 
 						// Draw position UI
-						Widgets::PositionUI(position);
-						ImGui::DragFloat2("Scale", glm::value_ptr(scale), 0.1f);
+						UI::DragButton2("Position", position);
+						UI::DragButton2("Scale", scale);
 						ImGui::SliderFloat("Rotation", &rotation, 0.0f, 360.0f);
 						ImGui::Separator();
 
@@ -603,7 +616,6 @@ namespace wc
 			ImGui::End();
 		}
 
-		// @TODO fix this
 		void UI_Console()
 		{
 			ImGui::Begin("Console", &showConsole);
