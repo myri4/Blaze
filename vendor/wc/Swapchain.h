@@ -3,6 +3,7 @@
 #include "vk/Image.h"
 #include "vk/SyncContext.h"
 #include "Utils/Window.h"
+#include "Memory/Buffer.h"
 
 namespace vk
 {
@@ -115,13 +116,13 @@ namespace vk
 				.oldSwapchain = m_Handle,
 			};
 
-			WC_CORE_INFO("Swapchain create info");
-			WC_CORE_INFO("Image count: {}", imageCount);
-			WC_CORE_INFO("Image format: {}", magic_enum::enum_name(surfaceFormat.format));
-			WC_CORE_INFO("Color-space: {}", magic_enum::enum_name(surfaceFormat.colorSpace));
-			WC_CORE_INFO("Extent: [{}, {}]", extent.width, extent.height);
-			//WC_CORE_INFO("Transform: {}", magic_enum::enum_name(surfaceFormat.colorSpace));
-			WC_CORE_INFO("Present mode: {}", magic_enum::enum_name(presentMode));
+			//WC_CORE_INFO("Swapchain create info");
+			//WC_CORE_INFO("Image count: {}", imageCount);
+			//WC_CORE_INFO("Image format: {}", magic_enum::enum_name(surfaceFormat.format));
+			//WC_CORE_INFO("Color-space: {}", magic_enum::enum_name(surfaceFormat.colorSpace));
+			//WC_CORE_INFO("Extent: [{}, {}]", extent.width, extent.height);
+			////WC_CORE_INFO("Transform: {}", magic_enum::enum_name(surfaceFormat.colorSpace));
+			//WC_CORE_INFO("Present mode: {}", magic_enum::enum_name(presentMode));
 
 			//QueueFamilyIndices indices = findQueueFamilies(physicalDevice/*, surface*/);
 			//uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value()/*, indices.presentFamily.value()*/ };

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <filesystem>
-#include <imgui/imgui_impl_vulkan.h>
+#include "imgui_backend/imgui_impl_vulkan.h"
 #include <stb_image/stb_image.h>
 #include <wc/vk/Image.h>
 #include <wc/vk/SyncContext.h>
@@ -111,9 +111,7 @@ namespace wc
             if (data)
             {
                 Load(data, width, height, mipMapping);
-                image.SetName(filepath);
-                view.SetName(filepath);
-                sampler.SetName(filepath);
+                SetName(filepath);
             }
             else
                 WC_CORE_ERROR("Could not find file at location {}", filepath);
