@@ -76,60 +76,195 @@ namespace wc
 			UpdatePhysics();
 		}
 
+		void SerializeEntity(flecs::entity& entity, YAML::Node& entityData)
+		{
+			if (entity.name() != "null") entityData["Name"] = std::string(entity.name().c_str());
+			else entityData["Name"] = std::string("null[5ws78@!12]");
+			entityData["ID"] = entity.id();
+
+			if (entity.has<PositionComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Position"] = entity.get<PositionComponent>()->position;
+				entityData["PositionComponent"] = componentData;
+			}
+
+			if (entity.has<ScaleComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Scale"] = entity.get<ScaleComponent>()->scale;
+				entityData["ScaleComponent"] = componentData;
+			}
+
+			if (entity.has<RotationComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Rotation"] = entity.get<RotationComponent>()->rotation;
+				entityData["RotationComponent"] = componentData;
+			}
+
+			if (entity.has<TextRendererComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Text"] = entity.get<TextRendererComponent>()->Text;
+				//componentData["Font"] = entity.get<TextRendererComponent>()->Font;		// @TODO: add support for serializing Font type
+				componentData["Color"] = entity.get<TextRendererComponent>()->Color;
+				entityData["TextRendererComponent"] = componentData;
+			}
+
+			if (entity.has<SpriteRendererComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Color"] = entity.get<SpriteRendererComponent>()->Color;
+				componentData["Texture"] = entity.get<SpriteRendererComponent>()->Texture;  // @TODO: this should be in text form
+				entityData["SpriteRendererComponent"] = componentData;
+			}
+
+			if (entity.has<CircleRendererComponent>())
+			{
+				YAML::Node componentData;
+				componentData["Color"] = entity.get<CircleRendererComponent>()->Color;
+				componentData["Thickness"] = entity.get<CircleRendererComponent>()->Thickness;
+				componentData["Fade"] = entity.get<CircleRendererComponent>()->Fade;
+				entityData["CircleRendererComponent"] = componentData;
+			}
+
+			if (entity.has<PhysicsComponent>())
+			{
+				YAML::Node componentData;
+				//componentData["Body"] = entity.get<PhysicsComponent>()->body;				// @TODO: add support for serializing b2Body type
+				componentData["PreviousPosition"] = entity.get<PhysicsComponent>()->prevPos;
+				entityData["PhysicsComponent"] = componentData;
+			}
+		}
+
+		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData)
+		{
+			YAML::Node childrenData;
+
+			m_World.query_builder<EntityTag>()
+				.with(flecs::ChildOf, parent)
+				.each([&](flecs::entity child, EntityTag) {
+				YAML::Node childData;
+				
+				SerializeEntity(child, childData);
+
+				SerializeChildEntity(child, childData);
+
+				childrenData.push_back(childData);
+			});
+
+			if (childrenData.size() != 0) entityData["Children"] = childrenData;
+		}
+
 		void Save(const std::string& filepath)
 		{
 			YAML::Node metaData;
 			YAML::Node entitiesData;
 
 			m_World.each([&](flecs::entity entity, EntityTag) {
-				YAML::Node entityData;
-				entityData["Name"] = std::string(entity.name().c_str());
-				entityData["ID"] = entity.id();
-
-				if (entity.has<PositionComponent>())
+				if (entity.parent() == 0)
 				{
-					YAML::Node componentData;
-					componentData["Position"] = entity.get<PositionComponent>()->position;
-					entityData["PositionComponent"] = componentData;
-				}
+					YAML::Node entityData;
 
-				if (entity.has<ScaleComponent>())
-				{
-					YAML::Node componentData;
-					componentData["Scale"] = entity.get<ScaleComponent>()->scale;
-					entityData["ScaleComponent"] = componentData;
-				}
+					SerializeEntity(entity, entityData);
 
-				if (entity.has<RotationComponent>())
-				{
-					YAML::Node componentData;
-					componentData["Rotation"] = entity.get<RotationComponent>()->rotation;
-					entityData["RotationComponent"] = componentData;
-				}
+					SerializeChildEntity(entity, entityData);
 
-				if (entity.has<SpriteRendererComponent>())
-				{
-					YAML::Node componentData;
-					componentData["Color"] = entity.get<SpriteRendererComponent>()->Color;
-					componentData["Texture"] = entity.get<SpriteRendererComponent>()->Texture; // @TODO: this should be in text form
-					entityData["SpriteRendererComponent"] = componentData;
+					entitiesData.push_back(entityData);
 				}
-
-				if (entity.has<CircleRendererComponent>())
-				{
-					YAML::Node componentData;
-					componentData["Color"] = entity.get<CircleRendererComponent>()->Color;
-					componentData["Thickness"] = entity.get<CircleRendererComponent>()->Thickness; 
-					componentData["Fade"] = entity.get<CircleRendererComponent>()->Fade;
-					entityData["CircleRendererComponent"] = componentData;
-				}
-
-				entitiesData.push_back(entityData);
 			});
 
 			metaData["Entities"] = entitiesData;
 
 			YAMLUtils::SaveFile(filepath, metaData);
+		}
+
+		void DeserializeEntity(flecs::entity& deserializedEntity, const YAML::detail::iterator_value& entity)
+		{
+			std::string name = entity["Name"].as<std::string>();
+			std::string id = entity["ID"].as<std::string>();
+
+			WC_CORE_TRACE("Deserialized entity with name = {}, ID = {}", name, id);
+
+			if (name == "null[5ws78@!12]") deserializedEntity = AddEntity("null");
+			else if (name != "null") deserializedEntity = AddEntity(name);
+			else deserializedEntity = AddEntity();
+
+			auto positionComponent = entity["PositionComponent"];
+			if (positionComponent)
+			{
+				deserializedEntity.set<PositionComponent>({
+					positionComponent["Position"].as<glm::vec2>()
+					});
+			}
+
+			auto scaleComponent = entity["ScaleComponent"];
+			if (scaleComponent)
+			{
+				deserializedEntity.set<ScaleComponent>({
+					scaleComponent["Scale"].as<glm::vec2>()
+					});
+			}
+
+			auto rotationComponent = entity["RotationComponent"];
+			if (rotationComponent)
+			{
+				deserializedEntity.set<RotationComponent>({
+					rotationComponent["Rotation"].as<float>()
+					});
+			}
+
+			auto textRendererComponent = entity["TextRendererComponent"];
+			if (textRendererComponent)
+			{
+				deserializedEntity.set<TextRendererComponent>({
+					textRendererComponent["Text"].as<std::string>(),
+					//textRendererComponent["Font"].as<Font>(),					// @TODO: add support for deserializing Font type
+					//textRendererComponent["Color"].as<glm::vec4>()
+					});
+			}
+
+			auto spriteRendererComponent = entity["SpriteRendererComponent"];
+			if (spriteRendererComponent)
+			{
+				deserializedEntity.set<SpriteRendererComponent>({
+					spriteRendererComponent["Color"].as<glm::vec4>(),
+					spriteRendererComponent["Texture"].as<uint32_t>()
+					});
+			}
+
+			auto circleRendererComponent = entity["CircleRendererComponent"];
+			if (circleRendererComponent)
+			{
+				deserializedEntity.set<CircleRendererComponent>({
+					circleRendererComponent["Color"].as<glm::vec4>(),
+					circleRendererComponent["Thickness"].as<float>(),
+					circleRendererComponent["Fade"].as<float>()
+					});
+			}
+
+			auto physicsComponent = entity["PhysicsComponent"];
+			if (physicsComponent)
+			{
+				deserializedEntity.set<PhysicsComponent>({
+					//physicsComponent["Body"].as<b2Body>(),					// @TODO: add support for deserializing b2Body type
+					//physicsComponent["PreviousPosition"].as<glm::vec2>()
+					});
+			}
+
+			auto childEntities = entity["Children"];
+			if (childEntities)
+			{
+				for (const auto& child : childEntities)
+				{
+					flecs::entity deserializedChildEntity;
+
+					DeserializeEntity(deserializedChildEntity, child);
+
+					deserializedChildEntity.child_of(deserializedEntity);
+				}
+			}
 		}
 
 		bool Load(const std::string& filepath)
@@ -147,55 +282,9 @@ namespace wc
 			{
 				for (const auto& entity : entities)
 				{
-					std::string name = entity["Name"].as<std::string>();
-					std::string id = entity["ID"].as<std::string>();
+					flecs::entity deserializedEntity;
 
-					WC_CORE_TRACE("Deserialized entity with name = {}, ID = {}", name, id);
-
-					flecs::entity deserializedEntity = AddEntity(name);
-
-					auto positionComponent = entity["PositionComponent"];
-					if (positionComponent)
-					{
-						deserializedEntity.set<PositionComponent>({
-							positionComponent["Position"].as<glm::vec2>()
-							});
-					}
-
-					auto scaleComponent = entity["ScaleComponent"];
-					if (scaleComponent)
-					{
-						deserializedEntity.set<ScaleComponent>({
-							scaleComponent["Scale"].as<glm::vec2>()
-							});
-					}
-
-					auto rotationComponent = entity["RotationComponent"];
-					if (rotationComponent)
-					{
-						deserializedEntity.set<RotationComponent>({
-							rotationComponent["Rotation"].as<float>()
-							});
-					}
-
-					auto spriteRendererComponent = entity["SpriteRendererComponent"];
-					if (spriteRendererComponent)
-					{
-						deserializedEntity.set<SpriteRendererComponent>({
-							spriteRendererComponent["Color"].as<glm::vec4>(),
-							spriteRendererComponent["Texture"].as<uint32_t>()
-							});
-					}
-
-					auto circleRendererComponent = entity["CircleRendererComponent"];
-					if (circleRendererComponent)
-					{
-						deserializedEntity.set<CircleRendererComponent>({
-							circleRendererComponent["Color"].as<glm::vec4>(),
-							circleRendererComponent["Thickness"].as<float>(),
-							circleRendererComponent["Fade"].as<float>()
-							});
-					}
+					DeserializeEntity(deserializedEntity, entity);
 				}
 			}
 		}
