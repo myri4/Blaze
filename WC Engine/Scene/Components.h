@@ -10,18 +10,10 @@ namespace wc
 
 	// Transforms
 
-	struct PositionComponent
+	struct TransformComponent
 	{
 		glm::vec2 position;
-	};
-
-	struct ScaleComponent
-	{
 		glm::vec2 scale;
-	};
-	
-	struct RotationComponent
-	{
 		float rotation;
 	};
 

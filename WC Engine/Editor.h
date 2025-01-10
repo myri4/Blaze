@@ -100,17 +100,14 @@ namespace wc
 			// Entity Loading
 			ent1 = scene.AddEntity("Entity 1");
 
-			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
-
-			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent1.set<TransformComponent>({ { 0.0f, 0.0f }, { 1.0f, 1.0f } });
 			ent1.set<CircleRendererComponent>({});
 
 			ent2 = scene.AddEntity("Entity 2");
 
-			ent2.set<PositionComponent>({ { -10.0f, 0.0f } });
-
-			ent2.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent2.set<TransformComponent>({ { -10.0f, 0.0f }, { 1.0f, 1.0f } });
 			ent2.set<SpriteRendererComponent>({});
+
 			ent2.child_of(ent1);
 		}
 
@@ -156,12 +153,12 @@ namespace wc
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
 
-			scene.GetWorld().each([&](flecs::entity entt, PositionComponent& p) {
+			scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
 				glm::vec2 scale = glm::vec2(1.f);
 				float rotation = 0.f;
 
-				if (entt.has<ScaleComponent>()) scale = entt.get<ScaleComponent>()->scale;
-				if (entt.has<RotationComponent>()) rotation = entt.get<RotationComponent>()->rotation;
+				scale = entt.get<TransformComponent>()->scale;
+				rotation = entt.get<TransformComponent>()->rotation;
 				
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(p.position, 0.f)) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { scale.x, scale.y, 1.f });
 				
@@ -231,9 +228,9 @@ namespace wc
 			ImGuizmo::SetDrawlist();
 			ImGuizmo::SetRect(WindowPos.x, WindowPos.y, RenderSize.x, RenderSize.y);
 
-			if (selected_entity != flecs::entity::null() && selected_entity.has<PositionComponent>())
+			if (selected_entity != flecs::entity::null() && selected_entity.has<TransformComponent>())
 			{
-				auto position = selected_entity.get<PositionComponent>()->position;
+				auto position = selected_entity.get<TransformComponent>()->position;
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(position, 0.f));
 
 				ImGuizmo::Manipulate(glm::value_ptr(camera.GetViewMatrix()), glm::value_ptr(projection), m_GuizmoOp, ImGuizmo::MODE::WORLD, glm::value_ptr(transform));
@@ -242,7 +239,7 @@ namespace wc
 				{
 					glm::vec3 translation, rotation, scale;
 					DecomposeTransform(transform, translation, rotation, scale);
-					selected_entity.set<PositionComponent>({ glm::vec2(translation) });
+					selected_entity.set<TransformComponent>({ glm::vec2(translation), glm::vec2(scale) });
 				}
 			}
 
@@ -436,25 +433,22 @@ namespace wc
 				//NOTE: for every new component, a new if is needed
 				ImGui::SeparatorText("Components");
 
-				if (selected_entity.has<PositionComponent>())
+				if (selected_entity.has<TransformComponent>())
 				{
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 					if (ImGui::CollapsingHeader("Position"))
 					{
-						auto& p = *selected_entity.get<PositionComponent>();
+						auto& p = *selected_entity.get<TransformComponent>();
 						auto& position = const_cast<glm::vec2&>(p.position);
 
 						Widgets::PositionUI(position);
 
 					}
-				}
 
-				if (selected_entity.has<ScaleComponent>())
-				{
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 					if (ImGui::CollapsingHeader("Scale"))
 					{
-						auto& s = *selected_entity.get<ScaleComponent>();
+						auto& s = *selected_entity.get<TransformComponent>();
 						auto& scale = const_cast<glm::vec2&>(s.scale);
 
 						Widgets::ScaleUI(scale);
