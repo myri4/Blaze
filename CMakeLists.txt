@@ -6,19 +6,18 @@ project("WC-Engine")
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/WC Engine/*.cpp" "${CMAKE_SOURCE_DIR}/WC Engine/*.h")
+file(GLOB IMGUI_SOURCES 
+"vendor/imgui/*.cpp" "vendor/imgui/*.h"
+"vendor/imgui/misc/cpp/*.cpp" "vendor/imgui/misc/cpp/*.h"
+)
     
 add_executable("WC-Engine" 
     ${SOURCES}
+    ${IMGUI_SOURCES}
+    "vendor/wc/imgui_backend/imgui_impl_glfw.cpp"
+    "vendor/wc/imgui_backend/imgui_impl_vulkan.cpp"
+    "vendor/imguizmo/ImGuizmo.cpp"
     "vendor/flecs/flecs.c"
-    "vendor/imgui/imgui.cpp"
-    "vendor/imgui/ImGuizmo.cpp"
-    "vendor/imgui/imgui_demo.cpp"
-    "vendor/imgui/imgui_draw.cpp"
-    "vendor/imgui/imgui_impl_glfw.cpp"
-    "vendor/imgui/imgui_impl_vulkan.cpp"
-    "vendor/imgui/imgui_stdlib.cpp"
-    "vendor/imgui/imgui_tables.cpp"
-    "vendor/imgui/imgui_widgets.cpp"
     "vendor/tinyxml2.cpp"
     "vendor/lodepng.cpp"
     "vendor/msdfgen/atlas-gen/bitmap-blit.cpp"
@@ -95,5 +94,6 @@ box2d::box2d
 target_include_directories(${PROJECT_NAME} PUBLIC 
 "vendor/"
 "vendor/box2d/include" # mad funny box2d
+"vendor/imgui"
 )
 target_link_directories(${PROJECT_NAME} PUBLIC ${VULKAN_LIBRARY_DIRS})

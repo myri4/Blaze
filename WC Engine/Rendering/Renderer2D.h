@@ -5,7 +5,7 @@
 #include <wc/Descriptors.h>
 
 #include "RenderData.h"
-#include <imgui/imgui_impl_vulkan.h>
+#include "wc/imgui_backend/imgui_impl_vulkan.h"
 
 #include "Font.h"
 
@@ -356,7 +356,7 @@ namespace wc
 
 		OrthographicCamera* camera = nullptr;
 
-		auto GetImguiImageID() { return m_ImguiImageID; }
+		auto GetImguiImageID() { return (uint64_t)m_ImguiImageID; }
 		auto GetOutputImage() const { return m_OutputImage; }
 
 		auto GetRenderSize() const { return m_RenderSize; }

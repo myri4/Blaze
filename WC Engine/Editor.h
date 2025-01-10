@@ -24,11 +24,9 @@
 
 // GUI
 #include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_vulkan.h>
 #include <imgui/imgui_internal.h>
-#include <imgui/imgui_stdlib.h>
-#include <imgui/ImGuizmo.h>
+#include <imgui/misc/cpp/imgui_stdlib.h>
+#include <imguizmo/ImGuizmo.h>
 
 #include "Globals.h"
 #include "Rendering/Renderer2D.h"
@@ -758,27 +756,26 @@ namespace wc
 					float spacing = 5.0f;
 
 					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + spacing));
-					if (ImGui::ImageButton(t_Collapse, { buttonSize, buttonSize }))
+					if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
 					{
 						//Globals.window.Collapse();
 					}
 
 					ImGui::SameLine();
-					if (ImGui::ImageButton(t_Minimize, { buttonSize, buttonSize }))
+					if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
 					{
 						//Globals.window.Maximize();
 					}
 
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
 					ImGui::SameLine();
-					if (ImGui::ImageButton(t_Close, { buttonSize, buttonSize }))
+					if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
 					{
 						Globals.window.Close();
 					}
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
 
-					ImGui::PopStyleVar(1);
-					ImGui::PopStyleColor(5);
+					ImGui::PopStyleVar();
+					ImGui::PopStyleColor(4);
 
 					ImGui::EndMenuBar();
 				}
@@ -792,8 +789,6 @@ namespace wc
 			if (showFileExplorer) UI_FileExplorer();
 
 			ImGui::End();
-
-			ImGui::PopStyleVar(3);
 		}
 
 		void Resize(glm::vec2 size)

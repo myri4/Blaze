@@ -11,7 +11,7 @@
 #include <GLFW/glfw3native.h>
 #include <glm/glm.hpp>
 #include "Log.h"
-#include <imgui/imgui_impl_glfw.h>
+#include "../imgui_backend/imgui_impl_glfw.h"
 
 namespace wc 
 {

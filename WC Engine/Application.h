@@ -1,8 +1,7 @@
 #pragma once
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_vulkan.h>
-#include <imgui/ImGuizmo.h>
+
+#include "wc/imgui_backend/imgui_impl_glfw.h"
+#include "wc/imgui_backend/imgui_impl_vulkan.h"
 
 #include "Editor.h"
 
@@ -41,11 +40,11 @@ namespace wc
 				.Width = 1280,
 				.Height = 720,
 				.Name = "WC Engine Editor",
-				.StartMode = WindowMode::Normal,
+				.StartMode = WindowMode::Maximized,
 				.VSync = false,
 				.Resizeable = true,
+			//	.Decorated = false;
 			};
-			//windowInfo.Decorated = false;
 			Globals.window.Create(windowInfo);
 			Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h) 
 			{ 
