@@ -34,7 +34,7 @@ namespace wc
 
 			// Calculate the available width for the input fields
 			float totalWidth = ImGui::GetContentRegionAvail().x;
-			float labelWidth = buttonWidth * 2 + ImGui::CalcTextSize("(?)").x + ImGui::GetStyle().ItemSpacing.x * 2;
+			float labelWidth = buttonWidth * 2 + ImGui::CalcTextSize("Position").x + ImGui::GetStyle().ItemSpacing.x * 2;
 			float inputWidth = (totalWidth - labelWidth) / 2;
 
 			ImGui::AlignTextToFramePadding();
@@ -52,7 +52,7 @@ namespace wc
 			ImGui::SameLine(0, 0);
 
 			ImGui::PushItemWidth(inputWidth);
-			if (ImGui::InputFloat("##XPosition", &position[0], 1.0f, 0.1f, "%.3f")) { pos.x = position[0]; }
+			if (ImGui::DragFloat("##XPosition", &position[0], 0.1f)) { pos.x = position[0]; }
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 
@@ -71,10 +71,15 @@ namespace wc
 			ImGui::SameLine(0, 0);
 
 			ImGui::PushItemWidth(inputWidth);
-			if (ImGui::InputFloat("##YPosition", &position[1], 1.0f, 0.1f, "%.3f")) { pos.y = position[1]; }
+			if (ImGui::DragFloat("##YPosition", &position[1], 0.1f)) { pos.y = position[1]; }
 			ImGui::PopItemWidth();
 
-			HelpMarker("HOLD Ctrl for less step");
+			ImGui::SameLine();
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("Position");
+
+			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
+
 
 			return;
 		}

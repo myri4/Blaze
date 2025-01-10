@@ -31,7 +31,7 @@ namespace wc
 			worldDef.gravity = b2Vec2{ 0.0f, -9.8f };
 			m_PhysicsWorld.Create(worldDef);
 
-			m_World.each([this](PhysicsComponent& p, PositionComponent& pos) {
+			m_World.each([this](PhysicsComponent& p, TransformComponent& pos) {
 				b2BodyDef bodyDef = b2DefaultBodyDef();
 				bodyDef.type = b2_dynamicBody;
 				bodyDef.position = b2Vec2{ pos.position.x, pos.position.y };
@@ -65,7 +65,7 @@ namespace wc
 
 			float alpha = AccumulatedTime / SimulationTime;
 
-			m_World.each([this, &alpha](PhysicsComponent& p, PositionComponent& pc)
+			m_World.each([this, &alpha](PhysicsComponent& p, TransformComponent& pc)
 				{
 					pc.position = glm::mix(p.prevPos, p.body.GetPosition(), alpha);
 				});
@@ -82,25 +82,13 @@ namespace wc
 			else entityData["Name"] = std::string("null[5ws78@!12]");
 			entityData["ID"] = entity.id();
 
-			if (entity.has<PositionComponent>())
+			if (entity.has<TransformComponent>())
 			{
 				YAML::Node componentData;
-				componentData["Position"] = entity.get<PositionComponent>()->position;
-				entityData["PositionComponent"] = componentData;
-			}
-
-			if (entity.has<ScaleComponent>())
-			{
-				YAML::Node componentData;
-				componentData["Scale"] = entity.get<ScaleComponent>()->scale;
-				entityData["ScaleComponent"] = componentData;
-			}
-
-			if (entity.has<RotationComponent>())
-			{
-				YAML::Node componentData;
-				componentData["Rotation"] = entity.get<RotationComponent>()->rotation;
-				entityData["RotationComponent"] = componentData;
+				componentData["Position"] = entity.get<TransformComponent>()->position;
+				componentData["Scale"] = entity.get<TransformComponent>()->scale;
+				componentData["Rotation"] = entity.get<TransformComponent>()->rotation;
+				entityData["TransformComponent"] = componentData;
 			}
 
 			if (entity.has<TextRendererComponent>())
@@ -191,27 +179,13 @@ namespace wc
 			else if (name != "null") deserializedEntity = AddEntity(name);
 			else deserializedEntity = AddEntity();
 
-			auto positionComponent = entity["PositionComponent"];
-			if (positionComponent)
+			auto transformComponent = entity["TransformComponent"];
+			if (transformComponent)
 			{
-				deserializedEntity.set<PositionComponent>({
-					positionComponent["Position"].as<glm::vec2>()
-					});
-			}
-
-			auto scaleComponent = entity["ScaleComponent"];
-			if (scaleComponent)
-			{
-				deserializedEntity.set<ScaleComponent>({
-					scaleComponent["Scale"].as<glm::vec2>()
-					});
-			}
-
-			auto rotationComponent = entity["RotationComponent"];
-			if (rotationComponent)
-			{
-				deserializedEntity.set<RotationComponent>({
-					rotationComponent["Rotation"].as<float>()
+				deserializedEntity.set<TransformComponent>({
+					transformComponent["Position"].as<glm::vec2>(),
+					transformComponent["Scale"].as<glm::vec2>(),
+					transformComponent["Rotation"].as<float>()
 					});
 			}
 

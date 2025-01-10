@@ -100,17 +100,14 @@ namespace wc
 			// Entity Loading
 			ent1 = scene.AddEntity("Entity 1");
 
-			ent1.set<PositionComponent>({ { 0.0f, 0.0f } });
-
-			ent1.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent1.set<TransformComponent>({ { 0.0f, 0.0f }, { 1.0f, 1.0f } });
 			ent1.set<CircleRendererComponent>({});
 
 			ent2 = scene.AddEntity("Entity 2");
 
-			ent2.set<PositionComponent>({ { -10.0f, 0.0f } });
-
-			ent2.set<ScaleComponent>({ { 1.0f, 1.0f } });
+			ent2.set<TransformComponent>({ { -10.0f, 0.0f }, { 1.0f, 1.0f } });
 			ent2.set<SpriteRendererComponent>({});
+
 			ent2.child_of(ent1);
 		}
 
@@ -156,12 +153,12 @@ namespace wc
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
 
-			scene.GetWorld().each([&](flecs::entity entt, PositionComponent& p) {
+			scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
 				glm::vec2 scale = glm::vec2(1.f);
 				float rotation = 0.f;
 
-				if (entt.has<ScaleComponent>()) scale = entt.get<ScaleComponent>()->scale;
-				if (entt.has<RotationComponent>()) rotation = entt.get<RotationComponent>()->rotation;
+				scale = entt.get<TransformComponent>()->scale;
+				rotation = entt.get<TransformComponent>()->rotation;
 				
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(p.position, 0.f)) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { scale.x, scale.y, 1.f });
 				
@@ -231,9 +228,9 @@ namespace wc
 			ImGuizmo::SetDrawlist();
 			ImGuizmo::SetRect(WindowPos.x, WindowPos.y, RenderSize.x, RenderSize.y);
 
-			if (selected_entity != flecs::entity::null() && selected_entity.has<PositionComponent>())
+			if (selected_entity != flecs::entity::null() && selected_entity.has<TransformComponent>())
 			{
-				auto position = selected_entity.get<PositionComponent>()->position;
+				auto position = selected_entity.get<TransformComponent>()->position;
 				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(position, 0.f));
 
 				ImGuizmo::Manipulate(glm::value_ptr(camera.GetViewMatrix()), glm::value_ptr(projection), m_GuizmoOp, ImGuizmo::MODE::WORLD, glm::value_ptr(transform));
@@ -242,7 +239,7 @@ namespace wc
 				{
 					glm::vec3 translation, rotation, scale;
 					DecomposeTransform(transform, translation, rotation, scale);
-					selected_entity.set<PositionComponent>({ glm::vec2(translation) });
+					selected_entity.set<TransformComponent>({ glm::vec2(translation), glm::vec2(scale) });
 				}
 			}
 
@@ -345,7 +342,7 @@ namespace wc
 				static std::string name = "";
 				ImGui::InputText("Name", &name);
 
-				if (ImGui::Button("Create")) 
+				if (ImGui::Button("Create") || ImGui::IsKeyPressed(ImGuiKey_Enter))
 				{
 					if (!name.empty()) 
 					{
@@ -423,43 +420,188 @@ namespace wc
 			{
 				std::string nameBuffer = selected_entity.name().c_str(); // Buffer to hold the entity's name
 
-				// Allow the user to edit the name in the buffer
-				if (ImGui::InputText("Name", &nameBuffer)) {
-					// Update the entity's name if it has changed
-					selected_entity.set_name(nameBuffer.c_str());
-				}
-
+				// Input name
+				if (ImGui::InputText("Name", &nameBuffer)) selected_entity.set_name(nameBuffer.c_str());
 
 				// Display the entity's ID
 				//ImGui::Text("ID: %u", selected_entity.id());
 
-				//NOTE: for every new component, a new if is needed
+				//NOTE: for every new component, a new if statement is needed
 				ImGui::SeparatorText("Components");
 
-				if (selected_entity.has<PositionComponent>())
+				if (selected_entity.has<TransformComponent>())
 				{
+					bool visible = true;
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					if (ImGui::CollapsingHeader("Position"))
+					if (ImGui::CollapsingHeader("Transform##header", &visible, ImGuiTreeNodeFlags_None))
 					{
-						auto& p = *selected_entity.get<PositionComponent>();
+						auto& p = *selected_entity.get<TransformComponent>();
 						auto& position = const_cast<glm::vec2&>(p.position);
+						auto& scale = const_cast<glm::vec2&>(p.scale);
+						auto& rotation = const_cast<float&>(p.rotation);
 
+						// Draw position UI
 						Widgets::PositionUI(position);
+						ImGui::DragFloat2("Scale", glm::value_ptr(scale), 0.1f);
+						ImGui::SliderFloat("Rotation", &rotation, 0.0f, 360.0f);
+						ImGui::Separator();
 
 					}
+
+					if (!visible) selected_entity.remove<TransformComponent>(); // add modal popup
 				}
 
-				if (selected_entity.has<ScaleComponent>())
+				if (selected_entity.has<SpriteRendererComponent>())
 				{
+					bool visible = true;
 					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-					if (ImGui::CollapsingHeader("Scale"))
+					if (ImGui::CollapsingHeader("Sprite Renderer##header", &visible, ImGuiTreeNodeFlags_None))
 					{
-						auto& s = *selected_entity.get<ScaleComponent>();
-						auto& scale = const_cast<glm::vec2&>(s.scale);
+						auto& s = *selected_entity.get<SpriteRendererComponent>();
+						auto& color = const_cast<glm::vec4&>(s.Color);
+						ImGui::ColorEdit4("color", glm::value_ptr(color));
+						ImGui::Separator();
+					}
 
-						Widgets::ScaleUI(scale);
+					if (!visible) selected_entity.remove<SpriteRendererComponent>();
+				}
+
+				if (selected_entity.has<CircleRendererComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Circle Renderer##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& c = *selected_entity.get<CircleRendererComponent>();
+						auto& thickness = const_cast<float&>(c.Thickness);
+						auto& fade = const_cast<float&>(c.Fade);
+						auto& color = const_cast<glm::vec4&>(c.Color);
+
+						// Draw circle renderer UI
+						ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
+						ImGui::SliderFloat("Fade", &fade, 0.0f, 1.0f);
+						ImGui::ColorEdit4("Color", glm::value_ptr(color));
+						ImGui::Separator();
+					}
+
+					if (!visible) selected_entity.remove<CircleRendererComponent>(); // add modal popup
+				}
+
+				if (selected_entity.has<TextRendererComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Text Renderer##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto& t = *selected_entity.get<TextRendererComponent>();
+						auto& text = const_cast<std::string&>(t.Text);
+						//auto& font = const_cast<std::string&>(t.Font);
+						auto& color = const_cast<glm::vec4&>(t.Color);
+						// Draw text renderer UI
+						ImGui::InputText("Text", &text);
+						//ImGui::InputText("Font", &font);
+						ImGui::ColorEdit4("Color", glm::value_ptr(color));
+						ImGui::Separator();
+					}
+					if (!visible) selected_entity.remove<TextRendererComponent>(); // add modal popup
+				}
+
+				static bool showAddComponent = false;
+				if (ImGui::Button("Add Component")) showAddComponent = true;
+
+				if (showAddComponent)
+				{
+					// Calculate clamp
+					{
+						// Calculate the desired position for the popup
+						ImVec2 popupPos = ImGui::GetItemRectMin();
+						popupPos.y = ImGui::GetItemRectMax().y + 5;
+						ImVec2 popupSize = { 200, 200 }; // Desired size of the popup
+
+						// Get the view port's boundaries
+						const ImGuiViewport* viewport = ImGui::GetWindowViewport();
+						ImVec2 viewportMin = viewport->Pos;
+						ImVec2 viewportMax = { viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
+
+						// Adjust the position to ensure the popup doesn't go outside the viewport
+						popupPos.x = std::clamp(popupPos.x, viewportMin.x, viewportMax.x - popupSize.x);
+						popupPos.y = std::clamp(popupPos.y, viewportMin.y, viewportMax.y - popupSize.y);
+
+						// Set the position and size of the popup
+						ImGui::SetNextWindowPos(popupPos);
+						ImGui::SetNextWindowSize(popupSize, ImGuiCond_Once);
+					}
+
+					// Begin the popup window
+					if (ImGui::Begin("Components", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking))
+					{
+						if (!ImGui::IsWindowFocused()) showAddComponent = false;
+
+						if (ImGui::CollapsingHeader("Physics"))
+						{
+							bool hasPosition = selected_entity.has<TransformComponent>();
+							if (ImGui::Checkbox("Transform", &hasPosition))
+							{
+								if (hasPosition) selected_entity.add<TransformComponent>();
+								else selected_entity.remove<TransformComponent>();
+							}
+
+
+
+						}
+
+						if (ImGui::CollapsingHeader("Render"))
+						{
+							bool hasSpriteRenderer = selected_entity.has<SpriteRendererComponent>();
+							bool hasCircleRenderer = selected_entity.has<CircleRendererComponent>();
+							bool hasTextRenderer = selected_entity.has<TextRendererComponent>();
+
+							if (ImGui::RadioButton("Sprite Renderer", hasSpriteRenderer))
+							{
+								if (!hasSpriteRenderer)
+								{
+									selected_entity.add<SpriteRendererComponent>();
+									selected_entity.remove<CircleRendererComponent>();
+									selected_entity.remove<TextRendererComponent>();
+								}
+								else selected_entity.remove<SpriteRendererComponent>();
+							}
+
+							if (ImGui::RadioButton("Circle Renderer", hasCircleRenderer))
+							{
+								if (!hasCircleRenderer)
+								{
+									selected_entity.add<CircleRendererComponent>();
+									selected_entity.remove<SpriteRendererComponent>();
+									selected_entity.remove<TextRendererComponent>();
+								}
+								else selected_entity.remove<CircleRendererComponent>();
+							}
+
+							if (ImGui::RadioButton("Text Renderer", hasTextRenderer)) // Crashes
+							{
+								if (!hasTextRenderer)
+								{
+									selected_entity.add<TextRendererComponent>();
+									selected_entity.remove<SpriteRendererComponent>();
+									selected_entity.remove<CircleRendererComponent>();
+								}
+								else selected_entity.remove<TextRendererComponent>();
+							}
+
+						}
+
+						if (ImGui::CollapsingHeader("Music"))
+						{
+
+						}
+
+						ImGui::EndTabBar();
+
+						ImGui::End();
 					}
 				}
+
 			}
 
 			ImGui::End();
