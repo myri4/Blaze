@@ -594,8 +594,6 @@ namespace wc
 
 						}
 
-						//ImGui::EndTabBar();
-
 						ImGui::End();
 					}
 				}
