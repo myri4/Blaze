@@ -1,6 +1,6 @@
 #pragma once
 
-#include "flecs/flecs.h"
+#include "flecs.h"
 #include "Components.h"
 #include "../Globals.h"
 #include <wc/Utils/YAML.h>

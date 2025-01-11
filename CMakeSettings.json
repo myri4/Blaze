@@ -26,6 +26,11 @@
           "name": "MSDF_ATLAS_GEN_BUILD_STANDALONE",
           "value": "False",
           "type": "BOOL"
+        },
+        {
+          "name": "FLECS_SHARED",
+          "value": "False",
+          "type": "BOOL"
         }
       ]
     }

@@ -18,9 +18,6 @@ add_executable("WC-Engine"
     "vendor/wc/imgui_backend/imgui_impl_glfw.cpp"
     "vendor/wc/imgui_backend/imgui_impl_vulkan.cpp"
     "vendor/imguizmo/ImGuizmo.cpp"
-    "vendor/flecs/flecs.c"
-    "vendor/tinyxml2.cpp"
-    "vendor/lodepng.cpp"
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -41,6 +38,7 @@ add_subdirectory("vendor/yaml-cpp")
 add_subdirectory("vendor/glm")
 add_subdirectory("vendor/freetype")
 add_subdirectory("vendor/box2d")
+add_subdirectory("vendor/flecs")
 
 set(FREETYPE_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/vendor/freetype/include")
 set(FREETYPE_LIBRARY ${CMAKE_BINARY_DIR}/vendor/freetype/freetype.lib)
@@ -57,10 +55,12 @@ box2d::box2d
 freetype
 freetype-interface
 msdf-atlas-gen::msdf-atlas-gen
+flecs::flecs_static
 )
 target_include_directories(${PROJECT_NAME} PUBLIC 
 "vendor/"
 "vendor/box2d/include" # mad funny box2d
 "vendor/imgui"
+"vendor/flecs/include"
 )
 target_link_directories(${PROJECT_NAME} PUBLIC ${VULKAN_LIBRARY_DIRS})
