@@ -1,10 +1,10 @@
 #pragma once
 
 #undef INFINITE
-#include <msdfgen/msdfgen.h>
-#include <msdfgen/msdfgen-ext.h>
-#include <msdfgen/atlas-gen/msdf-atlas-gen.h>
-#include <msdfgen/atlas-gen/GlyphGeometry.h>
+#include <msdf-atlas-gen/msdfgen/msdfgen.h>
+#include <msdf-atlas-gen/msdfgen/msdfgen-ext.h>
+#include <msdf-atlas-gen/msdf-atlas-gen/msdf-atlas-gen.h>
+#include <msdf-atlas-gen/msdf-atlas-gen/GlyphGeometry.h>
 #define INFINITE 0xFFFFFFFF
 
 #include <vector>

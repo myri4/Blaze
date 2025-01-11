@@ -189,7 +189,7 @@ namespace wc
     void SvgImage::Load(const std::string& filepath, RenderData& renderData)
     {
         bool loaded = msdfgen::loadSvgShape(shape, filepath.c_str());
-        if (loaded)
+       /* if (loaded)
         {
             shape.normalize();
             //                      max. angle
@@ -216,6 +216,6 @@ namespace wc
             textureID = renderData.LoadTextureFromMemory(newBitmap);
             renderData.Textures[textureID].SetName("svg");
             newBitmap.Free();
-        }
+        }*/
     }
 }

@@ -43,6 +43,7 @@ namespace wc
 	int main()
 	{
 		Log::Init();
+		std::filesystem::current_path("../../../../WC Engine/workdir"); 
 		glfwSetErrorCallback([](int err, const char* description) { WC_CORE_ERROR(description); /*WC_DEBUGBREAK();*/ });
 		//glfwSetMonitorCallback([](GLFWmonitor* monitor, int event)
 		//	{
