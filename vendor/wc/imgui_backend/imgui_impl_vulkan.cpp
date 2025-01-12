@@ -11,6 +11,161 @@
 #pragma warning (disable: 4127) // condition expression is constant
 #endif
 
+// For multi-viewport support:
+// Helper structure we store in the void* RendererUserData field of each ImGuiViewport to easily retrieve our backend data.
+
+struct ImGui_ImplVulkanH_FrameSemaphores
+{
+	vk::Semaphore         ImageAcquiredSemaphore;
+	vk::Semaphore         RenderCompleteSemaphore;
+};
+
+struct ImGui_ImplVulkanH_Frame
+{
+	VkCommandBuffer     CommandBuffer;
+	vk::Fence           Fence;
+};
+
+struct ImGui_ImplVulkanH_Window
+{
+	uint32_t            Width = 0;
+	uint32_t            Height = 0;
+	bool                ClearEnable = true;
+	vk::Swapchain       Swapchain;
+	VkClearValue        ClearValue = {};
+	uint32_t            FrameIndex = 0;
+	uint32_t            SemaphoreIndex = 0;
+	uint32_t            swapchainImageIndex = 0;
+	wc::FPtr<ImGui_ImplVulkanH_Frame> Frames;
+	wc::FPtr<ImGui_ImplVulkanH_FrameSemaphores> FrameSemaphores;
+
+	void CreateOrResize(uint32_t width, uint32_t height)
+	{
+		if (Swapchain)
+		{
+			VulkanContext::GetLogicalDevice().WaitIdle();
+			FreeSyncs();
+			Swapchain.DestroyFramebuffers();
+		}
+		// Create Swapchain
+		Width = width;
+		Height = height;
+
+		Swapchain.surface.Query();
+		Swapchain.Create(VkExtent2D{ width, height }, { width, height }, false, ClearEnable);
+		AllocSyncs();
+	}
+
+	void AllocSyncs()
+	{
+		Frames.Allocate(Swapchain.images.Count);
+		FrameSemaphores.Allocate(Swapchain.images.Count + 1);
+		memset(Frames.Data, 0, sizeof(Frames[0]) * Frames.Count);
+		memset(FrameSemaphores.Data, 0, sizeof(FrameSemaphores[0]) * FrameSemaphores.Count);
+
+		// Create Command Buffers
+		for (uint32_t i = 0; i < Frames.Count; i++)
+		{
+			ImGui_ImplVulkanH_Frame* fd = &Frames[i];
+			vk::SyncContext::GraphicsCommandPool.Allocate(VK_COMMAND_BUFFER_LEVEL_PRIMARY, fd->CommandBuffer);
+
+			fd->Fence.Create(VK_FENCE_CREATE_SIGNALED_BIT);
+		}
+
+		for (auto& fsd : FrameSemaphores)
+		{
+			fsd.ImageAcquiredSemaphore.Create();
+			fsd.RenderCompleteSemaphore.Create();
+		}
+	}
+
+	void FreeSyncs()
+	{
+		for (uint32_t i = 0; i < Frames.Count; i++)
+		{
+			Frames[i].Fence.Destroy();
+			vk::SyncContext::GraphicsCommandPool.Free(Frames[i].CommandBuffer);
+			Frames[i].CommandBuffer = VK_NULL_HANDLE;
+		}
+
+		for (auto& fsd : FrameSemaphores)
+		{
+			fsd.ImageAcquiredSemaphore.Destroy();
+			fsd.RenderCompleteSemaphore.Destroy();
+		}
+		Frames.Free();
+		FrameSemaphores.Free();
+	}
+
+	void Destroy(bool destroySurface = true)
+	{
+		VulkanContext::GetLogicalDevice().WaitIdle();
+		FreeSyncs();
+
+		Swapchain.DestroyFramebuffers();
+		Swapchain.DestroyRenderPass();
+		Swapchain.DestroySwapchain();
+		if (destroySurface) Swapchain.surface.Destroy();
+
+		auto surface = Swapchain.surface;
+		*this = ImGui_ImplVulkanH_Window();
+		Swapchain.surface = surface;
+	}
+};
+
+struct ImGui_ImplVulkan_FrameRenderBuffers
+{
+	vk::Buffer VertexBuffer;
+	vk::Buffer IndexBuffer;
+};
+
+struct ImGui_ImplVulkan_WindowRenderBuffers
+{
+	uint32_t            Index = 0;
+	wc::FPtr<ImGui_ImplVulkan_FrameRenderBuffers> FrameRenderBuffers;
+
+	void Destroy()
+	{
+		for (auto& frb : FrameRenderBuffers)
+		{
+			frb.VertexBuffer.Free();
+			frb.IndexBuffer.Free();
+		}
+		FrameRenderBuffers.Free();
+		Index = 0;
+	}
+};
+
+struct ImGui_ImplVulkan_ViewportData
+{
+	bool                                    WindowOwned = false;
+	ImGui_ImplVulkanH_Window                Window;
+
+	ImGui_ImplVulkan_WindowRenderBuffers RenderBuffers;
+};
+
+struct ImGui_ImplVulkan_Data
+{
+	VkRenderPass RenderPass = VK_NULL_HANDLE;
+	wc::Shader   Shader;
+	wc::Texture  FontTexture;
+
+	// Render buffers for main window
+	ImGui_ImplVulkan_WindowRenderBuffers MainWindowRenderBuffers;
+};
+
+static ImGui_ImplVulkan_Data* ImGui_ImplVulkan_GetBackendData() { return ImGui::GetCurrentContext() ? (ImGui_ImplVulkan_Data*)ImGui::GetIO().BackendRendererUserData : nullptr; }
+
+VkDescriptorSet MakeImGuiDescriptor(VkDescriptorSet dSet, const VkDescriptorImageInfo& imageInfo)
+{
+	if (dSet == VK_NULL_HANDLE) vk::descriptorAllocator.Allocate(dSet, ImGui_ImplVulkan_GetBackendData()->Shader.GetDescriptorLayout());
+
+	vk::DescriptorWriter writer(dSet);
+	writer.BindImage(0, imageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+	return dSet;
+}
+
 // Render function
 void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer cmd, VkRenderPassBeginInfo rpInfo)
 {
@@ -156,8 +311,7 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer cmd,
                 if (sizeof(ImTextureID) < sizeof(ImU64))
                 {
                     // We don't support texture switches if ImTextureID hasn't been redefined to be 64-bit. Do a flaky check that other textures haven't been used.
-                    IM_ASSERT(pcmd->TextureId == (ImTextureID)bd->FontDescriptorSet);
-                    desc_set = bd->FontDescriptorSet;
+                    desc_set = bd->FontTexture.GetImageID();
                 }
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, bd->Shader.GetPipelineLayout(), 0, 1, &desc_set, 0, nullptr);
 
@@ -180,104 +334,32 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
     ImGuiIO& io = ImGui::GetIO();
     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
 
-    // Destroy existing texture (if any)
-    if (bd->FontView || bd->FontImage || bd->FontDescriptorSet)
-    {
-        vk::SyncContext::GetGraphicsQueue().WaitIdle();
-        ImGui_ImplVulkan_DestroyFontsTexture();
-    }
-
     uint8_t* pixels;
     int width, height;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
     size_t upload_size = width * height * 4 * sizeof(char);
 
     // Create the Image:
-    vk::ImageSpecification imageSpec = 
+    wc::TextureSpecification texSpec = 
     {
         .format = VK_FORMAT_R8G8B8A8_UNORM,
         .width = (uint32_t)width,
         .height = (uint32_t)height,
-        .mipLevels = 1,
         .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+
+		.magFilter = vk::Filter::LINEAR,
+		.minFilter = vk::Filter::LINEAR,
+		.mipmapMode = vk::SamplerMipmapMode::LINEAR,
+		.addressModeU = vk::SamplerAddressMode::REPEAT,
+		.addressModeV = vk::SamplerAddressMode::REPEAT,
+		.addressModeW = vk::SamplerAddressMode::REPEAT,
     };
-	bd->FontImage.Create(imageSpec);
-	bd->FontImage.SetName("imgui_font_image");
-
-    // Create the Image View:
-    VkImageViewCreateInfo viewInfo = { 
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
-        .image = bd->FontImage,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = VK_FORMAT_R8G8B8A8_UNORM,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .levelCount = 1,
-            .layerCount = 1,
-        }
-    };
-    bd->FontView.Create(viewInfo);
-    bd->FontView.SetName("imgui_font_image_view");
-
-    // Create the Descriptor Set:
-    bd->FontDescriptorSet = (VkDescriptorSet)MakeImGuiDescriptor(bd->FontDescriptorSet, { bd->FontSampler, bd->FontView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-
-    // Create the Upload Buffer:
-    vk::StagingBuffer upload_buffer;
-    upload_buffer.Allocate(upload_size);
-    upload_buffer.SetData(pixels, upload_size);
-
-    // Copy to Image:
-    vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
-        VkImageMemoryBarrier copy_barrier = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = bd->FontImage,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1,
-            }
-        };
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &copy_barrier);
-
-        VkBufferImageCopy region = {
-            .imageSubresource = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .layerCount = 1,
-            },
-            .imageExtent = {
-                .width = (uint32_t)width,
-                .height = (uint32_t)height,
-                .depth = 1,
-            }
-        };
-        vkCmdCopyBufferToImage(cmd, upload_buffer, bd->FontImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-        VkImageMemoryBarrier use_barrier = { 
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = bd->FontImage,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1,
-            }
-        };
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &use_barrier);
-        });
-    upload_buffer.Free();
+	bd->FontTexture.Allocate(texSpec);
+	bd->FontTexture.SetName("imgui_font_texture");
+    bd->FontTexture.SetData(pixels, width, height);
 
     // Store our identifier
-    io.Fonts->SetTexID((ImTextureID)bd->FontDescriptorSet);
+    io.Fonts->SetTexID(bd->FontTexture);
 
     return true;
 }
@@ -287,10 +369,8 @@ void ImGui_ImplVulkan_DestroyFontsTexture()
     ImGuiIO& io = ImGui::GetIO();
     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
 
+    bd->FontTexture.Destroy();
     io.Fonts->SetTexID(0);
-
-    bd->FontView.Destroy();
-    bd->FontImage.Destroy();
 }
 
 //--------------------------------------------------------------------------------------------------------
@@ -316,7 +396,8 @@ static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
 static void ImGui_ImplVulkan_DestroyWindow(ImGuiViewport* viewport)
 {
     // The main viewport (owned by the application) will always have RendererUserData == 0 since we didn't create the data for it.
-    if (ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData)
+    ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData;
+    if (vd)
     {
         if (vd->WindowOwned)
             vd->Window.Destroy();
@@ -329,8 +410,8 @@ static void ImGui_ImplVulkan_DestroyWindow(ImGuiViewport* viewport)
 static void ImGui_ImplVulkan_SetWindowSize(ImGuiViewport* viewport, ImVec2 size)
 {
     ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData;
-    if (vd == nullptr) // This is nullptr for the main viewport (which is left to the user/app to handle)
-        return;
+    if (!vd) return;// This is nullptr for the main viewport (which is left to the user/app to handle)
+        
     vd->Window.ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;
     vd->Window.CreateOrResize((int)size.x, (int)size.y);
 }
@@ -349,9 +430,7 @@ static void ImGui_ImplVulkan_RenderWindow(ImGuiViewport* viewport, void*)
     fd->Fence.Reset();
 
     if (err == VK_ERROR_OUT_OF_DATE_KHR)
-    {
         return;
-    }
 
     wd->ClearValue.color = { 0.f, 0.f, 0.f, 1.f };
     vkResetCommandBuffer(fd->CommandBuffer, 0);
@@ -370,17 +449,7 @@ static void ImGui_ImplVulkan_RenderWindow(ImGuiViewport* viewport, void*)
         ImGui_ImplVulkan_RenderDrawData(viewport->DrawData, fd->CommandBuffer, info);
     }
 
-    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo info = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    info.waitSemaphoreCount = 1;
-    info.pWaitSemaphores = &fsd->ImageAcquiredSemaphore;
-    info.pWaitDstStageMask = &wait_stage;
-    info.commandBufferCount = 1;
-    info.pCommandBuffers = &fd->CommandBuffer;
-    info.signalSemaphoreCount = 1;
-    info.pSignalSemaphores = &fsd->RenderCompleteSemaphore;
-
-    vk::SyncContext::GetGraphicsQueue().Submit(info, fd->Fence);
+    vk::SyncContext::Submit(fd->CommandBuffer, vk::SyncContext::GetGraphicsQueue(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, fd->Fence);
 }
 
 static void ImGui_ImplVulkan_SwapBuffers(ImGuiViewport* viewport, void*)
@@ -393,12 +462,11 @@ static void ImGui_ImplVulkan_SwapBuffers(ImGuiViewport* viewport, void*)
     if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR)
         vd->Window.CreateOrResize((int)viewport->Size.x, (int)viewport->Size.y);
 
-
     wd->FrameIndex = (wd->FrameIndex + 1) % wd->Frames.Count;
     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->FrameSemaphores.Count;
 }
 
-bool ImGui_ImplVulkan_Init(VkRenderPass rp)
+void ImGui_ImplVulkan_Init(VkRenderPass rp)
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -412,19 +480,6 @@ bool ImGui_ImplVulkan_Init(VkRenderPass rp)
     bd->RenderPass = rp;
 
 	// Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling.
-	vk::SamplerSpecification samplerSpec = {
-		.magFilter = vk::Filter::LINEAR,
-		.minFilter = vk::Filter::LINEAR,
-		.mipmapMode = vk::SamplerMipmapMode::LINEAR,
-		.addressModeU = vk::SamplerAddressMode::REPEAT,
-		.addressModeV = vk::SamplerAddressMode::REPEAT,
-		.addressModeW = vk::SamplerAddressMode::REPEAT,
-		.minLod = -1000,
-		.maxLod = 1000,
-	};
-	bd->FontSampler.Create(samplerSpec);
-    bd->FontSampler.SetName("imgui_font_sampler");
-
 	//color_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	wc::ShaderCreateInfo createInfo;
 	createInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -438,28 +493,22 @@ bool ImGui_ImplVulkan_Init(VkRenderPass rp)
 	bd->Shader.Create(createInfo);
 
     // Our render function expect RendererUserData to be storing the window render buffer we need (for the main viewport we won't use ->Window)
-    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    main_viewport->RendererUserData = IM_NEW(ImGui_ImplVulkan_ViewportData)();
+    ImGui::GetMainViewport()->RendererUserData = IM_NEW(ImGui_ImplVulkan_ViewportData)();
 
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-		IM_ASSERT(platform_io.Platform_CreateVkSurface != nullptr && "Platform needs to setup the CreateVkSurface handler.");
 		platform_io.Renderer_CreateWindow = ImGui_ImplVulkan_CreateWindow;
 		platform_io.Renderer_DestroyWindow = ImGui_ImplVulkan_DestroyWindow;
 		platform_io.Renderer_SetWindowSize = ImGui_ImplVulkan_SetWindowSize;
 		platform_io.Renderer_RenderWindow = ImGui_ImplVulkan_RenderWindow;
 		platform_io.Renderer_SwapBuffers = ImGui_ImplVulkan_SwapBuffers;
     }
-
-    return true;
 }
 
 void ImGui_ImplVulkan_Shutdown()
 {
     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-    IM_ASSERT(bd != nullptr && "No renderer backend to shutdown, or already shutdown?");
-    ImGuiIO& io = ImGui::GetIO();
 
     // First destroy objects in all viewports
     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
@@ -469,7 +518,6 @@ void ImGui_ImplVulkan_Shutdown()
 
     ImGui_ImplVulkan_DestroyFontsTexture();
 
-    bd->FontSampler.Destroy();
     bd->Shader.Destroy();
 
     // Manually delete main viewport render data in-case we haven't initialized for viewports
@@ -481,6 +529,7 @@ void ImGui_ImplVulkan_Shutdown()
     // Clean up windows    
     ImGui::DestroyPlatformWindows();
 
+    ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = nullptr;
     io.BackendRendererUserData = nullptr;
     io.BackendFlags &= ~(ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasViewports);

@@ -162,44 +162,44 @@ namespace wc
 		}
 
 
-		bool InputFloat(const std::string& label, float& v, float step = 0.0f, float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		bool Input(const std::string& label, float& v, float step = 0.f, float step_fast = 0.f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_Float, (void*)&v, (void*)(step > 0.0f ? &step : NULL), (void*)(step_fast > 0.0f ? &step_fast : NULL), format, flags);
 		}
 
-		bool InputFloat2(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		bool Input2(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 2, NULL, NULL, format, flags);
 		}
 
-		bool InputFloat3(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		bool Input3(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 3, NULL, NULL, format, flags);
 		}
 
-		bool InputFloat4(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		bool Input4(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 4, NULL, NULL, format, flags);
 		}
 
-		bool InputInt(const std::string& label, int& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
+		bool Input(const std::string& label, int& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
 		{
 			// Hexadecimal input provided as a convenience but the flag name is awkward. Typically you'd use InputText() to parse your own data, if you want to handle prefixes.
 			const char* format = (flags & ImGuiInputTextFlags_CharsHexadecimal) ? "%08X" : "%d";
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_S32, (void*)v, (void*)(step > 0 ? &step : NULL), (void*)(step_fast > 0 ? &step_fast : NULL), format, flags);
 		}
 
-		bool InputInt2(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		bool Input2(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 2, NULL, NULL, "%d", flags);
 		}
 
-		bool InputInt3(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		bool Input3(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 3, NULL, NULL, "%d", flags);
 		}
 
-		bool InputInt4(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		bool Input4(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 4, NULL, NULL, "%d", flags);
 		}

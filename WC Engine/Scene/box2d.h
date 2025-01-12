@@ -136,13 +136,29 @@ namespace wc
 		/// Register the pre-solve callback. This is optional.
 		inline void SetPreSolveCallback(b2PreSolveFcn* fcn, void* context) { b2World_SetPreSolveCallback(id, fcn, context); }
 
+		/// Is body sleeping enabled?
+		bool IsSleepingEnabled() { return b2World_IsSleepingEnabled(id); }
+
+		/// Is continuous collision enabled?
+		bool IsContinuousEnabled() { return b2World_IsContinuousEnabled(id); }
+
+		/// Get the the restitution speed threshold. Usually in meters per second.
+		float GetRestitutionThreshold() { return b2World_GetRestitutionThreshold(id); }
+
+		/// Get the the hit event speed threshold. Usually in meters per second.
+		float GetHitEventThreshold() { return b2World_GetHitEventThreshold(id); }
+
 		/// Set the gravity vector for the entire world. Box2D has no concept of an up direction and this
 		/// is left as a decision for the application. Typically in m/s^2.
 		///	@see b2WorldDef
 		inline void SetGravity(glm::vec2 gravity) { b2World_SetGravity(id, { gravity.x, gravity.y }); }
 
 		/// Get the gravity vector
-		inline auto GetGravity() { return b2World_GetGravity(id); }
+		inline auto GetGravity() 
+		{ 
+			b2Vec2 g = b2World_GetGravity(id);
+			return glm::vec2(g.x, g.y); 
+		}
 
 		/// Apply a radial explosion
 		///	@param worldId The world id

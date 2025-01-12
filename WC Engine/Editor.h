@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <ranges>
 #include <unordered_map>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -62,7 +63,7 @@ namespace wc
 		ImGuizmo::OPERATION m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
 
 		bool showEditor = true;
-		bool showSettings = true;
+		bool showSceneProperties = true;
 		bool showEntities = true;
 		bool showProperties = true;
 		bool showConsole = true;
@@ -71,6 +72,7 @@ namespace wc
 		flecs::entity selected_entity = flecs::entity::null();
 
 		enum class PlayState { Paused, Simulate, Play };
+		PlayState m_PlayState = PlayState::Paused;
 
 		Scene scene;
 
@@ -78,9 +80,6 @@ namespace wc
 
 		float ZoomSpeed = 2.f;
 	public:
-
-		//ECS testing
-		flecs::entity ent1, ent2;
 
 		void Create(glm::vec2 renderSize)
 		{
@@ -94,27 +93,15 @@ namespace wc
 			t_Close.Load("assets/textures/menu/close.png");
 			t_Minimize.Load("assets/textures/menu/minimize.png");
 			t_Collapse.Load("assets/textures/menu/collapse.png");
-
-			// Entity Loading
-			ent1 = scene.AddEntity("Entity 1");
-
-			ent1.set<TransformComponent>({ { 0.0f, 0.0f }, { 1.0f, 1.0f } });
-			ent1.set<CircleRendererComponent>({});
-
-			ent2 = scene.AddEntity("Entity 2");
-
-			ent2.set<TransformComponent>({ { -10.0f, 0.0f }, { 1.0f, 1.0f } });
-			ent2.set<SpriteRendererComponent>({});
-
-			ent2.child_of(ent1);
 		}
 
 		void Input()
 		{
 			if (allowInput)
 			{
-				if (ImGui::IsKeyPressed(ImGuiKey_W)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
-				if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
+				if (ImGui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
+				else if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
+				else if (ImGui::IsKeyPressed(ImGuiKey_S)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
 
 				float scroll = Mouse::GetMouseScroll().y;
 				if (scroll != 0.f)
@@ -147,36 +134,43 @@ namespace wc
 			}
 		}
 
+		void RenderEntity(flecs::entity entt, glm::mat4& transform) 
+		{
+			if (entt.has<SpriteRendererComponent>())
+			{
+				auto& data = *entt.get<SpriteRendererComponent>();
+
+				m_RenderData.DrawQuad(transform, data.Texture, data.Color);
+			}
+			else if (entt.has<CircleRendererComponent>())
+			{
+				auto& data = *entt.get<CircleRendererComponent>();
+				m_RenderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
+			}
+			else if (entt.has<TextRendererComponent>())
+			{
+				auto& data = *entt.get<TextRendererComponent>();
+
+				//m_RenderData.DrawString(data.Text, data.Font, transform, data.Color);
+			}
+			scene.GetWorld().query_builder<TransformComponent, EntityTag>()
+				.with(flecs::ChildOf, entt)
+				.each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
+					{
+						transform = transform * childTransform.GetTransform();
+						RenderEntity(child, transform);
+					});
+		}
+
 		void Render()
 		{
 			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
 
 			scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
-				glm::vec2 scale = glm::vec2(1.f);
-				float rotation = 0.f;
+				if (entt.parent() != 0) return;
 
-				scale = entt.get<TransformComponent>()->scale;
-				rotation = entt.get<TransformComponent>()->rotation;
-				
-				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(p.position, 0.f)) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { scale.x, scale.y, 1.f });
-				
-				if (entt.has<SpriteRendererComponent>())
-				{
-					auto& data = *entt.get<SpriteRendererComponent>();
-
-					m_RenderData.DrawQuad(transform, data.Texture, data.Color);
-				}
-				else if (entt.has<CircleRendererComponent>())
-				{
-					auto& data = *entt.get<CircleRendererComponent>();
-					m_RenderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
-				}
-				else if (entt.has<TextRendererComponent>())
-				{
-					auto& data = *entt.get<TextRendererComponent>();
-
-					m_RenderData.DrawString(data.Text, data.Font, transform, data.Color);
-				}
+				glm::mat4 transform = p.GetTransform();
+				RenderEntity(entt, transform);				
 			});
 
 			m_Renderer.Flush(m_RenderData);
@@ -195,7 +189,7 @@ namespace wc
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 			ImGui::Begin("Editor", &showEditor);
 
-			allowInput = ImGui::IsWindowFocused();
+			allowInput = ImGui::IsWindowFocused() && ImGui::IsWindowHovered();
 
 			ImVec2 viewPortSize = ImGui::GetContentRegionAvail();
 			if (ViewPortSize != *((glm::vec2*)&viewPortSize))
@@ -217,7 +211,40 @@ namespace wc
 			RenderSize = *((glm::vec2*)&viewportBounds[1]) - WindowPos;
 
 			auto image = m_Renderer.GetImguiImageID();
-			ImGui::Image(image, viewPortSize);
+			ImGui::GetWindowDrawList()->AddImage(image, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
+
+
+			float buttonsWidth = ImGui::CalcTextSize("Play").x + ImGui::CalcTextSize("Stop").x + ImGui::CalcTextSize("Simulate").x + ImGui::GetStyle().FramePadding.x * 6.0f;
+			float totalWidth = buttonsWidth + ImGui::GetStyle().ItemSpacing.x * 2;
+			ImGui::SetCursorPosX((ImGui::GetWindowSize().x - totalWidth) * 0.5f);
+			bool isPlayingOrSimulating = (m_PlayState == PlayState::Play || m_PlayState == PlayState::Simulate);
+			bool isPaused = (m_PlayState == PlayState::Paused);
+			if (isPlayingOrSimulating)
+				ImGui::BeginDisabled();
+			if (ImGui::Button("Play") && isPaused)
+			{
+				m_PlayState = PlayState::Play;
+				WC_INFO("Play");
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Simulate") && isPaused)
+			{
+				m_PlayState = PlayState::Simulate;
+				WC_INFO("Simulate");
+			}
+			if (isPlayingOrSimulating)
+				ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (isPaused)
+				ImGui::BeginDisabled();
+			if (ImGui::Button("Stop"))
+			{
+				m_PlayState = PlayState::Paused;
+				WC_INFO("Stop");
+			}
+			if (isPaused)
+				ImGui::EndDisabled();
+
 
 			glm::mat4 projection = camera.GetProjectionMatrix();
 			projection[1][1] *= -1;
@@ -228,16 +255,63 @@ namespace wc
 
 			if (selected_entity != flecs::entity::null() && selected_entity.has<TransformComponent>())
 			{
-				auto position = selected_entity.get<TransformComponent>()->position;
-				glm::mat4 transform = glm::translate(glm::mat4(1.f), glm::vec3(position, 0.f));
+				glm::mat4 local_transform = selected_entity.get<TransformComponent>()->GetTransform();
+				glm::mat4 world_transform = local_transform;
+				glm::mat4 deltaMatrix;
 
-				ImGuizmo::Manipulate(glm::value_ptr(camera.GetViewMatrix()), glm::value_ptr(projection), m_GuizmoOp, ImGuizmo::MODE::WORLD, glm::value_ptr(transform));
+				// Build the world transform by accumulating parent transforms
+				auto parent = selected_entity.parent();
+				while (parent != flecs::entity::null() && parent.has<TransformComponent>())
+				{
+					glm::mat4 parent_transform = parent.get<TransformComponent>()->GetTransform();
+					world_transform = parent_transform * world_transform;
+					parent = parent.parent();
+				}
+
+				ImGuizmo::Manipulate(
+					glm::value_ptr(camera.GetViewMatrix()),
+					glm::value_ptr(projection),
+					m_GuizmoOp,
+					ImGuizmo::MODE::LOCAL,
+					glm::value_ptr(world_transform),
+					glm::value_ptr(deltaMatrix)
+				);
 
 				if (ImGuizmo::IsUsing())
 				{
+					// Convert world transform back to local space
+					glm::mat4 parent_world_transform(1.0f);
+					parent = selected_entity.parent();
+					if (parent != flecs::entity::null() && parent.has<TransformComponent>())
+					{
+						// Build parent's world transform
+						auto current = parent;
+						std::vector<flecs::entity> parent_transforms;
+
+						while (current != flecs::entity::null() && current.has<TransformComponent>())
+						{
+							parent_transforms.push_back(current);
+							current = current.parent();
+						}
+
+						// Multiply transforms from root to immediate parent
+						for (auto it = parent_transforms.rbegin(); it != parent_transforms.rend(); ++it)
+							parent_world_transform = parent_world_transform * (*it).get<TransformComponent>()->GetTransform();
+					}
+
+					// Convert world transform to local space
+					glm::mat4 local_matrix = glm::inverse(parent_world_transform) * world_transform;
+
+					// Decompose the local transform
 					glm::vec3 translation, rotation, scale;
-					DecomposeTransform(transform, translation, rotation, scale);
-					selected_entity.set<TransformComponent>({ glm::vec2(translation), glm::vec2(scale) });
+					DecomposeTransform(local_matrix, translation, rotation, scale);
+
+					// Update the entity's local transform
+					selected_entity.set<TransformComponent>({
+						glm::vec2(translation),
+						glm::vec2(scale),
+						glm::degrees(rotation.z)
+						});
 				}
 			}
 
@@ -245,12 +319,13 @@ namespace wc
 			ImGui::End();
 		}
 
-		void UI_Settings()
+		void UI_SceneProperties()
 		{
-			ImGui::Begin("Settings", &showSettings);
+			if (ImGui::Begin("Scene Properties", &showSceneProperties))
+			{
+				UI::Separator("Physics world");
 
-			ImGui::Separator();
-
+			}
 			ImGui::End();
 		}
 
@@ -395,7 +470,8 @@ namespace wc
 						name.clear();
 						ImGui::CloseCurrentPopup();
 					}
-					else {
+					else 
+					{
 						ImGui::SetNextWindowPos(ImGui::GetMousePos());
 						ImGui::OpenPopup("WarnEmptyName");
 					}
@@ -447,9 +523,9 @@ namespace wc
 					if (ImGui::CollapsingHeader("Transform##header", &visible, ImGuiTreeNodeFlags_None))
 					{
 						auto& p = *selected_entity.get<TransformComponent>();
-						auto& position = const_cast<glm::vec2&>(p.position);
-						auto& scale = const_cast<glm::vec2&>(p.scale);
-						auto& rotation = const_cast<float&>(p.rotation);
+						auto& position = const_cast<glm::vec2&>(p.Translation);
+						auto& scale = const_cast<glm::vec2&>(p.Scale);
+						auto& rotation = const_cast<float&>(p.Rotation);
 
 						// Draw position UI
 						UI::DragButton2("Position", position);
@@ -517,6 +593,112 @@ namespace wc
 					if (!visible) selected_entity.remove<TextRendererComponent>(); // add modal popup
 				}
 
+				auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
+					{
+						UI::Separator("Material");
+						UI::Drag("Density", material.Density);
+						UI::Drag("Friction", material.Friction);
+						UI::Drag("Restitution", material.Restitution);
+						UI::Drag("Rolling Resistance", material.RollingResistance);
+
+						UI::Separator();
+						UI::Drag("Allowed Clip Fraction", material.AllowedClipFraction);
+						ImGui::ColorEdit4("Debug Color", glm::value_ptr(material.DebugColor));
+
+						UI::Separator();
+						UI::Checkbox("Enable Sensor Events", material.EnableSensorEvents);
+						UI::Checkbox("Enable Contact Events", material.EnableContactEvents);
+						UI::Checkbox("Enable Hit Events", material.EnableHitEvents);
+						UI::Checkbox("Enable Pre-Solve Events", material.EnablePreSolveEvents);
+						UI::Checkbox("Invoke Contact Creation", material.InvokeContactCreation);
+						UI::Checkbox("Update Body Mass", material.UpdateBodyMass);
+					};
+
+				if (selected_entity.has<RigidBodyComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Rigid Body Component##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto p = selected_entity.get_ref<RigidBodyComponent>();
+
+						const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic"};
+						const char* currentBodyTypeString = bodyTypeStrings[(int)p->Type];
+
+						if (ImGui::BeginCombo("Body Type", currentBodyTypeString))
+						{
+							for (int i = 0; i < 3; i++)
+							{
+								bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
+								if (ImGui::Selectable(bodyTypeStrings[i], &isSelected))
+								{
+									currentBodyTypeString = bodyTypeStrings[i];
+									p->Type = BodyType(i);
+								}
+
+								if (isSelected)
+									ImGui::SetItemDefaultFocus();
+							}
+							ImGui::EndCombo();
+						}
+
+						UI::Drag("Gravity Scale", p->GravityScale);
+						UI::Drag("Linear Damping", p->LinearDamping);
+						UI::Drag("Angular Damping", p->AngularDamping);
+						UI::Checkbox("Fixed Rotation", p->FixedRotation);
+						UI::Checkbox("Bullet", p->Bullet);
+						UI::Checkbox("Fast Rotation", p->FastRotation);
+
+						ImGui::Separator();
+					}
+
+					if (!visible) selected_entity.remove<BoxCollider2DComponent>(); // add modal popup
+				}
+
+				if (selected_entity.has<BoxCollider2DComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Box Collider##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto p = selected_entity.get_ref<BoxCollider2DComponent>();
+						auto& offset = const_cast<glm::vec2&>(p->Offset);
+						auto& size = const_cast<glm::vec2&>(p->Size);
+
+						UI::DragButton2("Offset", offset);
+						UI::DragButton2("Size", size);
+
+						UI_PhysicsMaterial(p->Material);
+
+						ImGui::Separator();
+
+					}
+
+					if (!visible) selected_entity.remove<BoxCollider2DComponent>(); // add modal popup
+				}
+
+				if (selected_entity.has<CircleCollider2DComponent>())
+				{
+					bool visible = true;
+					ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+					if (ImGui::CollapsingHeader("Circle Collider##header", &visible, ImGuiTreeNodeFlags_None))
+					{
+						auto p = selected_entity.get_ref<CircleCollider2DComponent>();
+						auto& offset = const_cast<glm::vec2&>(p->Offset);
+						auto& radius = const_cast<float&>(p->Radius);
+
+						UI::DragButton2("Offset", offset);
+						UI::Drag("Radius", radius);
+
+						UI_PhysicsMaterial(p->Material);
+
+						ImGui::Separator();
+
+					}
+
+					if (!visible) selected_entity.remove<BoxCollider2DComponent>(); // add modal popup
+				}
+
 				static bool showAddComponent = false;
 				if (ImGui::Button("Add Component")) showAddComponent = true;
 
@@ -548,67 +730,41 @@ namespace wc
 					{
 						if (!ImGui::IsWindowFocused()) showAddComponent = false;
 
-						if (ImGui::CollapsingHeader("Physics"))
+						if (!selected_entity.has<TransformComponent>())
 						{
-							bool hasPosition = selected_entity.has<TransformComponent>();
-							if (ImGui::Checkbox("Transform", &hasPosition))
-							{
-								if (hasPosition) selected_entity.add<TransformComponent>();
-								else selected_entity.remove<TransformComponent>();
-							}
-
-
-
+							if (ImGui::Button("Transform Component"))
+								selected_entity.add<TransformComponent>();
 						}
 
+						if (!selected_entity.has<SpriteRendererComponent>() &&
+							!selected_entity.has<CircleRendererComponent>() &&
+							!selected_entity.has<TextRendererComponent>())
 						if (ImGui::CollapsingHeader("Render"))
 						{
-							bool hasSpriteRenderer = selected_entity.has<SpriteRendererComponent>();
-							bool hasCircleRenderer = selected_entity.has<CircleRendererComponent>();
-							bool hasTextRenderer = selected_entity.has<TextRendererComponent>();
-
-							if (ImGui::RadioButton("Sprite Renderer", hasSpriteRenderer))
-							{
-								if (!hasSpriteRenderer)
-								{
-									selected_entity.add<SpriteRendererComponent>();
-									selected_entity.remove<CircleRendererComponent>();
-									selected_entity.remove<TextRendererComponent>();
-								}
-								else selected_entity.remove<SpriteRendererComponent>();
-							}
-
-							if (ImGui::RadioButton("Circle Renderer", hasCircleRenderer))
-							{
-								if (!hasCircleRenderer)
-								{
-									selected_entity.add<CircleRendererComponent>();
-									selected_entity.remove<SpriteRendererComponent>();
-									selected_entity.remove<TextRendererComponent>();
-								}
-								else selected_entity.remove<CircleRendererComponent>();
-							}
-
-							if (ImGui::RadioButton("Text Renderer", hasTextRenderer)) // Crashes
-							{
-								if (!hasTextRenderer)
-								{
-									selected_entity.add<TextRendererComponent>();
-									selected_entity.remove<SpriteRendererComponent>();
-									selected_entity.remove<CircleRendererComponent>();
-								}
-								else selected_entity.remove<TextRendererComponent>();
-							}
-
+							if (ImGui::Button("Sprite Renderer Component")) selected_entity.add<SpriteRendererComponent>();
+							if (ImGui::Button("Circle Renderer Component")) selected_entity.add<CircleRendererComponent>();
+							if (ImGui::Button("Text Renderer Component")) selected_entity.add<TextRendererComponent>();
 						}
 
-						if (ImGui::CollapsingHeader("Music"))
+						if (ImGui::CollapsingHeader("Rigid Body Component##header"))
 						{
+							if (!selected_entity.has<RigidBodyComponent>())
+							{
+								if (ImGui::Button("Rigid Body Component"))
+									selected_entity.add<RigidBodyComponent>();
+							}
+
+							if (!selected_entity.has<BoxCollider2DComponent>() &&
+								!selected_entity.has<CircleCollider2DComponent>())
+							{
+								if (ImGui::Button("Box Collider Component")) selected_entity.add<BoxCollider2DComponent>();
+								if (ImGui::Button("Circle Collider Component")) selected_entity.add<CircleCollider2DComponent>();
+							}
 
 						}
 
-						ImGui::End();
 					}
+					ImGui::End();
 				}
 
 			}
@@ -668,9 +824,8 @@ namespace wc
 				if (/*ScrollToBottom ||*/
 					(/*m_ConsoleAutoScroll && */ ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
 					ImGui::SetScrollHereY(1.f);
-
-				ImGui::EndChild();
 			}
+			ImGui::EndChild();
 
 			ImGui::End();
 		}
@@ -728,12 +883,12 @@ namespace wc
 
 						if (ImGui::MenuItem("Open"))
 						{
-							WC_CORE_INFO("Open");
+							scene.Load("testScene.scene");
 						}
 
 						if (ImGui::MenuItem("Save"))
 						{
-							WC_CORE_INFO("Save");
+							scene.Save("testScene.scene");
 						}
 
 						if (ImGui::MenuItem("Save As"))
@@ -747,7 +902,7 @@ namespace wc
 					if (ImGui::BeginMenu("View"))
 					{
 						ImGui::MenuItem("Editor", NULL, &showEditor);
-						ImGui::MenuItem("Settings", NULL, &showSettings);
+						ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
 						ImGui::MenuItem("Entities", NULL, &showEntities);
 						ImGui::MenuItem("Properties", NULL, &showProperties);
 						ImGui::MenuItem("Console", NULL, &showConsole);
@@ -792,7 +947,7 @@ namespace wc
 			}
 
 			if (showEditor) UI_Editor();
-			if (showSettings) UI_Settings();
+			if (showSceneProperties) UI_SceneProperties();
 			if (showEntities) UI_Entities();
 			if (showProperties) UI_Properties();
 			if (showConsole) UI_Console();

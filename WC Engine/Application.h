@@ -116,9 +116,11 @@ namespace wc
 
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+			ImGuizmo::BeginFrame();
 			editor.UI();
 			//ImGui::ShowDemoWindow();
 			ImGui::EndFrame();
+			//ImGuizmo::EndFrame();
 			ImGui::Render();			
 
 			vkResetCommandBuffer(vk::SyncContext::GetMainCommandBuffer(), 0);

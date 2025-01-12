@@ -100,7 +100,7 @@ namespace wc
                 newBitmap.Set(x, y, glm::vec4(col, 255.f));
             }
 
-        textureID = renderData.LoadTextureFromMemory(newBitmap);
+        TextureID = renderData.LoadTextureFromMemory(newBitmap);
         newBitmap.Free();
 
         destroyFont(font);
@@ -184,38 +184,5 @@ namespace wc
 			}
 		}
 		return end - begin;
-    }
-
-    void SvgImage::Load(const std::string& filepath, RenderData& renderData)
-    {
-        bool loaded = msdfgen::loadSvgShape(shape, filepath.c_str());
-       /* if (loaded)
-        {
-            shape.normalize();
-            //                      max. angle
-            edgeColoringSimple(shape, 3.0);
-            //           image width, height
-            msdfgen::Bitmap<float, 3> bitmap(800, 400);
-            //                     range, scale, translation
-            msdfgen::generateMSDF(bitmap, shape, 4.0, 1.0, 0.0);
-
-
-            auto bytes_per_scanline = bitmap.width() * 3;
-            Image newBitmap(bitmap.width(), bitmap.height(), 4);
-
-            for (uint32_t x = 0; x < bitmap.width(); x++)
-                for (uint32_t y = 0; y < bitmap.height(); y++)
-                {
-                    glm::vec3 col;
-                    col.r = bitmap[y * bytes_per_scanline + x * 3 + 0];
-                    col.g = bitmap[y * bytes_per_scanline + x * 3 + 1];
-                    col.b = bitmap[y * bytes_per_scanline + x * 3 + 2];
-                    newBitmap.Set(x, y, glm::vec4(col, 255.f));
-                }
-
-            textureID = renderData.LoadTextureFromMemory(newBitmap);
-            renderData.Textures[textureID].SetName("svg");
-            newBitmap.Free();
-        }*/
     }
 }

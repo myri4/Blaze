@@ -391,7 +391,7 @@ namespace wc
 
 			const auto& fontGeometry = font.FontGeometry;
 			const auto& metrics = fontGeometry.getMetrics();
-			uint32_t texID = font.textureID;
+			uint32_t texID = font.TextureID;
 			auto& fontAtlas = Textures[texID];
 			float texelWidth = 1.f / fontAtlas.GetImage().GetSize().x;
 			float texelHeight = 1.f / fontAtlas.GetImage().GetSize().y;

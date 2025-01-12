@@ -21,17 +21,9 @@ namespace wc
 
         float Kerning = 0.f;
         float LineSpacing = 0.f;
-        uint32_t textureID = 0;
+        uint32_t TextureID = 0;
         msdf_atlas::FontGeometry FontGeometry;
     private:
         std::vector<msdf_atlas::GlyphGeometry> m_Glyphs;
 	};
-
-    struct SvgImage
-    {
-        void Load(const std::string& filepath, RenderData& renderData);
-
-        uint32_t textureID = 0;
-        msdfgen::Shape shape;
-    };
 }

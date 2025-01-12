@@ -271,6 +271,7 @@ namespace wc
         vk::ImageView GetView() const { return view; }
         vk::Sampler GetSampler() const { return sampler; }
         vk::Image GetImage() const { return image; }
+        auto GetImageID() const { return imageID; }
 
         void SetName(const std::string& name) 
         {
