@@ -87,14 +87,14 @@ namespace YAML
 
 namespace YAMLUtils 
 {
-	void SaveFile(const std::string& fileName, YAML::Node& node)
+	void SaveFile(const std::string& fileName, const YAML::Node& node)
 	{
 		std::ofstream file(fileName);
 		file << node;
 		file.close();
 	}
 
-	void SaveFile(const std::string& fileName, YAML::Emitter& emitter)
+	void SaveFile(const std::string& fileName, const YAML::Emitter& emitter)
 	{
 		std::ofstream file(fileName);
 		file << emitter.c_str();

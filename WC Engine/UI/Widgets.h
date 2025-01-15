@@ -24,7 +24,7 @@ namespace wc
 			}
 		}
 
-		void DragButton2(const char* txt, glm::vec2& v)
+		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
 		{
 			float position[2] = { v.x, v.y };
 

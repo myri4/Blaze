@@ -17,7 +17,8 @@ namespace wc
 		void Resize()
 		{
 			auto size = Globals.window.GetFramebufferSize();
-			while (size.x == 0 || size.y == 0) {
+			while (size.x == 0 || size.y == 0) 
+			{
 				size = Globals.window.GetFramebufferSize();
 				glfwWaitEvents();
 			}
@@ -36,7 +37,8 @@ namespace wc
 		//----------------------------------------------------------------------------------------------------------------------
 		bool OnCreate() 
 		{
-			WindowCreateInfo windowInfo = {
+			WindowCreateInfo windowInfo = 
+			{
 				.Width = 1280,
 				.Height = 720,
 				.Name = "WC Engine Editor",
@@ -71,7 +73,7 @@ namespace wc
 
 			auto& style = ImGui::GetStyle();
 			style.WindowMenuButtonPosition = ImGuiDir_None;
-			editor.Create(Globals.window.GetSize());
+			editor.Create();
 
 			return true;
 		}

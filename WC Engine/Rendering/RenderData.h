@@ -172,37 +172,6 @@ namespace wc
 			indexCount += 6;
 		}
 
-		void DrawQuadSvg(glm::mat4 transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
-		{
-			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
-
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			transform = ViewProjection * transform;
-
-			vertices[vertCount + 0] = Vertex(transform * glm::vec4(0.5f, 0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color);
-			vertices[vertCount + 1] = Vertex(transform * glm::vec4(-0.5f, 0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color);
-			vertices[vertCount + 2] = Vertex(transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color);
-			vertices[vertCount + 3] = Vertex(transform * glm::vec4(0.5f, -0.5f, 0.f, 1.f), { 1.f, 1.f }, texID, color);
-
-			for (uint32_t i = 0; i < 4; i++) vertices[vertCount + i].Thickness = -1.f;
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			indices[indexCount + 3] = 2 + vertCount;
-			indices[indexCount + 4] = 3 + vertCount;
-			indices[indexCount + 5] = vertCount;
-
-			vertCount += 4;
-			indexCount += 6;
-		}
-
 		void DrawLineQuad(glm::mat4 transform, const glm::vec4& color = glm::vec4(1.f))
 		{
 			glm::vec3 vertices[4];
@@ -242,6 +211,28 @@ namespace wc
 			DrawQuad(transform, texID, color);
 		}
 
+		void DrawTriangle(glm::vec2 v1, glm::vec2 v2, glm::vec2 v3, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
+		{
+			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
+
+			Vertex* vertices = m_VertexBuffer;
+			auto& vertCount = m_VertexBuffer.Counter;
+
+			uint32_t* indices = m_IndexBuffer;
+			auto& indexCount = m_IndexBuffer.Counter;
+
+			vertices[vertCount + 0] = Vertex(ViewProjection * glm::vec4(v1, 0.f, 1.f), { 1.f, 0.f }, texID, color);
+			vertices[vertCount + 1] = Vertex(ViewProjection * glm::vec4(v2, 0.f, 1.f), { 0.f, 0.f }, texID, color);
+			vertices[vertCount + 2] = Vertex(ViewProjection * glm::vec4(v3, 0.f, 1.f), { 0.f, 1.f }, texID, color);
+
+			indices[indexCount + 0] = vertCount;
+			indices[indexCount + 1] = 1 + vertCount;
+			indices[indexCount + 2] = 2 + vertCount;
+
+			vertCount += 3;
+			indexCount += 3;
+		}
+
 		void DrawTriangle(glm::mat4 transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
 		{
 			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
@@ -257,6 +248,7 @@ namespace wc
 			vertices[vertCount + 0] = Vertex(transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color);
 			vertices[vertCount + 1] = Vertex(transform * glm::vec4(0.5f, -0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color);
 			vertices[vertCount + 2] = Vertex(transform * glm::vec4(0.f, 0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color);
+
 
 			indices[indexCount + 0] = vertCount;
 			indices[indexCount + 1] = 1 + vertCount;
@@ -301,31 +293,9 @@ namespace wc
 
 		void DrawCircle(glm::vec3 position, float radius, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f))
 		{
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			auto transform = ViewProjection * glm::translate(glm::mat4(1.f), position) * glm::scale(glm::mat4(1.f), { radius, radius, 1.f });
-
-			vertices[vertCount + 0] = Vertex(transform * glm::vec4(1.f, 1.f, 0.f, 1.f), { 1.f, 1.f }, thickness, fade, color);
-			vertices[vertCount + 1] = Vertex(transform * glm::vec4(-1.f, 1.f, 0.f, 1.f), { -1.f, 1.f }, thickness, fade, color);
-			vertices[vertCount + 2] = Vertex(transform * glm::vec4(-1.f, -1.f, 0.f, 1.f), { -1.f,-1.f }, thickness, fade, color);
-			vertices[vertCount + 3] = Vertex(transform * glm::vec4(1.f, -1.f, 0.f, 1.f), { 1.f,-1.f }, thickness, fade, color);
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			indices[indexCount + 3] = 2 + vertCount;
-			indices[indexCount + 4] = 3 + vertCount;
-			indices[indexCount + 5] = vertCount;
-
-			vertCount += 4;
-			indexCount += 6;
+			auto transform = glm::translate(glm::mat4(1.f), position) * glm::scale(glm::mat4(1.f), { radius, radius, 1.f });
+			DrawCircle(transform, thickness, fade, color);
 		}
-
 
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& startColor, const glm::vec4& endColor)
 		{

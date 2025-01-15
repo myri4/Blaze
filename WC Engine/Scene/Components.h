@@ -18,7 +18,7 @@ namespace wc
 
 		glm::mat4 GetTransform() const
 		{
-			return glm::translate(glm::mat4(1.f), glm::vec3(Translation, 0.f)) * glm::rotate(glm::mat4(1.f), glm::radians(Rotation), { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.0f), glm::vec3(Scale, 1.f));
+			return glm::translate(glm::mat4(1.f), glm::vec3(Translation, 0.f)) * glm::rotate(glm::mat4(1.f), Rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.0f), glm::vec3(Scale, 1.f));
 		}
 	};
 
@@ -49,6 +49,13 @@ namespace wc
 	// Physics
 	enum class BodyType { Static = 0, Dynamic, Kinematic };
 
+	b2BodyType BodyTypeToBox2D(BodyType type)
+	{
+		if (type == BodyType::Static) return b2_staticBody;
+		if (type == BodyType::Dynamic) return b2_dynamicBody;
+		if (type == BodyType::Kinematic) return b2_kinematicBody;
+	}
+
 	struct RigidBodyComponent
 	{
 		// Don't expose in the ui
@@ -67,7 +74,7 @@ namespace wc
 		b2BodyDef GetBodyDef() const
 		{
 			b2BodyDef bodyDef = b2DefaultBodyDef();
-			bodyDef.type = (b2BodyType)Type;
+			bodyDef.type = BodyTypeToBox2D(Type);
 			bodyDef.fixedRotation = FixedRotation;
 			bodyDef.isBullet = Bullet;
 			bodyDef.allowFastRotation = FastRotation;
@@ -118,8 +125,8 @@ namespace wc
 
 	struct BoxCollider2DComponent
 	{
-		glm::vec2 Offset = { 0.f, 0.f };
-		glm::vec2 Size = { 0.5f, 0.5f };
+		glm::vec2 Offset = glm::vec2(0.f);
+		glm::vec2 Size = glm::vec2(1.f);
 
 		PhysicsMaterial Material;
 
@@ -128,7 +135,7 @@ namespace wc
 
 	struct CircleCollider2DComponent
 	{
-		glm::vec2 Offset = { 0.f, 0.f };
+		glm::vec2 Offset = glm::vec2(0.f);
 		float Radius = 0.5f; // @TODO: if this is set to -1 derive the radius from other components
 
 		PhysicsMaterial Material;

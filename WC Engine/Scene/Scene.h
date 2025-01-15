@@ -24,49 +24,38 @@ namespace wc
 
 		auto AddEntity(const std::string& name) { return m_World.entity(name.c_str()).add<EntityTag>(); }
 
+		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(m_World, ent2, ent, true); }
+
 		void KillEntity(flecs::entity& ent)	{ ent.destruct(); }
-
-		auto GetGravity() 
-		{
-			auto g = m_PhysicsWorld.GetGravity();
-			return glm::vec2(g.x, g.y);
-		}
-
-		void SetGravity(glm::vec2 g) 
-		{
-			m_PhysicsWorld.SetGravity(g);
-		}
 
 		void CreatePhysicsWorld()
 		{
 			b2WorldDef worldDef = b2DefaultWorldDef();
-			worldDef.gravity = b2Vec2{ 0.0f, -9.8f };
-			m_PhysicsWorld.Create(worldDef);			
-		}
-
-		void CreatePhysicsEntities()
-		{
+			m_PhysicsWorld.Create(worldDef);
 			m_World.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
 				if (p.body.IsValid()) return;
 				b2BodyDef bodyDef = p.GetBodyDef();
 
 				if (entt.has<BoxCollider2DComponent>())
 				{
-					auto boxDef = entt.get_ref<BoxCollider2DComponent>();
-					bodyDef.position = b2Vec2{ pos.Translation.x + boxDef->Offset.x, pos.Translation.y + boxDef->Offset.y };
-
+					auto collDef = entt.get_ref<BoxCollider2DComponent>();
+					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
+					bodyDef.rotation = b2MakeRot(pos.Rotation);
 					p.body.Create(m_PhysicsWorld, bodyDef);
-					boxDef->Shape.CreatePolygonShape(p.body, boxDef->Material.GetShapeDef(), b2MakeBox(boxDef->Size.x, boxDef->Size.y));
+					collDef->Shape.CreatePolygonShape(p.body, collDef->Material.GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
 				}
-				else if (entt.has<CircleCollider2DComponent>())
+
+				if (entt.has<CircleCollider2DComponent>())
 				{
-					auto circleDef = entt.get_ref<CircleCollider2DComponent>();
-					bodyDef.position = b2Vec2{ pos.Translation.x + circleDef->Offset.x, pos.Translation.y + circleDef->Offset.y };
-
+					auto collDef = entt.get_ref<CircleCollider2DComponent>();
+					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
+					bodyDef.rotation = b2MakeRot(pos.Rotation);
 					p.body.Create(m_PhysicsWorld, bodyDef);
-					circleDef->Shape.CreateCircleShape(p.body, circleDef->Material.GetShapeDef(), { bodyDef.position, circleDef->Radius });
+					collDef->Shape.CreateCircleShape(p.body, collDef->Material.GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
 				}
-			});
+				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
+				p.previousRotation = pos.Rotation;
+				});
 		}
 
 		void DestroyPhysicsWorld()
@@ -80,8 +69,9 @@ namespace wc
 
 			while (AccumulatedTime >= SimulationTime)
 			{
-				m_World.each([this](RigidBodyComponent& p) {
+				m_World.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
 					p.prevPos = p.body.GetPosition();
+					p.previousRotation = p.body.GetAngle();
 					});
 
 				m_PhysicsWorld.Step(SimulationTime, 4);
@@ -94,6 +84,7 @@ namespace wc
 			m_World.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
 					pc.Translation = glm::mix(p.prevPos, p.body.GetPosition(), alpha);
+					pc.Rotation = glm::mix(p.previousRotation, p.body.GetAngle(), alpha);
 				});
 		}
 
@@ -102,7 +93,7 @@ namespace wc
 			UpdatePhysics();
 		}
 
-		void SerializeEntity(flecs::entity& entity, YAML::Node& entityData)
+		void SerializeEntity(flecs::entity& entity, YAML::Node& entityData) const
 		{
 			if (entity.name() != "null") entityData["Name"] = std::string(entity.name().c_str());
 			else entityData["Name"] = std::string("null[5ws78@!12]");
@@ -114,7 +105,7 @@ namespace wc
 				YAML::Node componentData;
 				componentData["Translation"] = component->Translation;
 				componentData["Scale"] = component->Scale;
-				componentData["Rotation"] = component->Rotation;
+				componentData["Rotation"] = glm::degrees(component->Rotation);
 				entityData["TransformComponent"] = componentData;
 			}
 
@@ -214,7 +205,7 @@ namespace wc
 			}
 		}
 
-		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData)
+		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData) const
 		{
 			YAML::Node childrenData;
 
@@ -234,14 +225,14 @@ namespace wc
 				entityData["Children"] = childrenData;
 		}
 
-		void Save(const std::string& filepath)
+		YAML::Node toYAML() const
 		{
 			YAML::Node metaData;
 			YAML::Node entitiesData;
 
 			m_World.each([&](flecs::entity entity, EntityTag) {
 				if (entity.parent() != 0) return;
-				
+
 				YAML::Node entityData;
 
 				SerializeEntity(entity, entityData);
@@ -249,12 +240,30 @@ namespace wc
 				SerializeChildEntity(entity, entityData);
 
 				entitiesData.push_back(entityData);
-			});
+				});
 
-			if (m_PhysicsWorld.IsValid()) metaData["Gravity"] = m_PhysicsWorld.GetGravity();
+			if (m_PhysicsWorld.IsValid())
+			{
+				metaData["Gravity"] = m_PhysicsWorld.GetGravity();
+			}
 			metaData["Entities"] = entitiesData;
+			return metaData;
+		}
 
-			YAMLUtils::SaveFile(filepath, metaData);
+		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }
+
+		void fromYAML(const YAML::Node& data)
+		{
+			auto entities = data["Entities"];
+			if (entities)
+			{
+				for (const auto& entity : entities)
+				{
+					flecs::entity deserializedEntity;
+
+					DeserializeEntity(deserializedEntity, entity);
+				}
+			}
 		}
 
 		void DeserializeEntity(flecs::entity& deserializedEntity, const YAML::Node& entity)
@@ -262,7 +271,7 @@ namespace wc
 			std::string name = entity["Name"].as<std::string>();
 			std::string id = entity["ID"].as<std::string>();
 
-			WC_CORE_TRACE("Deserialized entity with name = {}, ID = {}", name, id);
+			WC_CORE_INFO("Deserialized entity with name = {}, ID = {}", name, id);
 
 			if (name == "null[5ws78@!12]") deserializedEntity = AddEntity("null");
 			else if (name != "null") deserializedEntity = AddEntity(name);
@@ -274,7 +283,7 @@ namespace wc
 				deserializedEntity.set<TransformComponent>({
 					transformComponent["Translation"].as<glm::vec2>(),
 					transformComponent["Scale"].as<glm::vec2>(),
-					transformComponent["Rotation"].as<float>()
+					glm::radians(transformComponent["Rotation"].as<float>())
 					});
 			}
 			
@@ -398,18 +407,20 @@ namespace wc
 				return false;
 			}
 
-			YAML::Node data = YAML::LoadFile(filepath);
+			fromYAML(YAML::LoadFile(filepath));
+		}
 
-			auto entities = data["Entities"];
-			if (entities)
-			{
-				for (const auto& entity : entities)
-				{
-					flecs::entity deserializedEntity;
+		void DeleteAllEntities()
+		{
+			m_World.each([](flecs::entity entity, EntityTag) {
+				entity.destruct();
+				});
+		}
 
-					DeserializeEntity(deserializedEntity, entity);
-				}
-			}
+		void Copy(const Scene& FromWorld)
+		{
+			DeleteAllEntities();
+			fromYAML(FromWorld.toYAML());
 		}
 	};
 }

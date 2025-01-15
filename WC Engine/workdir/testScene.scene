@@ -3,7 +3,7 @@ Entities:
     ID: 558
     TransformComponent:
       Translation: [0, 0]
-      Scale: [6.6741595, 1]
+      Scale: [7.5027304, 1]
       Rotation: 0
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
@@ -18,7 +18,39 @@ Entities:
       AngularDamping: 0
     BoxCollider2DComponent:
       Offset: [0, 0]
-      Size: [6.674, 1]
+      Size: [7.503, 1]
+      Density: 1
+      Friction: 0.6
+      Restitution: 0
+      RollingResistance: 0.5
+      AllowedClipFraction: 0.1
+      DebugColor: [1, 1, 1, 1]
+      EnableSensorEvents: true
+      EnableContactEvents: false
+      EnableHitEvents: false
+      EnablePreSolveEvents: false
+      InvokeContactCreation: false
+      UpdateBodyMass: true
+  - Name: Cube
+    ID: 559
+    TransformComponent:
+      Translation: [-0.031249642, 9.671875]
+      Scale: [1, 1]
+      Rotation: 0
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      Texture: 0
+    RigidBodyComponent:
+      Type: Dynamic
+      FixedRotation: false
+      Bullet: false
+      FastRotation: false
+      GravityScale: 1
+      LinearDamping: 0
+      AngularDamping: 0
+    BoxCollider2DComponent:
+      Offset: [0, 0]
+      Size: [1, 1]
       Density: 1
       Friction: 0.6
       Restitution: 0
@@ -32,9 +64,9 @@ Entities:
       InvokeContactCreation: false
       UpdateBodyMass: true
   - Name: Circle
-    ID: 559
+    ID: 560
     TransformComponent:
-      Translation: [-0.046874285, 3.1874993]
+      Translation: [1.7343807, 13.218749]
       Scale: [1, 1]
       Rotation: 0
     CircleRendererComponent:
@@ -42,7 +74,7 @@ Entities:
       Thickness: 1
       Fade: 0.005
     RigidBodyComponent:
-      Type: Static
+      Type: Dynamic
       FixedRotation: false
       Bullet: false
       FastRotation: false

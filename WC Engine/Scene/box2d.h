@@ -31,25 +31,25 @@ namespace wc
 		}
 
 		/// World id validation. Provides validation for up to 64K allocations.
-		inline bool IsValid() { return b2World_IsValid(id); }
+		inline bool IsValid() const { return b2World_IsValid(id); }
 
 		/// Simulate a world for one time step. This performs collision detection, integration, and constraint solution.
 		/// @param worldId The world to simulate
 		/// @param timeStep The amount of time to simulate, this should be a fixed number. Typically 1/60.
 		/// @param subStepCount The number of sub-steps, increasing the sub-step count can increase accuracy. Typically 4.
-		inline void Step(float timeStep, int subStepCount) { b2World_Step(id, timeStep, subStepCount); }
+		inline void Step(float timeStep, int subStepCount) const { b2World_Step(id, timeStep, subStepCount); }
 
 		/// Call this to draw shapes and other debug draw data
-		inline void Draw(b2DebugDraw* draw) { b2World_Draw(id, draw); }
+		inline void Draw(b2DebugDraw* draw) const { b2World_Draw(id, draw); }
 
 		/// Get the body events for the current time step. The event data is transient. Do not store a reference to this data.
-		inline auto GetBodyEvents() { return b2World_GetBodyEvents(id); }
+		inline auto GetBodyEvents() const { return b2World_GetBodyEvents(id); }
 
 		/// Get sensor events for the current time step. The event data is transient. Do not store a reference to this data.
-		inline auto GetSensorEvents() { return b2World_GetSensorEvents(id); }
+		inline auto GetSensorEvents() const { return b2World_GetSensorEvents(id); }
 
 		/// Get contact events for this current time step. The event data is transient. Do not store a reference to this data.
-		inline auto GetContactEvents() { return b2World_GetContactEvents(id); }
+		inline auto GetContactEvents() const { return b2World_GetContactEvents(id); }
 
 		/// Overlap test for all shapes that *potentially* overlap the provided AABB
 		inline void OverlapAABB(b2AABB aabb, b2QueryFilter filter, b2OverlapResultFcn* fcn, void* context) { b2World_OverlapAABB(id, aabb, filter, fcn, context); }
@@ -154,7 +154,7 @@ namespace wc
 		inline void SetGravity(glm::vec2 gravity) { b2World_SetGravity(id, { gravity.x, gravity.y }); }
 
 		/// Get the gravity vector
-		inline auto GetGravity() 
+		inline auto GetGravity() const
 		{ 
 			b2Vec2 g = b2World_GetGravity(id);
 			return glm::vec2(g.x, g.y); 
@@ -210,9 +210,9 @@ namespace wc
 			id = b2_nullBodyId;
 		}
 
-		inline bool IsValid() { return b2Body_IsValid(id); }
+		inline bool IsValid() const { return b2Body_IsValid(id); }
 
-		inline auto GetType() { return b2Body_GetType(id); }
+		inline auto GetType() const { return b2Body_GetType(id); }
 
 		/// Change the body type. This is an expensive operation. This automatically updates the mass
 		///	properties regardless of the automatic mass setting.
@@ -225,15 +225,15 @@ namespace wc
 		inline void* GetUserData() { return b2Body_GetUserData(id); }
 
 		/// Get the world position of a body. This is the location of the body origin.
-		inline glm::vec2 GetPosition() { auto pos = b2Body_GetPosition(id); return { pos.x,pos.y }; }
+		inline glm::vec2 GetPosition() const { auto pos = b2Body_GetPosition(id); return { pos.x,pos.y }; }
 
 		/// Get the world rotation of a body as a cosine/sine pair (complex number)
-		inline auto GetRotation() { return b2Body_GetRotation(id); }
+		inline auto GetRotation() const { return b2Body_GetRotation(id); }
 
-		inline auto GetAngle() { return b2Rot_GetAngle(GetRotation()); }
+		inline auto GetAngle() const { return b2Rot_GetAngle(GetRotation()); }
 
 		/// Get the world transform of a body.
-		inline auto GetTransform() { return b2Body_GetTransform(id); }
+		inline auto GetTransform() const { return b2Body_GetTransform(id); }
 
 		/// Set the world transform of a body. This acts as a teleport and is fairly expensive.
 		/// @note Generally you should create a body with then intended transform.
@@ -241,22 +241,22 @@ namespace wc
 		inline void SetTransform(glm::vec2 position, b2Rot rotation) { b2Body_SetTransform(id, { position.x, position.y }, rotation); }
 
 		/// Get a local point on a body given a world point
-		inline glm::vec2 GetLocalPoint(glm::vec2 worldPoint) { auto pos = b2Body_GetLocalPoint(id, { worldPoint.x, worldPoint.y }); return { pos.x,pos.y }; }
+		inline glm::vec2 GetLocalPoint(glm::vec2 worldPoint) const { auto pos = b2Body_GetLocalPoint(id, { worldPoint.x, worldPoint.y }); return { pos.x,pos.y }; }
 
 		/// Get a world point on a body given a local point
-		inline glm::vec2 GetWorldPoint(glm::vec2 localPoint) { auto pos = b2Body_GetWorldPoint(id, { localPoint.x, localPoint.y }); return { pos.x,pos.y }; }
+		inline glm::vec2 GetWorldPoint(glm::vec2 localPoint) const { auto pos = b2Body_GetWorldPoint(id, { localPoint.x, localPoint.y }); return { pos.x,pos.y }; }
 
 		/// Get a local vector on a body given a world vector
-		inline glm::vec2 GetLocalVector(glm::vec2 worldVector) { auto pos = b2Body_GetLocalVector(id, { worldVector.x, worldVector.y }); return { pos.x,pos.y }; }
+		inline glm::vec2 GetLocalVector(glm::vec2 worldVector) const { auto pos = b2Body_GetLocalVector(id, { worldVector.x, worldVector.y }); return { pos.x,pos.y }; }
 
 		/// Get a world vector on a body given a local vector
-		inline glm::vec2 GetWorldVector(glm::vec2 localVector) { auto pos = b2Body_GetWorldVector(id, { localVector.x, localVector.y }); return { pos.x,pos.y }; }
+		inline glm::vec2 GetWorldVector(glm::vec2 localVector) const { auto pos = b2Body_GetWorldVector(id, { localVector.x, localVector.y }); return { pos.x,pos.y }; }
 
 		/// Get the linear velocity of a body's center of mass. Typically in meters per second.
-		inline glm::vec2 GetLinearVelocity() { auto pos = b2Body_GetLinearVelocity(id); return { pos.x,pos.y }; }
+		inline glm::vec2 GetLinearVelocity() const { auto pos = b2Body_GetLinearVelocity(id); return { pos.x,pos.y }; }
 
 		/// Get the angular velocity of a body in radians per second
-		inline auto GetAngularVelocity() { return b2Body_GetAngularVelocity(id); }
+		inline auto GetAngularVelocity() const { return b2Body_GetAngularVelocity(id); }
 
 		/// Set the linear velocity of a body. Typically in meters per second.
 		inline void SetLinearVelocity(glm::vec2 linearVelocity) { b2Body_SetLinearVelocity(id, { linearVelocity.x, linearVelocity.y }); }
