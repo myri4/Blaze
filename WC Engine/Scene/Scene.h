@@ -7,11 +7,19 @@
 
 namespace wc
 {
+	struct PhysicsWorldData
+	{
+		glm::vec2 Gravity = { 0.f, -9.8f };
+	};
+
 	struct Scene
 	{
 	private:
 		flecs::world m_World;
 		b2World m_PhysicsWorld;
+		PhysicsWorldData m_PhysicsWorldData;
+
+		std::vector<flecs::entity> m_Entities;
 
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
@@ -19,6 +27,7 @@ namespace wc
 	public:
 		auto GetWorld()	{ return m_World; }
 		auto GetPhysicsWorld() { return m_PhysicsWorld; }
+		auto& GetPhysicsWorldData() { return m_PhysicsWorldData; }
 
 		auto AddEntity() {	return m_World.entity().add<EntityTag>();	}
 
@@ -31,6 +40,7 @@ namespace wc
 		void CreatePhysicsWorld()
 		{
 			b2WorldDef worldDef = b2DefaultWorldDef();
+			worldDef.gravity = { m_PhysicsWorldData.Gravity.x, m_PhysicsWorldData.Gravity.y };
 			m_PhysicsWorld.Create(worldDef);
 			m_World.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
 				if (p.body.IsValid()) return;
@@ -169,6 +179,7 @@ namespace wc
 				componentData["AllowedClipFraction"] = component->Material.AllowedClipFraction;
 				componentData["DebugColor"] = component->Material.DebugColor;
 
+				componentData["Sensor"] = component->Material.Sensor;
 				componentData["EnableSensorEvents"] = component->Material.EnableSensorEvents;
 				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
 				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
@@ -194,6 +205,7 @@ namespace wc
 				componentData["AllowedClipFraction"] = component->Material.AllowedClipFraction;
 				componentData["DebugColor"] = component->Material.DebugColor;
 
+				componentData["Sensor"] = component->Material.Sensor;
 				componentData["EnableSensorEvents"] = component->Material.EnableSensorEvents;
 				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
 				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
@@ -347,6 +359,7 @@ namespace wc
 					component.Material.AllowedClipFraction = componentData["AllowedClipFraction"].as<float>();
 					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
 
+					component.Material.Sensor = componentData["Sensor"].as<bool>();
 					component.Material.EnableSensorEvents = componentData["EnableSensorEvents"].as<bool>();
 					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
 					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();
@@ -374,6 +387,7 @@ namespace wc
 					component.Material.AllowedClipFraction = componentData["AllowedClipFraction"].as<float>();
 					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
 
+					component.Material.Sensor = componentData["Sensor"].as<bool>();
 					component.Material.EnableSensorEvents = componentData["EnableSensorEvents"].as<bool>();
 					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
 					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();

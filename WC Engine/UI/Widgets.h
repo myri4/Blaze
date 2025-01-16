@@ -11,6 +11,21 @@ namespace wc
 
 	namespace UI
 	{
+		static void RenderArrowIcon()
+		{
+			ImVec2 arrowPos = ImVec2(
+				ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::CalcTextSize(">").x,
+				ImGui::GetCursorScreenPos().y - ImGui::GetTextLineHeight() - ImGui::GetStyle().ItemSpacing.y // Adjust to align with text height
+			);
+
+			ImGui::RenderArrow(
+				ImGui::GetWindowDrawList(),
+				arrowPos,
+				ImGui::GetColorU32(ImGuiCol_Text),
+				ImGuiDir_Right
+			);
+		}
+
 		static void HelpMarker(const char* desc, bool sameLine = true)
 		{
 			if (sameLine) ImGui::SameLine();

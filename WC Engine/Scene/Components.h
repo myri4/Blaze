@@ -96,6 +96,7 @@ namespace wc
 		float AllowedClipFraction = 0.1f;
 		glm::vec4 DebugColor = glm::vec4(1.f);
 
+		bool Sensor = false;
 		bool EnableSensorEvents = true;
 		bool EnableContactEvents = false;
 		bool EnableHitEvents = false;
@@ -112,6 +113,7 @@ namespace wc
 			shapeDef.rollingResistance = RollingResistance;
 			shapeDef.allowedClipFraction = AllowedClipFraction;
 			shapeDef.customColor = glm::packUnorm4x8(DebugColor); // @NOTE: maybe not working
+			shapeDef.isSensor = Sensor;
 			shapeDef.enableSensorEvents = EnableSensorEvents;
 			shapeDef.enableContactEvents = EnableContactEvents;
 			shapeDef.enableHitEvents = EnableHitEvents;
