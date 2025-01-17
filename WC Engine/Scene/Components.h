@@ -10,6 +10,11 @@ namespace wc
 {
 	struct EntityTag {};
 
+	struct ChildNamesComponent
+	{
+		std::vector<std::string> childNames;
+	};
+
 	struct TransformComponent
 	{
 		glm::vec2 Translation = glm::vec2(0.f);
@@ -23,7 +28,6 @@ namespace wc
 	};
 
 	// Graphics
-
 	struct TextRendererComponent
 	{
 		std::string Text;

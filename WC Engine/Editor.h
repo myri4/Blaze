@@ -118,7 +118,6 @@ namespace wc
 		glm::vec2 m_BeginCameraPosition;
 		bool m_Panning = false;
 
-
 		OrthographicCamera camera;
 
 		RenderData m_RenderData;
@@ -303,8 +302,7 @@ namespace wc
 		void ChangeSceneState(SceneState newState)
 		{
 			std::string selectedEntityName;
-			if (m_SelectedEntity != flecs::entity::null())
-				selectedEntityName = m_SelectedEntity.name().c_str();
+			if (m_SelectedEntity != flecs::entity::null()) selectedEntityName = m_SelectedEntity.name().c_str();
 			//WC_INFO("Changing scene state. Selected Entity: {0}", selectedEntityName);
 
 			m_SceneState = newState;
@@ -320,7 +318,7 @@ namespace wc
 				m_Scene.Copy(m_TempScene);
 			}
 
-			if(m_SelectedEntity != flecs::entity::null())m_SelectedEntity = m_Scene.GetWorld().lookup(selectedEntityName.c_str());
+			if(m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.GetWorld().lookup(selectedEntityName.c_str());
 			//WC_INFO("Scene state changed. Selected Entity: {0}", m_SelectedEntity.name().c_str());
 		}
 
@@ -461,10 +459,40 @@ namespace wc
 		{
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
-				auto& worldData = m_Scene.GetPhysicsWorldData();
+				//tests
+				{
+				//if (m_SelectedEntity != flecs::entity::null())
+				//{
+				//	WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
+				//	auto names = m_SelectedEntity.get_ref<ChildNamesComponent>();
+				//	if (names)
+				//	{
+				//		for (const auto& name : names->childNames)
+				//		{
+				//			auto entity = m_Scene.GetWorld().lookup(name.c_str());
+				//			ImGui::Button(name.c_str());
+				//			
+				//		}
+				//	}
+				//}
 
-				UI::DragButton2("Gravity", worldData.Gravity);
+				//for (const auto& name : m_Scene.GetParentEntityNames())
+				//{
+				//	auto entity = m_Scene.GetWorld().lookup(name.c_str());
+				//	if (entity)
+				//	{
+				//		if (ImGui::Button(name.c_str()))
+				//		{
+				//			m_SelectedEntity = entity;
+				//		}
+				//	}
+				//}
+				}
 
+				//auto& worldData = m_Scene.GetPhysicsWorldData();
+
+				//UI::DragButton2("Gravity", worldData.Gravity);
+				
 				//}
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
@@ -495,112 +523,214 @@ namespace wc
 			ImGui::End();
 		}
 
-		flecs::entity ShowEntityTree(flecs::entity e, flecs::entity parent = flecs::entity::null())
+		flecs::entity m_DraggedEntity = flecs::entity::null();
+
+		void ShowEntities()
 		{
-			// Check if the mouse is clicked outside the tree nodes
+			// Reset selection if the mouse is clicked outside the tree nodes
 			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused())
 			{
 				m_SelectedEntity = flecs::entity::null();
 			}
 
-			if (parent != flecs::entity::null() && !e.is_a(flecs::ChildOf))
-				return flecs::entity::null(); // Skip if entity is not a child 
+			// Vector for entities to show
+			std::vector<std::pair<flecs::entity, int>> entityVector; // Pair to store entity and its level (depth)
 
-			// Get children
-			std::vector<flecs::entity> children;
-			e.children([&children](flecs::entity child) {
-				children.push_back(child);
-				});
-
-			bool is_selected = (m_SelectedEntity == e);
-
-			// Check if a child is selected - keep parent node open
-			bool keep_open = std::any_of(children.begin(), children.end(), [&](const flecs::entity& child) {
-				return (m_SelectedEntity == child);
-				});
-
-			if (keep_open)
-				ImGui::SetNextItemOpen(true); // Set node open
-
-			ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
-
-			if (is_selected) node_flags |= ImGuiTreeNodeFlags_Selected;
-
-			bool is_open = ImGui::TreeNodeEx(e.name().c_str(), node_flags);
-			if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+			// Iterate over all root-level entities and add them to the vector
+			for (const auto& name : m_Scene.GetParentEntityNames())
 			{
-				m_SelectedEntity = e;  // Update the selected entity
-			}
-
-			// Check for right-click and open popup
-			if (ImGui::IsWindowHovered())
-			{
-				if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+				WC_INFO(name);
+				auto entity = m_Scene.GetWorld().lookup(name.c_str());
+				if (entity)
 				{
-					ImGui::OpenPopup(std::to_string(e.id()).c_str());
-				}
-				else if (m_SelectedEntity != flecs::entity::null() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-				{
-					ImGui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+					entityVector.emplace_back(entity, 0);  // Add root entities with level 0 to the vector
 				}
 			}
 
-			// Display the popup
-			if (ImGui::BeginPopup(std::to_string(e.id()).c_str()))
+			// Process the vector iteratively (non-recursive)
+			for (size_t i = 0; i < entityVector.size(); ++i)
 			{
-				ImGui::Text("%s", e.name().c_str());
-				ImGui::Separator();
+				auto [e, level] = entityVector[i]; // Get entity and its level
 
-				if (ImGui::MenuItem("Clone"))
+				bool is_selected = (m_SelectedEntity == e);
+
+				// Get children of the current entity
+				std::vector<flecs::entity> children;
+				e.children([&children](flecs::entity child) {
+					children.push_back(child);
+					});
+
+				// Check if any child is selected (keep parent node open if so)
+				bool keep_open = std::any_of(children.begin(), children.end(), [&](const flecs::entity& child) {
+					return (m_SelectedEntity == child);
+					});
+
+				if (keep_open)
+					ImGui::SetNextItemOpen(true);  // Set node open if any child is selected
+
+				// Setup the flags for the current tree node
+				ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+
+				if (is_selected) node_flags |= ImGuiTreeNodeFlags_Selected;
+
+				// Adjust cursor position based on the entity's level (indentation)
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + level * 20.0f);  // Adjust 20.0f for the desired indentation
+
+				bool is_open = ImGui::TreeNodeEx(e.name().c_str(), node_flags);
+
+				// Handle item click to select the entity
+				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 				{
-					WC_CORE_INFO("Implement Clone");
-					ImGui::CloseCurrentPopup();
+					m_SelectedEntity = e;  // Update selected entity
 				}
 
-				if (ImGui::MenuItem("Export"))
+				// Handle drag and drop
+				if (ImGui::BeginDragDropSource())
 				{
-					WC_CORE_INFO("Implement Export");
-					ImGui::CloseCurrentPopup();
+					m_DraggedEntity = e;
+					ImGui::SetDragDropPayload("ENTITY", &e, sizeof(flecs::entity));
+					ImGui::Text("%s", e.name().c_str());
+					ImGui::EndDragDropSource();
 				}
 
-				ImGui::Separator();
-
-				ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-				if (ImGui::MenuItem("Delete"))
+				if (ImGui::BeginDragDropTarget())
 				{
-					m_Scene.KillEntity(e);
-					m_SelectedEntity = flecs::entity::null();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::PopStyleColor();
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+					{
+						IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+						flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
 
-				ImGui::EndPopup();
+						if (droppedEntity != e)
+						{
+							if (level == 0)
+							{
+								// Reorder root entities
+								auto& rootEntities = m_Scene.GetParentEntityNames();
+								auto droppedIt = std::find(rootEntities.begin(), rootEntities.end(), droppedEntity.name().c_str());
+								auto targetIt = std::find(rootEntities.begin(), rootEntities.end(), e.name().c_str());
+
+								if (droppedIt != rootEntities.end() && targetIt != rootEntities.end())
+								{
+									// Remove the dropped entity from its current position
+									rootEntities.erase(droppedIt);
+
+									// Insert the dropped entity before the target entity
+									rootEntities.insert(targetIt, droppedEntity.name().c_str());
+								}
+							}
+							else
+							{
+								// Reorder child entities
+								auto parent = e.parent();
+								if (parent != flecs::entity::null())
+								{
+									// Get the list of children for the parent entity
+									std::vector<flecs::entity> children;
+									parent.children([&children](flecs::entity child) {
+										children.push_back(child);
+										});
+
+									// Find the position of the child and beforeChild in the list
+									auto childIt = std::find(children.begin(), children.end(), droppedEntity);
+									auto beforeChildIt = std::find(children.begin(), children.end(), e);
+
+									if (childIt != children.end() && beforeChildIt != children.end())
+									{
+										// Remove the child from its current position
+										children.erase(childIt);
+
+										// Insert the child before the beforeChild
+										children.insert(beforeChildIt, droppedEntity);
+
+										// Update the parent entity with the new order of children
+										for (auto& child : children)
+										{
+											child.add(flecs::ChildOf, parent);
+										}
+									}
+								}
+							}
+						}
+					}
+					ImGui::EndDragDropTarget();
+				}
+
+				// Check for right-click and open a popup
+				if (ImGui::IsWindowHovered())
+				{
+					if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+					{
+						ImGui::OpenPopup(std::to_string(e.id()).c_str());
+					}
+					else if (m_SelectedEntity != flecs::entity::null() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+					{
+						ImGui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+					}
+				}
+
+				// Display the popup menu with actions like Clone, Export, etc.
+				if (ImGui::BeginPopup(std::to_string(e.id()).c_str()))
+				{
+					ImGui::Text("%s", e.name().c_str());
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Clone"))
+					{
+						WC_CORE_INFO("Implement Clone");
+						ImGui::CloseCurrentPopup();
+					}
+
+					if (ImGui::MenuItem("Export"))
+					{
+						WC_CORE_INFO("Implement Export");
+						ImGui::CloseCurrentPopup();
+					}
+
+					if (e.parent() != flecs::entity::null() && ImGui::MenuItem("Remove Child"))
+					{
+						auto parent = e.parent();
+						m_Scene.RemoveChild(parent, e);
+					}
+
+					if (m_SelectedEntity != flecs::entity::null() && e != m_SelectedEntity)
+					{
+						if (ImGui::MenuItem("Set Child of Selected"))
+						{
+							m_Scene.SetChild(m_SelectedEntity, e);
+						}
+					}
+
+					ImGui::Separator();
+
+					ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+					if (ImGui::MenuItem("Delete"))
+					{
+						m_Scene.KillEntity(e);
+						m_SelectedEntity = flecs::entity::null();
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::PopStyleColor();
+
+					ImGui::EndPopup();
+				}
+
+				// If the node is open, add its children to the vector
+				if (is_open && !children.empty())
+				{
+					for (auto& child : children)
+					{
+						entityVector.emplace_back(child, level + 1);  // Add child entities to the vector with increased level
+					}
+					ImGui::TreePop();  // Close the parent node
+				}
 			}
-
-			if (is_open)
-			{
-				// If the node is open, recursively show its children
-				for (const auto& child : children)
-					ShowEntityTree(child, e);  // Pass the current entity as the parent for the child
-
-				if (!children.empty())
-					ImGui::TreePop();  // Close node                
-			}
-
-			return m_SelectedEntity;
 		}
 
 		void UI_Entities()
 		{
 			if (ImGui::Begin("Entities", &showEntities))
 			{
-				m_Scene.GetWorld().each([this](flecs::entity e, EntityTag p)
-					{
-						// Only call ShowEntityTree for root entities (entities with no parent)
-						if (e.parent() == flecs::entity::null()) {
-							ShowEntityTree(e);
-						}
-					});
+				ShowEntities();
 
 				ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6);
 				ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 40, ImGui::GetWindowSize().y - 40));
@@ -975,8 +1105,6 @@ namespace wc
 		{
 			if (ImGui::Begin("Console", &showConsole))
 			{
-
-
 				if (ImGui::Button("Clear"))
 				{
 					//Globals.console.Clear();
@@ -987,7 +1115,12 @@ namespace wc
 				ImGui::SameLine();
 				if (ImGui::Button("Copy"))
 				{
-					WC_INFO("TODO - IMPLEMENT COPY");
+					std::string logData;
+					for (const auto& msg : Log::GetConsoleSink()->messages)
+					{
+						logData += msg.payload + "\n"; // Assuming msg.payload is a string
+					}
+					ImGui::SetClipboardText(logData.c_str());
 				}
 
 				ImGui::SameLine();

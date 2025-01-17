@@ -10,6 +10,7 @@ namespace wc
 	struct PhysicsWorldData
 	{
 		glm::vec2 Gravity = { 0.f, -9.8f };
+		float TimeStep = 1.f / 60.f;
 	};
 
 	struct Scene
@@ -19,7 +20,7 @@ namespace wc
 		b2World m_PhysicsWorld;
 		PhysicsWorldData m_PhysicsWorldData;
 
-		std::vector<flecs::entity> m_Entities;
+		std::vector<std::string> m_ParentEntityNames; // only parents
 
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
@@ -28,14 +29,85 @@ namespace wc
 		auto GetWorld()	{ return m_World; }
 		auto GetPhysicsWorld() { return m_PhysicsWorld; }
 		auto& GetPhysicsWorldData() { return m_PhysicsWorldData; }
+		auto& GetParentEntityNames() { return m_ParentEntityNames; }
 
 		auto AddEntity() {	return m_World.entity().add<EntityTag>();	}
 
-		auto AddEntity(const std::string& name) { return m_World.entity(name.c_str()).add<EntityTag>(); }
+		auto AddEntity(const std::string& name) { m_ParentEntityNames.push_back(name); return m_World.entity(name.c_str()).add<EntityTag>(); }
+		
+		void RemoveChild(flecs::entity& parent, flecs::entity& child)
+		{
+			child.remove(flecs::ChildOf, parent);
+			auto names = parent.get_ref<ChildNamesComponent>();
+
+			if (names)
+			{
+				auto& childNames = names->childNames;
+				auto it = std::remove(childNames.begin(), childNames.end(), child.name().c_str());
+				if (it != childNames.end())
+				{
+					childNames.erase(it, childNames.end());
+
+					// If it was the last child, remove the ChildNamesComponent from the parent
+					if (childNames.empty())
+					{
+						parent.remove<ChildNamesComponent>();
+					}
+				}
+			}
+
+			// Add the child's name back to m_EntityNames
+			m_ParentEntityNames.push_back(child.name().c_str());
+		}
+
+		void SetChild(flecs::entity& parent, flecs::entity& child)
+		{
+			// Check if the child already has a parent
+			auto currentParent = child.parent();
+			if (child.parent() != flecs::entity::null())
+			{
+				// Remove the child from the current parent
+				RemoveChild(currentParent, child);
+			}
+
+			parent.add<ChildNamesComponent>();
+			parent.get_ref<ChildNamesComponent>()->childNames.push_back(child.name().c_str());
+			child.add(flecs::ChildOf, parent);
+
+			// Remove the child's name from m_ParentEntityNames
+			m_ParentEntityNames.erase(std::remove(m_ParentEntityNames.begin(), m_ParentEntityNames.end(), child.name().c_str()), m_ParentEntityNames.end());
+		}
 
 		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(m_World, ent2, ent, true); }
 
-		void KillEntity(flecs::entity& ent)	{ ent.destruct(); }
+		void KillEntity(flecs::entity& ent)
+		{
+			// Remove the entity's name from m_EntityNames
+			auto it = std::remove(m_ParentEntityNames.begin(), m_ParentEntityNames.end(), ent.name().c_str());
+			if (it != m_ParentEntityNames.end()) {
+				m_ParentEntityNames.erase(it, m_ParentEntityNames.end());
+			}
+
+			// Check if the entity has a parent
+			auto parent = ent.parent();
+			if (parent != flecs::entity::null() && parent.has<ChildNamesComponent>())
+			{
+				// Remove the child's name from the parent's ChildNamesComponent
+				auto& childNames = parent.get_ref<ChildNamesComponent>()->childNames;
+				auto childIt = std::remove(childNames.begin(), childNames.end(), ent.name().c_str());
+				if (childIt != childNames.end()) {
+					childNames.erase(childIt, childNames.end());
+
+					// If it was the last child, remove the ChildNamesComponent from the parent
+					if (childNames.empty()) {
+						parent.remove<ChildNamesComponent>();
+					}
+				}
+			}
+
+			// Destruct the entity
+			ent.destruct();
+		}
 
 		void CreatePhysicsWorld()
 		{
@@ -407,8 +479,8 @@ namespace wc
 					flecs::entity deserializedChildEntity;
 
 					DeserializeEntity(deserializedChildEntity, child);
-
-					deserializedChildEntity.child_of(deserializedEntity);
+					
+					SetChild(deserializedEntity, deserializedChildEntity);
 				}
 			}
 		}
@@ -429,6 +501,7 @@ namespace wc
 			m_World.each([](flecs::entity entity, EntityTag) {
 				entity.destruct();
 				});
+			m_ParentEntityNames.clear();
 		}
 
 		void Copy(const Scene& FromWorld)
