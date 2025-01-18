@@ -460,18 +460,15 @@ namespace wc
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
 				//tests
-				{
 				//if (m_SelectedEntity != flecs::entity::null())
 				//{
-				//	WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
+				//	//WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
 				//	auto names = m_SelectedEntity.get_ref<ChildNamesComponent>();
 				//	if (names)
 				//	{
 				//		for (const auto& name : names->childNames)
 				//		{
-				//			auto entity = m_Scene.GetWorld().lookup(name.c_str());
 				//			ImGui::Button(name.c_str());
-				//			
 				//		}
 				//	}
 				//}
@@ -487,7 +484,7 @@ namespace wc
 				//		}
 				//	}
 				//}
-				}
+				
 
 				//auto& worldData = m_Scene.GetPhysicsWorldData();
 
@@ -523,8 +520,6 @@ namespace wc
 			ImGui::End();
 		}
 
-		flecs::entity m_DraggedEntity = flecs::entity::null();
-
 		void ShowEntities()
 		{
 			// Reset selection if the mouse is clicked outside the tree nodes
@@ -533,134 +528,104 @@ namespace wc
 				m_SelectedEntity = flecs::entity::null();
 			}
 
-			// Vector for entities to show
-			std::vector<std::pair<flecs::entity, int>> entityVector; // Pair to store entity and its level (depth)
+			// Recursive function to display entities
+			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void {
+				bool is_selected = (m_SelectedEntity == entity);
 
-			// Iterate over all root-level entities and add them to the vector
-			for (const auto& name : m_Scene.GetParentEntityNames())
-			{
-				WC_INFO(name);
-				auto entity = m_Scene.GetWorld().lookup(name.c_str());
-				if (entity)
-				{
-					entityVector.emplace_back(entity, 0);  // Add root entities with level 0 to the vector
-				}
-			}
-
-			// Process the vector iteratively (non-recursive)
-			for (size_t i = 0; i < entityVector.size(); ++i)
-			{
-				auto [e, level] = entityVector[i]; // Get entity and its level
-
-				bool is_selected = (m_SelectedEntity == e);
-
-				// Get children of the current entity
+				// Get children of the current entity from ChildNamesComponent
 				std::vector<flecs::entity> children;
-				e.children([&children](flecs::entity child) {
-					children.push_back(child);
-					});
+				if (entity.has<ChildNamesComponent>())
+				{
+					auto& childNames = entity.get<ChildNamesComponent>()->childNames;
+					for (const auto& childName : childNames)
+					{
+						std::string fullChildName = std::string(entity.name()) + "::" + childName;
 
-				// Check if any child is selected (keep parent node open if so)
-				bool keep_open = std::any_of(children.begin(), children.end(), [&](const flecs::entity& child) {
-					return (m_SelectedEntity == child);
-					});
+						// Now ensure the lookup takes into account the parent and grandparent names
+						flecs::entity childEntity = entity; // Start with current entity (parent)
+						while (childEntity.parent() != flecs::entity::null()) {
+							childEntity = childEntity.parent();  // Traverse upwards to ensure the full entity path
+							fullChildName = std::string(childEntity.name()) + "::" + fullChildName;  // Add parent names to the lookup path
+						}
 
-				if (keep_open)
-					ImGui::SetNextItemOpen(true);  // Set node open if any child is selected
+						// Lookup the child entity using the constructed full path
+						auto childEntityResolved = m_Scene.GetWorld().lookup(fullChildName.c_str());
+						if (childEntityResolved)
+						{
+							children.push_back(childEntityResolved);
+						}
+					}
+				}
 
-				// Setup the flags for the current tree node
-				ImGuiTreeNodeFlags node_flags = (children.empty() ? ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen : ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+				// Setup the tree node flags
+				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+				if (is_selected)
+					node_flags |= ImGuiTreeNodeFlags_Selected;
 
-				if (is_selected) node_flags |= ImGuiTreeNodeFlags_Selected;
+				if (children.empty())
+					node_flags |= ImGuiTreeNodeFlags_Leaf;
 
-				// Adjust cursor position based on the entity's level (indentation)
-				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + level * 20.0f);  // Adjust 20.0f for the desired indentation
+				if (m_SelectedEntity != flecs::entity::null()) {
+					auto parent = m_SelectedEntity.parent();
+					while (parent != flecs::entity::null()) {
+						if (parent == entity) {
+							ImGui::SetNextItemOpen(true);
+							break;
+						}
+						parent = parent.parent();
+					}
+				}
 
-				bool is_open = ImGui::TreeNodeEx(e.name().c_str(), node_flags);
+				// Push a flag to allow duplicate IDs in the same window
+				ImGui::PushItemFlag(ImGuiItemFlags_AllowDuplicateId, true);
 
-				// Handle item click to select the entity
+				// Render the entity
+				bool is_open = ImGui::TreeNodeEx(entity.name().c_str(), node_flags);
+
+				ImGui::PopItemFlag();
+
+				// Handle selection on click
 				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 				{
-					m_SelectedEntity = e;  // Update selected entity
+					m_SelectedEntity = entity;
 				}
 
-				// Handle drag and drop
-				if (ImGui::BeginDragDropSource())
+				if (ImGui::IsItemActive() && !ImGui::IsItemHovered())
 				{
-					m_DraggedEntity = e;
-					ImGui::SetDragDropPayload("ENTITY", &e, sizeof(flecs::entity));
-					ImGui::Text("%s", e.name().c_str());
-					ImGui::EndDragDropSource();
-				}
+					auto& entitiyNames = entity.parent() == flecs::entity::null() ? m_Scene.GetParentEntityNames() : entity.parent().get_ref<ChildNamesComponent>()->childNames;
+					auto it = std::find(entitiyNames.begin(), entitiyNames.end(), std::string(entity.name()));
 
-				if (ImGui::BeginDragDropTarget())
-				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+					if (it != entitiyNames.end())
 					{
-						IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-						flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+						int index = std::distance(entitiyNames.begin(), it);
 
-						if (droppedEntity != e)
+						// Get the drag delta in Y-axis
+						float drag_delta_y = ImGui::GetMouseDragDelta(0).y;
+
+						// Only consider a drag if the delta is significant
+						if (std::abs(drag_delta_y) > 5.0f)  // A threshold to ignore small drags
 						{
-							if (level == 0)
+							// Calculate the target index based on drag direction
+							int n_next = index + (drag_delta_y < 0.f ? -1 : 1);
+
+							// Ensure the index stays within bounds and we don't swap to the same position
+							if (n_next >= 0 && n_next < entitiyNames.size() && n_next != index)
 							{
-								// Reorder root entities
-								auto& rootEntities = m_Scene.GetParentEntityNames();
-								auto droppedIt = std::find(rootEntities.begin(), rootEntities.end(), droppedEntity.name().c_str());
-								auto targetIt = std::find(rootEntities.begin(), rootEntities.end(), e.name().c_str());
+								std::swap(entitiyNames[index], entitiyNames[n_next]);
 
-								if (droppedIt != rootEntities.end() && targetIt != rootEntities.end())
-								{
-									// Remove the dropped entity from its current position
-									rootEntities.erase(droppedIt);
-
-									// Insert the dropped entity before the target entity
-									rootEntities.insert(targetIt, droppedEntity.name().c_str());
-								}
-							}
-							else
-							{
-								// Reorder child entities
-								auto parent = e.parent();
-								if (parent != flecs::entity::null())
-								{
-									// Get the list of children for the parent entity
-									std::vector<flecs::entity> children;
-									parent.children([&children](flecs::entity child) {
-										children.push_back(child);
-										});
-
-									// Find the position of the child and beforeChild in the list
-									auto childIt = std::find(children.begin(), children.end(), droppedEntity);
-									auto beforeChildIt = std::find(children.begin(), children.end(), e);
-
-									if (childIt != children.end() && beforeChildIt != children.end())
-									{
-										// Remove the child from its current position
-										children.erase(childIt);
-
-										// Insert the child before the beforeChild
-										children.insert(beforeChildIt, droppedEntity);
-
-										// Update the parent entity with the new order of children
-										for (auto& child : children)
-										{
-											child.add(flecs::ChildOf, parent);
-										}
-									}
-								}
+								// Reset the mouse drag delta after a swap
+								ImGui::ResetMouseDragDelta();
 							}
 						}
 					}
-					ImGui::EndDragDropTarget();
 				}
 
-				// Check for right-click and open a popup
+				// Handle right-click and popup menu
 				if (ImGui::IsWindowHovered())
 				{
 					if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 					{
-						ImGui::OpenPopup(std::to_string(e.id()).c_str());
+						ImGui::OpenPopup(std::to_string(entity.id()).c_str());
 					}
 					else if (m_SelectedEntity != flecs::entity::null() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 					{
@@ -668,10 +633,10 @@ namespace wc
 					}
 				}
 
-				// Display the popup menu with actions like Clone, Export, etc.
-				if (ImGui::BeginPopup(std::to_string(e.id()).c_str()))
+				// Display the popup menu
+				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str()))
 				{
-					ImGui::Text("%s", e.name().c_str());
+					ImGui::Text("%s", entity.name().c_str());
 					ImGui::Separator();
 
 					if (ImGui::MenuItem("Clone"))
@@ -686,17 +651,17 @@ namespace wc
 						ImGui::CloseCurrentPopup();
 					}
 
-					if (e.parent() != flecs::entity::null() && ImGui::MenuItem("Remove Child"))
+					if (entity.parent() != flecs::entity::null() && ImGui::MenuItem("Remove Child"))
 					{
-						auto parent = e.parent();
-						m_Scene.RemoveChild(parent, e);
+						auto parent = entity.parent();
+						m_Scene.RemoveChild(parent, entity);
 					}
 
-					if (m_SelectedEntity != flecs::entity::null() && e != m_SelectedEntity)
+					if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
 					{
 						if (ImGui::MenuItem("Set Child of Selected"))
 						{
-							m_Scene.SetChild(m_SelectedEntity, e);
+							m_Scene.SetChild(m_SelectedEntity, entity);
 						}
 					}
 
@@ -705,7 +670,7 @@ namespace wc
 					ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
 					if (ImGui::MenuItem("Delete"))
 					{
-						m_Scene.KillEntity(e);
+						m_Scene.KillEntity(entity);
 						m_SelectedEntity = flecs::entity::null();
 						ImGui::CloseCurrentPopup();
 					}
@@ -714,14 +679,25 @@ namespace wc
 					ImGui::EndPopup();
 				}
 
-				// If the node is open, add its children to the vector
-				if (is_open && !children.empty())
+				// If the node is open, recursively display children
+				if (is_open)
 				{
-					for (auto& child : children)
+					for (const auto& child : children)
 					{
-						entityVector.emplace_back(child, level + 1);  // Add child entities to the vector with increased level
+						displayEntityRef(child, displayEntityRef);
 					}
-					ImGui::TreePop();  // Close the parent node
+
+					ImGui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
+				}
+				};
+
+			// Display root entities
+			for (const auto& name : m_Scene.GetParentEntityNames())
+			{
+				auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
+				if (rootEntity)
+				{
+					displayEntity(rootEntity, displayEntity);
 				}
 			}
 		}
