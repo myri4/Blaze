@@ -7,12 +7,25 @@ project("WC-Engine")
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/WC Engine/*.cpp" "${CMAKE_SOURCE_DIR}/WC Engine/*.h")
-file(GLOB IMGUI_SOURCES 
+file(GLOB IMGUI_SOURCES
 "vendor/imgui/*.cpp" "vendor/imgui/*.h"
 "vendor/imgui/misc/cpp/*.cpp" "vendor/imgui/misc/cpp/*.h"
 )
-    
-add_executable("WC-Engine" 
+
+# Check if we're inside CLion
+if (NOT DEFINED ENV{CLION_IDE})
+    message(STATUS "Not in CLion, assuming Visual Studio or other IDE.")
+    # Define MSVC macro if you're using Visual Studio
+    if (MSVC)
+        add_definitions(-DMSVC)
+    endif()
+else()
+    message(STATUS "Building in CLion.")
+    add_definitions(-DCLION)
+endif()
+
+
+add_executable("WC-Engine"
     ${SOURCES}
     ${IMGUI_SOURCES}
     "vendor/wc/imgui_backend/imgui_impl_glfw.cpp"

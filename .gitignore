@@ -5,3 +5,4 @@
 *.properties
 out/
 .vs/
+cmake-build-relwithdebinfo-visual-studio

@@ -43,7 +43,16 @@ namespace wc
 	int main()
 	{
 		Log::Init();
-		std::filesystem::current_path("../../../../WC Engine/workdir"); 
+
+#ifdef MSVC  // Visual Studio
+		std::filesystem::current_path("../../../../WC Engine/workdir");
+#elif defined(CLION)  // CLion
+		std::filesystem::current_path("../../WC Engine/workdir");
+#else  // Default or other IDEs
+		std::filesystem::current_path("../../../../WC Engine/workdir");
+#endif
+
+
 		glfwSetErrorCallback([](int err, const char* description) { WC_CORE_ERROR(description); /*WC_DEBUGBREAK();*/ });
 		//glfwSetMonitorCallback([](GLFWmonitor* monitor, int event)
 		//	{
