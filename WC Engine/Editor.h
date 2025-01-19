@@ -460,6 +460,7 @@ namespace wc
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
 				//tests
+				
 				//if (m_SelectedEntity != flecs::entity::null())
 				//{
 				//	//WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
@@ -528,6 +529,13 @@ namespace wc
 				m_SelectedEntity = flecs::entity::null();
 			}
 
+			static bool dragMode = false;
+			if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
+			{
+				dragMode = !dragMode;
+				WC_INFO("Changed Mode to : {0}", dragMode);
+			}
+
 			// Recursive function to display entities
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void {
 				bool is_selected = (m_SelectedEntity == entity);
@@ -558,7 +566,7 @@ namespace wc
 				}
 
 				// Setup the tree node flags
-				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
 				if (is_selected)
 					node_flags |= ImGuiTreeNodeFlags_Selected;
 
@@ -590,7 +598,36 @@ namespace wc
 					m_SelectedEntity = entity;
 				}
 
-				if (ImGui::IsItemActive() && !ImGui::IsItemHovered())
+				// TODO - fix
+				if(dragMode)
+				{
+					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+					{
+						WC_INFO("Dragging");
+						ImGui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
+						ImGui::Text("Dragging %s", entity.name().c_str());
+						ImGui::EndDragDropSource();
+					}
+
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+						{
+							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+							flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+
+							// Check if the drop target is empty space
+							 if (droppedEntity != entity.parent())
+							{
+								m_Scene.SetChild(entity, droppedEntity);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+
+
+				}
+				else if(ImGui::IsItemActive() && !ImGui::IsItemHovered())
 				{
 					auto& entitiyNames = entity.parent() == flecs::entity::null() ? m_Scene.GetParentEntityNames() : entity.parent().get_ref<ChildNamesComponent>()->childNames;
 					auto it = std::find(entitiyNames.begin(), entitiyNames.end(), std::string(entity.name()));
@@ -619,7 +656,7 @@ namespace wc
 						}
 					}
 				}
-
+				
 				// Handle right-click and popup menu
 				if (ImGui::IsWindowHovered())
 				{
@@ -634,7 +671,7 @@ namespace wc
 				}
 
 				// Display the popup menu
-				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str()))
+				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoFocusOnAppearing))
 				{
 					ImGui::Text("%s", entity.name().c_str());
 					ImGui::Separator();
@@ -785,7 +822,7 @@ namespace wc
 					if (m_SelectedEntity.has<TransformComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Transform##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Transform##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto& p = *m_SelectedEntity.get<TransformComponent>();
 							auto& position = const_cast<glm::vec2&>(p.Translation);
@@ -804,7 +841,7 @@ namespace wc
 					if (m_SelectedEntity.has<SpriteRendererComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Sprite Renderer##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Sprite Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto& s = *m_SelectedEntity.get<SpriteRendererComponent>();
 							auto& color = const_cast<glm::vec4&>(s.Color);
@@ -817,7 +854,7 @@ namespace wc
 					if (m_SelectedEntity.has<CircleRendererComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Circle Renderer##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Circle Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto& c = *m_SelectedEntity.get<CircleRendererComponent>();
 							auto& thickness = const_cast<float&>(c.Thickness);
@@ -837,7 +874,7 @@ namespace wc
 					if (m_SelectedEntity.has<TextRendererComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Text Renderer##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Text Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto& t = *m_SelectedEntity.get<TextRendererComponent>();
 							auto& text = const_cast<std::string&>(t.Text);
@@ -877,7 +914,7 @@ namespace wc
 					if (m_SelectedEntity.has<RigidBodyComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Rigid Body Component##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Rigid Body Component##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto p = m_SelectedEntity.get_ref<RigidBodyComponent>();
 
@@ -917,7 +954,7 @@ namespace wc
 					if (m_SelectedEntity.has<BoxCollider2DComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Box Collider##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Box Collider##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto p = m_SelectedEntity.get_ref<BoxCollider2DComponent>();
 							auto& offset = const_cast<glm::vec2&>(p->Offset);
@@ -938,7 +975,7 @@ namespace wc
 					if (m_SelectedEntity.has<CircleCollider2DComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Circle Collider##header", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Circle Collider##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto p = m_SelectedEntity.get_ref<CircleCollider2DComponent>();
 							auto& offset = const_cast<glm::vec2&>(p->Offset);

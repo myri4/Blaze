@@ -1,16 +1,18 @@
 #pragma once
 
 #include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 
 namespace wc
 {
-	ImVec2 ImConv(glm::vec2 v)
+
+	namespace UI
+	{
+		ImVec2 ImConv(glm::vec2 v)
 	{
 		return ImVec2(v.x, v.y);
 	}
 
-	namespace UI
-	{
 		static void RenderArrowIcon()
 		{
 			ImVec2 arrowPos = ImVec2(
