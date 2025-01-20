@@ -180,7 +180,8 @@ namespace wc
 			t_Folder.Load("assets/textures/menu/folder-fill.png");
 
 			b2AABB bounds = { { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } };
-			debugDraw = {
+			debugDraw =
+			    {
 					DrawPolygonFcn,
 					DrawSolidPolygonFcn,
 					DrawCircleFcn,
@@ -459,8 +460,11 @@ namespace wc
 		{
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
+				auto& worldData = m_Scene.GetPhysicsWorldData();
+				UI::DragButton2("Gravity", worldData.Gravity);
+
 				//tests
-				
+
 				//if (m_SelectedEntity != flecs::entity::null())
 				//{
 				//	//WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
@@ -485,12 +489,10 @@ namespace wc
 				//		}
 				//	}
 				//}
-				
 
-				//auto& worldData = m_Scene.GetPhysicsWorldData();
 
-				//UI::DragButton2("Gravity", worldData.Gravity);
-				
+
+
 				//}
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
@@ -533,12 +535,12 @@ namespace wc
 			if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
 			{
 				dragMode = !dragMode;
-				WC_INFO("Changed Mode to : {0}", dragMode);
+				WC_INFO(dragMode ? "Changed Mode to : Bond" : "Changed Mode to : Reorder");
 			}
 
 			// Recursive function to display entities
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void {
-				bool is_selected = (m_SelectedEntity == entity);
+				const bool is_selected = (m_SelectedEntity == entity);
 
 				// Get children of the current entity from ChildNamesComponent
 				std::vector<flecs::entity> children;
@@ -565,7 +567,7 @@ namespace wc
 					}
 				}
 
-				// Setup the tree node flags
+				// Set up the tree node flags
 				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
 				if (is_selected)
 					node_flags |= ImGuiTreeNodeFlags_Selected;
@@ -598,7 +600,6 @@ namespace wc
 					m_SelectedEntity = entity;
 				}
 
-				// TODO - fix
 				if(dragMode)
 				{
 					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
@@ -656,7 +657,7 @@ namespace wc
 						}
 					}
 				}
-				
+
 				// Handle right-click and popup menu
 				if (ImGui::IsWindowHovered())
 				{
@@ -741,7 +742,7 @@ namespace wc
 
 		void UI_Entities()
 		{
-			if (ImGui::Begin("Entities", &showEntities))
+			if (ImGui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
 				ShowEntities();
 
@@ -754,7 +755,7 @@ namespace wc
 				ImGui::SetItemTooltip("Add Entity");
 				ImGui::PopStyleVar();
 
-				if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |	ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) 
+				if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 				{
 					ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 					ImVec2 windowSize = ImGui::GetWindowSize();
@@ -1266,7 +1267,7 @@ namespace wc
 								bool& isOpen = it->second;
 
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-								ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
 								if (ImGui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
 								{
 									isOpen = !isOpen; // Toggle state
@@ -1488,7 +1489,8 @@ namespace wc
 
 		void UI()
 		{
-			const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+		    const ImGuiViewport* viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(viewport->WorkPos);
 			ImGui::SetNextWindowSize(viewport->WorkSize);
 			ImGui::SetNextWindowViewport(viewport->ID);
@@ -1501,8 +1503,6 @@ namespace wc
 				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
 				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground))
 			{
-
-
 				ImGuiIO& io = ImGui::GetIO();
 				if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 				{
@@ -1513,87 +1513,120 @@ namespace wc
 				ImGui::PopStyleVar(3);
 
 				// Main Menu Bar
+
+				if (ImGui::BeginMenuBar())
 				{
-					if (ImGui::BeginMenuBar())
+
+					// TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
+					if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
 					{
-
-						// TODO - add Dragging and Turn of GLFW tab bar -> custom
-						if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
-						{
-							//WC_CORE_INFO("Empty space on main menu bar is hovered)"
-						}
-
-						if (ImGui::BeginMenu("File"))
-						{
-							if (ImGui::MenuItem("New"))
-							{
-								WC_CORE_INFO("New");
-							}
-
-							if (ImGui::MenuItem("Open"))
-							{
-								m_Scene.Load("testScene.scene");
-							}
-
-							if (ImGui::MenuItem("Save"))
-							{
-								m_Scene.Save("testScene.scene");
-							}
-
-							if (ImGui::MenuItem("Save As"))
-							{
-								WC_CORE_INFO("Save As");
-							}
-
-							ImGui::EndMenu();
-						}
-
-						if (ImGui::BeginMenu("View"))
-						{
-							ImGui::MenuItem("Editor", NULL, &showEditor);
-							ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
-							ImGui::MenuItem("Entities", NULL, &showEntities);
-							ImGui::MenuItem("Properties", NULL, &showProperties);
-							ImGui::MenuItem("Console", NULL, &showConsole);
-							ImGui::MenuItem("Assets", NULL, &showAssets);
-
-							ImGui::EndMenu();
-						}
-
-						// Buttons
-						ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 1.f));
-						ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-						ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-
-						float buttonSize = ImGui::GetFrameHeightWithSpacing();
-						float spacing = 5.0f;
-
-						ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + spacing));
-						if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
-						{
-							//Globals.window.Collapse();
-						}
-
-						ImGui::SameLine();
-						if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-						{
-							//Globals.window.Maximize();
-						}
-
-						ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
-						ImGui::SameLine();
-						if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
-						{
-							Globals.window.Close();
-						}
-
-						ImGui::PopStyleVar();
-						ImGui::PopStyleColor(4);
-
-						ImGui::EndMenuBar();
+						//WC_CORE_INFO("Empty space on main menu bar is hovered)"
 					}
+
+					if (ImGui::BeginMenu("File"))
+					{
+						if (ImGui::MenuItem("New"))
+						{
+							WC_CORE_INFO("New");
+						}
+
+						if (ImGui::MenuItem("Open"))
+						{
+							m_Scene.Load("testScene.scene");
+						}
+
+						if (ImGui::MenuItem("Save"))
+						{
+							m_Scene.Save("testScene.scene");
+						}
+
+						if (ImGui::MenuItem("Save As"))
+						{
+							WC_CORE_INFO("Save As");
+						}
+
+						ImGui::EndMenu();
+					}
+
+					if (ImGui::BeginMenu("View"))
+					{
+						ImGui::MenuItem("Editor", NULL, &showEditor);
+						ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
+						ImGui::MenuItem("Entities", NULL, &showEntities);
+						ImGui::MenuItem("Properties", NULL, &showProperties);
+						ImGui::MenuItem("Console", NULL, &showConsole);
+						ImGui::MenuItem("Assets", NULL, &showAssets);
+
+					    if (ImGui::BeginMenu("Theme"))
+					    {
+					        // TODO - Add more themes / custom themes / save themes
+					        static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
+					        static int currentTheme = 0; // Default to SoDark
+					        static float hue = 0.0f;
+
+					        if (ImGui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
+					        {
+					            switch (currentTheme)
+					            {
+					                case 0: // SoDark
+					                    ImGui::GetStyle() = UI::SoDark(hue);
+					                break;
+					                case 1: // Classic
+					                    ImGui::StyleColorsClassic();
+					                break;
+					                case 2: // Dark
+					                    ImGui::StyleColorsDark();
+					                break;
+					                case 3: // Light
+					                    ImGui::StyleColorsLight();
+					                break;
+					            }
+					        }
+
+					        if (currentTheme == 0 && ImGui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
+					        {
+					            ImGui::GetStyle() = UI::SoDark(hue);
+					        }
+
+					        ImGui::EndMenu();
+					    }
+
+						ImGui::EndMenu();
+					}
+
+					// Buttons
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+					ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+
+					float buttonSize = ImGui::GetFrameHeightWithSpacing();
+
+					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize));
+					if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
+					{
+						//Globals.window.Collapse();
+					}
+
+					ImGui::SameLine();
+					if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
+					{
+						//Globals.window.Maximize();
+					}
+
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
+				    ImGui::SameLine();
+					if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+					{
+						Globals.window.Close();
+					}
+
+					ImGui::PopStyleVar();
+					ImGui::PopStyleColor(4);
+
+					ImGui::EndMenuBar();
 				}
+
 
 				if (showEditor) UI_Editor();
 				if (showSceneProperties) UI_SceneProperties();

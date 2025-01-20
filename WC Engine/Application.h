@@ -4,17 +4,18 @@
 #include "wc/imgui_backend/imgui_impl_vulkan.h"
 
 #include "Editor.h"
+#include "UI/Widgets.h"
 
 #include <wc/Swapchain.h>
 
 namespace wc
 {
-		Editor editor;
+    Editor editor;
 		
-		vk::Swapchain swapchain;
-		bool SwapChainOk = true;
+	vk::Swapchain swapchain;
+    bool SwapChainOk = true;
 
-		void Resize()
+    void Resize()
 		{
 			auto size = Globals.window.GetFramebufferSize();
 			while (size.x == 0 || size.y == 0) 
@@ -32,6 +33,7 @@ namespace wc
 			Globals.window.resized = false;
 			SwapChainOk = true;
 		}
+
 	class Application 
 	{
 		//----------------------------------------------------------------------------------------------------------------------
@@ -71,8 +73,9 @@ namespace wc
 			ImGui_ImplVulkan_Init(swapchain.RenderPass);
 			ImGui_ImplVulkan_CreateFontsTexture();
 
-			auto& style = ImGui::GetStyle();
-			style.WindowMenuButtonPosition = ImGuiDir_None;
+
+		    ImGuiStyle& style = ImGui::GetStyle();
+		    style = UI::SoDark(0.0f);
 			editor.Create();
 
 			return true;
