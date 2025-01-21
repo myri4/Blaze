@@ -485,8 +485,18 @@ namespace wc
 			}
 		}
 
-		bool Load(const std::string& filepath)
+	    void DeleteAllEntities()
 		{
+		    m_World.each([](flecs::entity entity, EntityTag) {
+                entity.destruct();
+                });
+		    m_ParentEntityNames.clear();
+		}
+
+		bool Load(const std::string& filepath, const bool clear = true)
+		{
+
+		    if (clear)DeleteAllEntities();
 			if (!std::filesystem::exists(filepath))
 			{
 				WC_CORE_ERROR("{} does not exist.", filepath);
@@ -494,14 +504,6 @@ namespace wc
 			}
 
 			fromYAML(YAML::LoadFile(filepath));
-		}
-
-		void DeleteAllEntities()
-		{
-			m_World.each([](flecs::entity entity, EntityTag) {
-				entity.destruct();
-				});
-			m_ParentEntityNames.clear();
 		}
 
 		void Copy(const Scene& FromWorld)

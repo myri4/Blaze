@@ -19,6 +19,7 @@
 #include <wc/Utils/List.h>
 #include <wc/Utils/Window.h>
 #include <wc/Utils/YAML.h>
+#include <wc/Utils/FileDialogs.h>
 
 //ECS
 #include "Scene/Scene.h"
@@ -35,7 +36,7 @@
 
 namespace wc
 {
-	glm::vec4 decompress(uint32_t num)
+    glm::vec4 decompress(uint32_t num)
 	{ // Remember! Convert from 0-255 to 0-1!
 		glm::vec4 Output;
 		Output.r = float((num & uint32_t(0x000000ff)));
@@ -158,7 +159,7 @@ namespace wc
 		bool showEntities = true;
 		bool showProperties = true;
 		bool showConsole = true;
-		bool showAssets = true;
+		bool showFileExplorer = true;
 	    bool showDebugStats = true;
 
 		flecs::entity m_SelectedEntity = flecs::entity::null();
@@ -775,6 +776,8 @@ namespace wc
 				ImGui::SetItemTooltip("Add Entity");
 				ImGui::PopStyleVar();
 
+			    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
 				if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 				{
 					ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -1068,30 +1071,22 @@ namespace wc
 							if (!ImGui::IsWindowFocused()) showAddComponent = false;
 
 							//Replace with an arrow button
-							if (menu != None && ImGui::Button("<"))
+							if (menu != None && ImGui::ArrowButton("Back", ImGuiDir_Left))
 							{
 								menu = None;
 							}
 							ImGui::SameLine();
-							switch (menu)
-							{
-							case None:
-								ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Components").x) * 0.5f);
-								ImGui::Text("Components");
-								break;
-							case Transform:
-								ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Transform").x) * 0.5f);
-								ImGui::Text("Transform");
-								break;
-							case Render:
-								ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Render").x) * 0.5f);
-								ImGui::Text("Render");
-								break;
-							case Rigid:
-								ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Rigid Body").x) * 0.5f);
-								ImGui::Text("Rigid Body");
-								break;
-							}
+
+						    const char* menuText = "";
+						    switch (menu)
+						    {
+						        case None: menuText = "Components"; break;
+						        case Transform: menuText = "Transform"; break;
+						        case Render: menuText = "Render"; break;
+						        case Rigid: menuText = "Rigid Body"; break;
+						    }
+						    ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize(menuText).x) * 0.5f);
+						    ImGui::Text("%s", menuText);
 
 							ImGui::Separator();
 
@@ -1126,7 +1121,6 @@ namespace wc
 								break;
 							}
 							}
-
 						}
 						ImGui::End();
 					}
@@ -1201,9 +1195,9 @@ namespace wc
 			ImGui::End();
 		}
 
-		void UI_Assets()
+		void UI_FileExplorer()
 		{
-			static const std::filesystem::path assetsPath = std::filesystem::current_path() / "assets";
+			static const std::filesystem::path assetsPath = std::filesystem::current_path();
 			static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
 			static std::filesystem::path selectedFolderPath = assetsPath;
 			static std::vector<std::filesystem::path> openedFiles;
@@ -1224,7 +1218,7 @@ namespace wc
 				}
 				};
 
-			if (ImGui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
+			if (ImGui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
 			{
 				if (ImGui::BeginMenuBar())
 				{
@@ -1322,12 +1316,19 @@ namespace wc
 								{
 									if (previewAsset) ImGui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-									if (ImGui::IsMouseDoubleClicked(0))
+									if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 									{
-										if (openedFileNames.insert(fullPathStr).second)
-										{
-											openedFiles.push_back(entry.path());
-										}
+									    if (entry.path().extension() != L".scene")
+									    {
+										    if (openedFileNames.insert(fullPathStr).second)
+										    {
+											    openedFiles.push_back(entry.path());
+										    }
+									    }
+									    else
+									    {
+									        ImGui::OpenPopup("Confirm");
+									    }
 									}
 
 									if (ImGui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
@@ -1336,6 +1337,23 @@ namespace wc
 										ImGui::EndPopup();
 									}
 								}
+
+							    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+							    {
+							        ImGui::Text("Are you sure you want to load this scene?");
+							        if (ImGui::Button("Yes"))
+							        {
+							            m_Scene.Load(entry.path().string());
+							            ImGui::CloseCurrentPopup();
+							        }
+							        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+							        if (ImGui::Button("Cancel"))
+							        {
+							            ImGui::CloseCurrentPopup();
+							        }
+							        ImGui::EndPopup();
+							    }
+
 							}
 						}
 
@@ -1361,16 +1379,15 @@ namespace wc
 
 						if (ImGui::GetContentRegionMax().x > 200)
 						{
-							if (ImGui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true)) // Enable scroll with the third argument
+							if (ImGui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
 							{
-								// Replace with an arrow button
 								if (selectedFolderPath == assetsPath)
 								{
 									ImGui::BeginDisabled();
-									ImGui::Button("<<");
+								    ImGui::ArrowButton("Back", ImGuiDir_Left);
 									ImGui::EndDisabled();
 								}
-								else if (ImGui::Button("<<")) selectedFolderPath = selectedFolderPath.parent_path();
+								else if (ImGui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
 								ImGui::SameLine();
 								ImGui::Text(selectedFolderPath.string().c_str());
@@ -1453,18 +1470,42 @@ namespace wc
 
 											if (ImGui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
 											{
-												if (openedFileNames.insert(entry.path().string()).second)
-												{
-													openedFiles.push_back(entry.path());
-												}
-											}
+                                                if (entry.path().extension() != L".scene")
+                                                {
+											        if (openedFileNames.insert(entry.path().string()).second)
+												    {
+												    	openedFiles.push_back(entry.path());
+												    }
+                                                }
+											    else
+											    {
+											        ImGui::OpenPopup("Confirm");
+											    }
 
+											}
 											ImGui::PopStyleVar();
 											ImGui::PopStyleColor();
 											ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 50);
 											ImGui::TextWrapped(entry.path().filename().string().c_str());
 											ImGui::PopTextWrapPos();
 											ImGui::EndGroup();
+
+										    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+                                            {
+                                                ImGui::Text("Are you sure you want to load this scene?");
+                                                if (ImGui::Button("Yes"))
+                                                {
+                                                    m_Scene.Load(entry.path().string());
+                                                    ImGui::CloseCurrentPopup();
+                                                }
+										        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+										        if (ImGui::Button("Cancel"))
+										        {
+										            ImGui::CloseCurrentPopup();
+										        }
+                                                ImGui::EndPopup();
+                                            }
+
 										}
 										i++;
 									}
@@ -1509,16 +1550,29 @@ namespace wc
 			}
 		}
 
-	    void UI_DebugStats()
+        void UI_DebugStats()
 	    {
-	        if (ImGui::Begin("Debug Stats", &showDebugStats))
+	        if (ImGui::Begin("Debug Stats", &showDebugStats, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize))
 	        {
+	            // Draw background if docked, if not, only tint
+	            ImGuiDockNode* dockNode = ImGui::GetWindowDockNode();
+	            if (dockNode == nullptr) // Window is floating
+	            {
+	                ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), {ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y}, IM_COL32(20, 20, 20, 60));
+	            }
+	            else // Window is docked
+	            {
+	                ImVec4 bgColor = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+	                ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(),
+                        {ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y},
+                        ImGui::ColorConvertFloat4ToU32(bgColor));
+	            }
+
 	            uint32_t fps = 1.f / Globals.deltaTime;
-	            UI::Text(std::format("Frame time: {}ms", Globals.deltaTime * 1000.f));
+	            UI::Text(std::format("Frame time: {:.4f}ms", Globals.deltaTime * 1000.f));
 	            UI::Text(std::format("FPS: {}", fps));
 	            UI::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
 	            UI::Text(std::format("Min FPS: {}", m_PrevMinFPS));
-
 	            UI::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
 
 	            m_DebugTimer += Globals.deltaTime;
@@ -1573,7 +1627,6 @@ namespace wc
 
 				if (ImGui::BeginMenuBar())
 				{
-
 					// TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
 					if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
 					{
@@ -1582,14 +1635,19 @@ namespace wc
 
 					if (ImGui::BeginMenu("File"))
 					{
-						if (ImGui::MenuItem("New"))
+						if (ImGui::MenuItem("New Project"))
 						{
 							WC_CORE_INFO("New");
 						}
 
-						if (ImGui::MenuItem("Open"))
+						if (ImGui::MenuItem("Open Project"))
 						{
-							m_Scene.Load("testScene.scene");
+						    auto filepath = FileDialogs::OpenFile(Globals.window, "Blaze Scene (*.scene)\0*.scene\0");
+
+						    if (!filepath.empty())
+                            {
+                                m_Scene.Load(filepath);
+                            }
 						}
 
 						if (ImGui::MenuItem("Save"))
@@ -1612,7 +1670,8 @@ namespace wc
 						ImGui::MenuItem("Entities", NULL, &showEntities);
 						ImGui::MenuItem("Properties", NULL, &showProperties);
 						ImGui::MenuItem("Console", NULL, &showConsole);
-						ImGui::MenuItem("Assets", NULL, &showAssets);
+						ImGui::MenuItem("File Explorer", NULL, &showFileExplorer);
+					    ImGui::MenuItem("DebugStats", NULL, &showDebugStats);
 
 					    if (ImGui::BeginMenu("Theme"))
 					    {
@@ -1690,7 +1749,7 @@ namespace wc
 				if (showEntities) UI_Entities();
 				if (showProperties) UI_Properties();
 				if (showConsole) UI_Console();
-				if (showAssets) UI_Assets();
+				if (showFileExplorer) UI_FileExplorer();
 			    if (showDebugStats) UI_DebugStats();
 			}
 			ImGui::End();
