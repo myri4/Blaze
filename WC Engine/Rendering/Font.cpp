@@ -3,7 +3,7 @@
 
 namespace wc
 {
-	void Font::Load(const std::string filepath, RenderData& renderData)
+	void Font::Load(const std::string filepath, AssetManager& assetManager)
     {
         msdfgen::FreetypeHandle* ft = msdfgen::initializeFreetype();
 
@@ -66,7 +66,7 @@ namespace wc
                 return true;
                 }, m_Glyphs.size()).finish(THREAD_COUNT);
         }
-        else 
+        else
         {
             unsigned long long glyphSeed = coloringSeed;
             for (msdf_atlas::GlyphGeometry& glyph : m_Glyphs)
@@ -100,7 +100,8 @@ namespace wc
                 newBitmap.Set(x, y, glm::vec4(col, 255.f));
             }
 
-        TextureID = renderData.LoadTextureFromMemory(newBitmap);
+        Tex.Load(newBitmap.Data, newBitmap.Width, newBitmap.Height);
+        TextureID = assetManager.PushTexture(Tex, filepath);
         newBitmap.Free();
 
         destroyFont(font);
@@ -160,14 +161,14 @@ namespace wc
 			if (!glyph)
 				glyph = fontGeometry.getGlyph('?');
 
-			if (!glyph) 
+			if (!glyph)
 				return glm::dvec2(0.0);
 
 			double pl, pb, pr, pt;
 			glyph->getQuadPlaneBounds(pl, pb, pr, pt);
 			glm::dvec2 quadMin(pl, pb);
 			glm::dvec2 quadMax(pr, pt);
-		
+
 			quadMin = quadMin * fsScale + glm::dvec2{x, y};
 			quadMax = quadMax * fsScale + glm::dvec2{x, y};
 

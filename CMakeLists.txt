@@ -24,13 +24,13 @@ else()
     add_definitions(-DCLION)
 endif()
 
-
 add_executable("WC-Engine"
     ${SOURCES}
     ${IMGUI_SOURCES}
     "vendor/wc/imgui_backend/imgui_impl_glfw.cpp"
     "vendor/wc/imgui_backend/imgui_impl_vulkan.cpp"
     "vendor/imguizmo/ImGuizmo.cpp"
+        "WC Engine/Rendering/AssetManager.h"
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -39,11 +39,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 
-
 find_package(Vulkan REQUIRED)
 set(VULKAN_SDK $ENV{VULKAN_SDK})
 set(VULKAN_LIBRARY_DIRS "${VULKAN_SDK}/Lib")
-
 
 add_subdirectory("vendor/glfw")
 add_subdirectory("vendor/spdlog")
@@ -57,6 +55,40 @@ set(FREETYPE_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/vendor/freetype/include")
 set(FREETYPE_LIBRARY ${CMAKE_BINARY_DIR}/vendor/freetype/freetype.lib)
 add_subdirectory("vendor/msdf-atlas-gen")
 
+# Find all shader files
+set(SHADER_IN_DIR "${PROJECT_SOURCE_DIR}/WC Engine/shaders/")
+file(GLOB SHADER_SOURCES
+        "${PROJECT_SOURCE_DIR}/WC Engine/shaders/*.vert"
+        "${PROJECT_SOURCE_DIR}/WC Engine/shaders/*.frag"
+        "${PROJECT_SOURCE_DIR}/WC Engine/shaders/*.comp")
+
+file(GLOB SHADER_HEADERS
+        "${SHADER_IN_DIR}/include/*.glsl")
+
+# Create custom target for all shaders
+add_custom_target(shaders ALL)
+
+foreach(SHADER ${SHADER_SOURCES})
+    get_filename_component(SHADER_NAME ${SHADER} NAME)
+    add_custom_command(
+            OUTPUT "${PROJECT_SOURCE_DIR}/WC Engine/workdir/assets/shaders/${SHADER_NAME}"
+            COMMAND "$ENV{VULKAN_SDK}/Bin/glslc.exe"
+            -std=450core
+            -I"${SHADER_IN_DIR}/include"
+            -o "${PROJECT_SOURCE_DIR}/WC Engine/workdir/assets/shaders/${SHADER_NAME}"
+            -O0
+            ${SHADER}
+            DEPENDS ${SHADER}
+            ${SHADER_HEADERS}
+            COMMENT "Compiling ${SHADER_NAME}"
+            VERBATIM
+    )
+    add_custom_target(${SHADER_NAME} DEPENDS "${PROJECT_SOURCE_DIR}/WC Engine/workdir/assets/shaders/${SHADER_NAME}")
+    add_dependencies(shaders ${SHADER_NAME})
+endforeach()
+
+# Make shaders compile automatically when building the main target
+add_dependencies(${PROJECT_NAME} shaders)
 
 target_link_libraries(${PROJECT_NAME} 
 Vulkan::Vulkan

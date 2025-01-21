@@ -3,7 +3,7 @@
 #include <wc/vk/Buffer.h>
 #include <wc/vk/Commands.h>
 #include <wc/vk/Image.h>
-#include <wc/Texture.h>
+
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,18 +11,12 @@
 #include <wc/Math/Splines.h>
 #include <wc/Utils/Image.h>
 #include "Font.h"
+#include "AssetManager.h"
 
 #undef LoadImage
 
 namespace wc
 {
-	static const uint32_t MaxQuadCount = 10'000;
-	static const uint32_t MaxQuadVertexCount = MaxQuadCount * 4;
-	static const uint32_t MaxQuadIndexCount = MaxQuadCount * 6;
-
-	static const uint32_t MaxLineCount = 20'000;
-	static const uint32_t MaxLineVertexCount = MaxLineCount * 2;
-
 	struct Vertex
 	{
 		glm::vec3 Position;
@@ -40,7 +34,7 @@ namespace wc
 	struct LineVertex
 	{
 		glm::vec3 Position;
-		uint32_t _pad1 = 0;
+
 		glm::vec4 Color;
 
 		LineVertex() = default;
@@ -50,25 +44,19 @@ namespace wc
 	struct RenderData
 	{
 	private:
-		vk::BufferManager<Vertex> m_VertexBuffer;
-		vk::BufferManager<uint32_t> m_IndexBuffer;
-		vk::BufferManager<LineVertex> m_LineVertexBuffer;
-
-		std::unordered_map<std::string, uint32_t> m_Cache;
-	public:
-		std::vector<Texture> Textures;
-
-		glm::mat4 ViewProjection = glm::mat4(1.f);
+		vk::DBufferManager<Vertex, vk::DEVICE_ADDRESS> m_VertexBuffer;
+		vk::DBufferManager<uint32_t, vk::INDEX_BUFFER> m_IndexBuffer;
+		vk::DBufferManager<LineVertex, vk::DEVICE_ADDRESS> m_LineVertexBuffer;
 	public:
 		auto GetVertexBuffer() const { return m_VertexBuffer.GetBuffer(); }
 		auto GetIndexBuffer() const { return m_IndexBuffer.GetBuffer(); }
 
 		auto GetLineVertexBuffer() const { return m_LineVertexBuffer.GetBuffer(); }
 
-		auto GetIndexCount() const { return m_IndexBuffer.Counter; }
-		auto GetVertexCount() const { return m_VertexBuffer.Counter; }
+		auto GetIndexCount() const { return m_IndexBuffer.GetSize(); }
+		auto GetVertexCount() const { return m_VertexBuffer.GetSize(); }
 
-		auto GetLineVertexCount() const { return m_LineVertexBuffer.Counter; }
+		auto GetLineVertexCount() const { return m_LineVertexBuffer.GetSize(); }
 
 		void UploadVertexData()
 		{
@@ -85,94 +73,43 @@ namespace wc
 				});
 		}
 
-		void Create()
+		void Allocate()
 		{
-			m_IndexBuffer.Allocate(MaxQuadIndexCount, vk::INDEX_BUFFER);
-			m_VertexBuffer.Allocate(MaxQuadVertexCount);
-
-			m_LineVertexBuffer.Allocate(MaxLineVertexCount);
-
-			m_LineVertexBuffer.GetBuffer().SetName("LineVertexBuffer");
-
-			Texture texture;
-			uint32_t white = 0xFFFFFFFF;
-			texture.Load(&white, 1, 1);
-			Textures.push_back(texture);
 		}
 
-		uint32_t LoadTexture(const std::string& file)
+		void Reset()
 		{
-			if (m_Cache.find(file) != m_Cache.end()) return m_Cache[file];  // If this texture exists
-			if (std::filesystem::exists(file))
-			{
-				Texture texture;
-				texture.Load(file);
-				Textures.push_back(texture);
-
-				m_Cache[file] = uint32_t(Textures.size() - 1);
-				return uint32_t(Textures.size() - 1);
-			}
-
-			m_Cache[file] = 0;
-			WC_CORE_ERROR("Cannot find file at location: {}", file);
-			return 0;
+			m_IndexBuffer.Reset();
+			m_VertexBuffer.Reset();
+			m_LineVertexBuffer.Reset();
 		}
 
-		Texture LoadImage(const std::string& file) { return Textures[LoadTexture(file)]; }
-
-		uint32_t LoadTextureFromMemory(const Image& image)
+		void Free()
 		{
-			Texture texture;
-			texture.Load(image.Data, image.Width, image.Height);
-			Textures.push_back(texture);
-
-			return uint32_t(Textures.size() - 1);
+			m_VertexBuffer.Free();
+			m_IndexBuffer.Free();
+			m_LineVertexBuffer.Free();
 		}
 
-		uint32_t AllocateTexture(const TextureSpecification& specification)
+		void DrawQuad(const glm::mat4& transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
 		{
-			Texture texture;
-			texture.Allocate(specification);
-			Textures.push_back(texture);
+			auto vertCount = m_VertexBuffer.GetSize();
 
-			return uint32_t(Textures.size() - 1);
+			m_VertexBuffer.Push({transform * glm::vec4( 0.5f,  0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color});
+			m_VertexBuffer.Push({transform * glm::vec4(-0.5f,  0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color});
+			m_VertexBuffer.Push({transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color});
+			m_VertexBuffer.Push({transform * glm::vec4( 0.5f, -0.5f, 0.f, 1.f), { 1.f, 1.f }, texID, color});
+
+			m_IndexBuffer.Push(0 + vertCount);
+			m_IndexBuffer.Push(1 + vertCount);
+			m_IndexBuffer.Push(2 + vertCount);
+
+			m_IndexBuffer.Push(2 + vertCount);
+			m_IndexBuffer.Push(3 + vertCount);
+			m_IndexBuffer.Push(0 + vertCount);
 		}
 
-		void DrawMesh(const Vertex* pVertices, uint32_t vCount, const uint32_t* pIndices, uint32_t iCount)
-		{
-
-		}
-
-		void DrawQuad(glm::mat4 transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
-		{
-			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
-
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			transform = ViewProjection * transform;
-
-			vertices[vertCount + 0] = Vertex(transform * glm::vec4(0.5f, 0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color);
-			vertices[vertCount + 1] = Vertex(transform * glm::vec4(-0.5f, 0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color);
-			vertices[vertCount + 2] = Vertex(transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color);
-			vertices[vertCount + 3] = Vertex(transform * glm::vec4(0.5f, -0.5f, 0.f, 1.f), { 1.f, 1.f }, texID, color);
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			indices[indexCount + 3] = 2 + vertCount;
-			indices[indexCount + 4] = 3 + vertCount;
-			indices[indexCount + 5] = vertCount;
-
-			vertCount += 4;
-			indexCount += 6;
-		}
-
-		void DrawLineQuad(glm::mat4 transform, const glm::vec4& color = glm::vec4(1.f))
+		void DrawLineQuad(const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.f))
 		{
 			glm::vec3 vertices[4];
 			vertices[0] = transform * glm::vec4(0.5f, 0.5f, 0.f, 1.f);
@@ -213,82 +150,32 @@ namespace wc
 
 		void DrawTriangle(glm::vec2 v1, glm::vec2 v2, glm::vec2 v3, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
 		{
-			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
+			auto vertCount = m_VertexBuffer.GetSize();
+			m_VertexBuffer.Push({glm::vec4(v1, 0.f, 1.f), { 1.f, 0.f }, texID, color});
+			m_VertexBuffer.Push({glm::vec4(v2, 0.f, 1.f), { 0.f, 0.f }, texID, color});
+			m_VertexBuffer.Push({glm::vec4(v3, 0.f, 1.f), { 0.f, 1.f }, texID, color});
 
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			vertices[vertCount + 0] = Vertex(ViewProjection * glm::vec4(v1, 0.f, 1.f), { 1.f, 0.f }, texID, color);
-			vertices[vertCount + 1] = Vertex(ViewProjection * glm::vec4(v2, 0.f, 1.f), { 0.f, 0.f }, texID, color);
-			vertices[vertCount + 2] = Vertex(ViewProjection * glm::vec4(v3, 0.f, 1.f), { 0.f, 1.f }, texID, color);
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			vertCount += 3;
-			indexCount += 3;
+			m_IndexBuffer.Push(0 + vertCount);
+			m_IndexBuffer.Push(1 + vertCount);
+			m_IndexBuffer.Push(2 + vertCount);
 		}
 
-		void DrawTriangle(glm::mat4 transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f))
+		void DrawCircle(const glm::mat4& transform, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f))
 		{
-			if (m_IndexBuffer.Counter >= MaxQuadIndexCount) WC_CORE_ERROR("Not enough memory");// Flush();
+			auto vertCount = m_VertexBuffer.GetSize();
 
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
+			m_VertexBuffer.Push({transform * glm::vec4( 1.f, 1.f, 0.f, 1.f),  {  1.f, 1.f }, thickness, fade, color});
+			m_VertexBuffer.Push({transform * glm::vec4(-1.f, 1.f, 0.f, 1.f),  { -1.f, 1.f }, thickness, fade, color});
+			m_VertexBuffer.Push({transform * glm::vec4(-1.f, -1.f, 0.f, 1.f), { -1.f,-1.f }, thickness, fade, color});
+			m_VertexBuffer.Push({transform * glm::vec4( 1.f, -1.f, 0.f, 1.f), {  1.f,-1.f }, thickness, fade, color});
 
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
+			m_IndexBuffer.Push(0 + vertCount);
+			m_IndexBuffer.Push(1 + vertCount);
+			m_IndexBuffer.Push(2 + vertCount);
 
-			transform = ViewProjection * transform;
-
-			vertices[vertCount + 0] = Vertex(transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color);
-			vertices[vertCount + 1] = Vertex(transform * glm::vec4(0.5f, -0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color);
-			vertices[vertCount + 2] = Vertex(transform * glm::vec4(0.f, 0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color);
-
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			vertCount += 3;
-			indexCount += 3;
-		}
-
-		void DrawTriangle(const glm::vec3& position, glm::vec2 size, float rotation, uint32_t texID = 0, const glm::vec4& color = glm::vec4(1.f))
-		{
-			glm::mat4 transform = glm::translate(glm::mat4(1.f), position) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { size.x, size.y, 1.f });
-			DrawTriangle(transform, texID, color);
-		}
-
-		void DrawCircle(glm::mat4 transform, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f))
-		{
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			transform = ViewProjection * transform;
-
-			vertices[vertCount + 0] = Vertex(transform * glm::vec4(1.f, 1.f, 0.f, 1.f), { 1.f, 1.f }, thickness, fade, color);
-			vertices[vertCount + 1] = Vertex(transform * glm::vec4(-1.f, 1.f, 0.f, 1.f), { -1.f, 1.f }, thickness, fade, color);
-			vertices[vertCount + 2] = Vertex(transform * glm::vec4(-1.f, -1.f, 0.f, 1.f), { -1.f,-1.f }, thickness, fade, color);
-			vertices[vertCount + 3] = Vertex(transform * glm::vec4(1.f, -1.f, 0.f, 1.f), { 1.f,-1.f }, thickness, fade, color);
-
-			indices[indexCount + 0] = vertCount;
-			indices[indexCount + 1] = 1 + vertCount;
-			indices[indexCount + 2] = 2 + vertCount;
-
-			indices[indexCount + 3] = 2 + vertCount;
-			indices[indexCount + 4] = 3 + vertCount;
-			indices[indexCount + 5] = vertCount;
-
-			vertCount += 4;
-			indexCount += 6;
+			m_IndexBuffer.Push(2 + vertCount);
+			m_IndexBuffer.Push(3 + vertCount);
+			m_IndexBuffer.Push(0 + vertCount);
 		}
 
 		void DrawCircle(glm::vec3 position, float radius, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f))
@@ -299,19 +186,15 @@ namespace wc
 
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& startColor, const glm::vec4& endColor)
 		{
-			//if (m_LineVertexCount >= MaxLineVertexCount) Flush();
-
-			m_LineVertexBuffer[m_LineVertexBuffer.Counter + 0] = LineVertex(ViewProjection * glm::vec4(start, 1.f), startColor);
-			m_LineVertexBuffer[m_LineVertexBuffer.Counter + 1] = LineVertex(ViewProjection * glm::vec4(end, 1.f), endColor);
-
-			m_LineVertexBuffer.Counter += 2;
+			m_LineVertexBuffer.Push({ glm::vec4(start, 1.f), startColor } );
+			m_LineVertexBuffer.Push({ glm::vec4(end, 1.f), endColor });
 		}
 
-		void DrawLines(const LineVertex* vertices, uint32_t count)
-		{
-			memcpy(m_LineVertexBuffer + m_LineVertexBuffer.Counter * sizeof(LineVertex), vertices, count * sizeof(LineVertex));
-			m_LineVertexBuffer.Counter += count;
-		}
+		//void DrawLines(const LineVertex* vertices, uint32_t count)
+		//{
+		//	memcpy(m_LineVertexBuffer + m_LineVertexBuffer.Counter * sizeof(LineVertex), vertices, count * sizeof(LineVertex));
+		//	m_LineVertexBuffer.Counter += count;
+		//}
 
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec3& startColor, const glm::vec3& endColor) { DrawLine(start, end, glm::vec4(startColor, 1.f), glm::vec4(endColor, 1.f)); }
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color = glm::vec4(1.f)) { DrawLine(start, end, color, color); }
@@ -322,7 +205,7 @@ namespace wc
 		void DrawLine(glm::vec2 start, glm::vec2 end, const glm::vec3& startColor, const glm::vec3& endColor) { DrawLine(glm::vec3(start, 0.f), glm::vec3(end, 0.f), glm::vec4(startColor, 1.f), glm::vec4(endColor, 1.f)); }
 		void DrawLine(glm::vec2 start, glm::vec2 end, const glm::vec3& color) { DrawLine(glm::vec3(start, 0.f), glm::vec3(end, 0.f), color, color); }
 
-		// @TODO: 
+		// @TODO:
 		// Add support for color gradient and specifying vec3s instead of vec4s for colors
 		// Add support for 3D
 		void DrawBezierCurve(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, const glm::vec4& color = glm::vec4(1.f), uint32_t steps = 30)
@@ -349,27 +232,21 @@ namespace wc
 			}
 		}
 
-		void DrawString(const std::string& string, const Font& font, glm::mat4 transform, const glm::vec4& color = glm::vec4(1.f))
+		void DrawString(const std::string& string, const Font& font, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.f))
 		{
-			Vertex* vertices = m_VertexBuffer;
-			auto& vertCount = m_VertexBuffer.Counter;
-
-			uint32_t* indices = m_IndexBuffer;
-			auto& indexCount = m_IndexBuffer.Counter;
-
-			transform = ViewProjection * transform;
+			auto vertCount = m_VertexBuffer.GetSize();
 
 			const auto& fontGeometry = font.FontGeometry;
 			const auto& metrics = fontGeometry.getMetrics();
 			uint32_t texID = font.TextureID;
-			auto& fontAtlas = Textures[texID];
+			auto& fontAtlas = font.Tex;
 			float texelWidth = 1.f / fontAtlas.GetImage().GetSize().x;
 			float texelHeight = 1.f / fontAtlas.GetImage().GetSize().y;
 
 			double x = 0.0;
 			double fsScale = 1.0 / (metrics.ascenderY - metrics.descenderY);
-			double y = 0.0;			
-						
+			double y = 0.0;
+
 			const float spaceGlyphAdvance = fontGeometry.getGlyph(' ')->getAdvance();
 
 			for (uint32_t i = 0; i < string.size(); i++)
@@ -430,23 +307,26 @@ namespace wc
 				texCoordMin *= glm::dvec2(texelWidth, texelHeight);
 				texCoordMax *= glm::dvec2(texelWidth, texelHeight);
 
-				vertices[vertCount + 0] = Vertex(transform * glm::vec4(quadMax, 0.f, 1.f), texCoordMax, texID, color);
-				vertices[vertCount + 1] = Vertex(transform * glm::vec4(quadMin.x, quadMax.y, 0.f, 1.f), { texCoordMin.x, texCoordMax.y }, texID, color);
-				vertices[vertCount + 2] = Vertex(transform * glm::vec4(quadMin, 0.f, 1.f), texCoordMin, texID, color);
-				vertices[vertCount + 3] = Vertex(transform * glm::vec4(quadMax.x, quadMin.y, 0.f, 1.f), { texCoordMax.x, texCoordMin.y }, texID, color);
+				Vertex vertices[] = {
+					Vertex(transform * glm::vec4(quadMax, 0.f, 1.f), texCoordMax, texID, color),
+					Vertex(transform * glm::vec4(quadMin.x, quadMax.y, 0.f, 1.f), { texCoordMin.x, texCoordMax.y }, texID, color),
+					Vertex(transform * glm::vec4(quadMin, 0.f, 1.f), texCoordMin, texID, color),
+					Vertex(transform * glm::vec4(quadMax.x, quadMin.y, 0.f, 1.f), { texCoordMax.x, texCoordMin.y }, texID, color),
+				};
 
-				for (uint32_t i = 0; i < 4; i++) vertices[vertCount + i].Thickness = -1.f;
+				for (uint32_t i = 0; i < 4; i++)
+				{
+					vertices[i].Thickness = -1.f;
+					m_VertexBuffer.Push(vertices[i]);
+				}
 
-				indices[indexCount + 0] = vertCount;
-				indices[indexCount + 1] = 1 + vertCount;
-				indices[indexCount + 2] = 2 + vertCount;
+				m_IndexBuffer.Push(0 + vertCount);
+				m_IndexBuffer.Push(1 + vertCount);
+				m_IndexBuffer.Push(2 + vertCount);
 
-				indices[indexCount + 3] = 2 + vertCount;
-				indices[indexCount + 4] = 3 + vertCount;
-				indices[indexCount + 5] = vertCount;
-
-				vertCount += 4;
-				indexCount += 6;
+				m_IndexBuffer.Push(2 + vertCount);
+				m_IndexBuffer.Push(3 + vertCount);
+				m_IndexBuffer.Push(0 + vertCount);
 
 				if (i < string.size() - 1)
 				{
@@ -469,23 +349,6 @@ namespace wc
 		{
 			glm::mat4 transform = glm::translate(glm::mat4(1.f), { position.x, position.y, 0.f });
 			DrawString(string, font, transform, color);
-		}
-
-		void Reset()
-		{
-			m_IndexBuffer.Counter = 0;
-			m_VertexBuffer.Counter = 0;
-
-			m_LineVertexBuffer.Counter = 0;
-		}
-
-		void Destroy()
-		{
-			m_VertexBuffer.Free();
-			m_IndexBuffer.Free();
-			m_LineVertexBuffer.Free();
-
-			for (auto& texture : Textures) texture.Destroy();
 		}
 	};
 }

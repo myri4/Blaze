@@ -4,7 +4,7 @@
 #include "Commands.h"
 #include "Synchronization.h"
 
-constexpr uint32_t FRAME_OVERLAP = 1;
+constexpr uint32_t FRAME_OVERLAP = 3;
 constexpr uint64_t MAX_PASSES = 200;
 inline uint8_t CURRENT_FRAME = 0;
 

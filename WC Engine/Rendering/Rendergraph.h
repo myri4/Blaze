@@ -144,8 +144,8 @@ namespace wc
 		void AddColorInput(const AttachmentInfo& info) { inputImages.push_back(info); }
 		void AddColorOutput(const AttachmentInfo& info) { outputImages.push_back(info); }
 
-		void AddColorAttachment(const RenderAttachmentInfo& info) 
-		{ 
+		void AddColorAttachment(const RenderAttachmentInfo& info)
+		{
 			colorAttachments.push_back(info);
 			clearValues.push_back(info.clearValue);
 		}
@@ -164,7 +164,7 @@ namespace wc
 
 	struct ComputePass : public RenderPass
 	{
-		Shader shader;	
+		Shader shader;
 	};
 
 	struct ShaderSpecification
@@ -231,7 +231,7 @@ namespace wc
 					WC_CORE_ERROR("Redefintion of pass \"{}\".", name);
 					return (GraphicsPass*)&pass;
 				}
-			
+
 			auto* ptr = new GraphicsPass();
 
 			ptr->name = name;
@@ -453,7 +453,7 @@ namespace wc
 						.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
 						.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
 					};
-					
+
 					VkRenderPassCreateInfo renderPassInfo = {
 						.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 						.attachmentCount = colorAttachmentCount,
@@ -465,7 +465,7 @@ namespace wc
 					};
 					vkCreateRenderPass(VulkanContext::GetLogicalDevice(), &renderPassInfo, VulkanContext::GetAllocator(), &pass->renderPass);
 
-					VkFramebufferCreateInfo fbufCreateInfo = { 
+					VkFramebufferCreateInfo fbufCreateInfo = {
 						.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 						.renderPass = pass->renderPass,
 						.attachmentCount = static_cast<uint32_t>(attachmentViews.size()),
@@ -559,7 +559,7 @@ namespace wc
 			Attachments.clear();
 			Passes.clear();
 		}
-				
+
 		void Execute()
 		{
 			for (auto& cmd : pendingCommands)
@@ -597,7 +597,7 @@ namespace wc
 					return CreateCommandBuffer(usableCommands, pendingCommands, vk::SyncContext::GraphicsCommandPool);
 				};
 
-			VkCommandBuffer cmd = VK_NULL_HANDLE;			
+			VkCommandBuffer cmd = VK_NULL_HANDLE;
 			bool recording = false;
 			PassType previousType = Passes[0]->type;
 
@@ -605,8 +605,8 @@ namespace wc
 				{
 					if (!recording)
 					{
-						if (type != previousType || !cmd) cmd = CreateCmdFromType(type); 
-						VkCommandBufferBeginInfo begInfo = { 
+						if (type != previousType || !cmd) cmd = CreateCmdFromType(type);
+						VkCommandBufferBeginInfo begInfo = {
 							.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 							.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 						};
@@ -646,7 +646,7 @@ namespace wc
 					vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 
-					
+
 					VkPipelineLayout boundLayout = VK_NULL_HANDLE;
 					for (auto& c : encoder.GetEncodeBuffer())
 					{
@@ -722,7 +722,7 @@ namespace wc
 					BeginRecording(pass->type);
 
 					vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pass->shader.GetPipeline());
-					
+
 					for (auto& c : encoder.GetEncodeBuffer())
 					{
 						ICommand* command = (ICommand*)c;

@@ -47,8 +47,8 @@ namespace wc
 
 	void DrawTransformFcn(b2Transform transform, void* context)
 	{
-		auto t = glm::translate(glm::mat4(1.f), glm::vec3(transform.p.x, transform.p.y, 0.f)) * glm::rotate(glm::mat4(1.f), b2Rot_GetAngle(transform.q), { 0.f, 0.f, 1.f });
-		static_cast<RenderData*>(context)->DrawLineQuad(t);
+		auto t = glm::translate(glm::mat4(1.f), glm::vec3(transform.p.x, transform.p.y, 0.f)) * glm::rotate(glm::mat4(1.f), glm::radians(360.f) - b2Rot_GetAngle(transform.q), { 0.f, 0.f, 1.f });
+	    static_cast<RenderData*>(context)->DrawLineQuad(t);
 	}
 
 	void DrawCircleFcn(b2Vec2 center, float radius, b2HexColor color, void* context)
@@ -74,9 +74,8 @@ namespace wc
 			static_cast<RenderData*>(context)->DrawLine({ vertices[i].x, vertices[i].y }, { vertices[(i + 1) % vertexCount].x, vertices[(i + 1) % vertexCount].y }, decompress((int)color));
 	}
 
-	void DrawSolidPolygonFcn(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color,
-		void* context)
-	{
+	void DrawSolidPolygonFcn(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
+    {
 		auto t = glm::translate(glm::mat4(1.f), glm::vec3(transform.p.x, transform.p.y, 0.f)) * glm::rotate(glm::mat4(1.f), glm::radians(360.f) - b2Rot_GetAngle(transform.q), { 0.f, 0.f, 1.f });
 
 		for (int i = 0; i < vertexCount; i++)
@@ -118,9 +117,22 @@ namespace wc
 		glm::vec2 m_BeginCameraPosition;
 		bool m_Panning = false;
 
+	    // Debug stats
+	    float m_DebugTimer = 0.f;
+
+	    uint32_t m_PrevMaxFPS = 0;
+	    uint32_t m_MaxFPS = 0;
+
+	    uint32_t m_PrevMinFPS = 0;
+	    uint32_t m_MinFPS = 0;
+
+	    uint32_t m_FrameCount = 0;
+	    uint32_t m_FrameCounter = 0;
+	    uint32_t m_PrevFrameCounter = 0;
+
 		OrthographicCamera camera;
 
-		RenderData m_RenderData;
+	    RenderData m_RenderData[FRAME_OVERLAP];
 		Renderer2D m_Renderer;
 
 		Texture t_Close;
@@ -147,6 +159,7 @@ namespace wc
 		bool showProperties = true;
 		bool showConsole = true;
 		bool showAssets = true;
+	    bool showDebugStats = true;
 
 		flecs::entity m_SelectedEntity = flecs::entity::null();
 
@@ -157,54 +170,57 @@ namespace wc
 		Scene m_TempScene;
 
 		// Settings
-
 		float ZoomSpeed = 2.f;
+	    b2DebugDraw m_PhysicsDebugDraw;
+
 	public:
-		b2DebugDraw debugDraw;
+	    AssetManager assetManager;
 
-		void Create()
-		{
-			m_RenderData.Create();
+	    void Create()
+	    {
+	        assetManager.Init();
 
-			m_Renderer.camera = &camera;
-			m_Renderer.Init(m_RenderData);
+	        for (int i = 0; i < FRAME_OVERLAP; i++)
+	            m_RenderData[i].Allocate();
 
-			// Load Textures
-			t_Close.Load("assets/textures/menu/close.png");
-			t_Minimize.Load("assets/textures/menu/minimize.png");
-			t_Collapse.Load("assets/textures/menu/collapse.png");
-			t_FolderOpen.Load("assets/textures/menu/folder-open.png");
-			t_FolderClosed.Load("assets/textures/menu/folder-closed.png");
-			t_File.Load("assets/textures/menu/file.png");
-			t_FolderEmpty.Load("assets/textures/menu/folder-empty.png");
-			t_Folder.Load("assets/textures/menu/folder-fill.png");
+	        m_Renderer.camera = &camera;
+	        m_Renderer.Init(assetManager);
 
-			b2AABB bounds = { { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } };
-			debugDraw =
-			    {
-					DrawPolygonFcn,
-					DrawSolidPolygonFcn,
-					DrawCircleFcn,
-					DrawSolidCircleFcn,
-					DrawSolidCapsuleFcn,
-					DrawSegmentFcn,
-					DrawTransformFcn,
-					DrawPointFcn,
-					DrawStringFcn,
-					bounds,
-					true, // drawUsingBounds
-					true, // shapes
-					true, // joints
-					true, // joint extras
-					true, // aabbs
-					true, // mass
-					true, // contacts
-					true, // colors
-					true, // normals
-					true, // impulse
-					true, // friction
-					&m_RenderData };
-		}
+	        // Load Textures
+	        t_Close.Load("assets/textures/menu/close.png");
+	        t_Minimize.Load("assets/textures/menu/minimize.png");
+	        t_Collapse.Load("assets/textures/menu/collapse.png");
+	        t_FolderOpen.Load("assets/textures/menu/folder-open.png");
+	        t_FolderClosed.Load("assets/textures/menu/folder-closed.png");
+	        t_File.Load("assets/textures/menu/file.png");
+	        t_FolderEmpty.Load("assets/textures/menu/folder-empty.png");
+	        t_Folder.Load("assets/textures/menu/folder-fill.png");
+
+	        b2AABB bounds = { { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } };
+	        m_PhysicsDebugDraw = {
+	            DrawPolygonFcn,
+                DrawSolidPolygonFcn,
+                DrawCircleFcn,
+                DrawSolidCircleFcn,
+                DrawSolidCapsuleFcn,
+                DrawSegmentFcn,
+                DrawTransformFcn,
+                DrawPointFcn,
+                DrawStringFcn,
+                bounds,
+                true, // drawUsingBounds
+                true, // shapes
+                true, // joints
+                true, // joint extras
+                true, // aabbs
+                true, // mass
+                true, // contacts
+                true, // colors
+                true, // normals
+                true, // impulse
+                true, // friction
+                &m_RenderData };
+	    }
 
 		void Input()
 		{
@@ -245,51 +261,55 @@ namespace wc
 			}
 		}
 
-		void RenderEntity(flecs::entity entt, glm::mat4& transform) 
+	    void RenderEntity(flecs::entity entt, glm::mat4& transform)
 		{
-			if (entt.has<SpriteRendererComponent>())
-			{
-				auto& data = *entt.get<SpriteRendererComponent>();
+		    auto& renderData = m_RenderData[CURRENT_FRAME];
+		    if (entt.has<SpriteRendererComponent>())
+		    {
+		        auto& data = *entt.get<SpriteRendererComponent>();
 
-				m_RenderData.DrawQuad(transform, data.Texture, data.Color);
-			}
-			else if (entt.has<CircleRendererComponent>())
-			{
-				auto& data = *entt.get<CircleRendererComponent>();
-				m_RenderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
-			}
-			else if (entt.has<TextRendererComponent>())
-			{
-				auto& data = *entt.get<TextRendererComponent>();
+		        renderData.DrawQuad(transform, data.Texture, data.Color);
+		    }
+		    else if (entt.has<CircleRendererComponent>())
+		    {
+		        auto& data = *entt.get<CircleRendererComponent>();
+		        renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
+		    }
+		    else if (entt.has<TextRendererComponent>())
+		    {
+		        auto& data = *entt.get<TextRendererComponent>();
 
-				//m_RenderData.DrawString(data.Text, data.Font, transform, data.Color);
-			}
-			//m_Scene.GetWorld().query_builder<TransformComponent, EntityTag>()
-			//	.with(flecs::ChildOf, entt)
-			//	.each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
-			//		{
-			//			transform = transform * childTransform.GetTransform();
-			//			RenderEntity(child, transform);
-			//		});
+		        //renderData.DrawString(data.Text, data.Font, transform, data.Color);
+		    }
+		    //m_Scene.GetWorld().query_builder<TransformComponent, EntityTag>()
+		    //	.with(flecs::ChildOf, entt)
+		    //	.each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
+		    //		{
+		    //			transform = transform * childTransform.GetTransform();
+		    //			RenderEntity(child, transform);
+		    //		});
 		}
 
-		void Render()
+	    void Render()
 		{
-			m_RenderData.ViewProjection = camera.GetViewProjectionMatrix();
+		    auto& renderData = m_RenderData[CURRENT_FRAME];
 
-			m_Scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
-				//if (entt.parent() != 0) return;
+		    m_Scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
+                //if (entt.parent() != 0) return;
 
-				glm::mat4 transform = p.GetTransform();
-				RenderEntity(entt, transform);				
-			});
+                glm::mat4 transform = p.GetTransform();
+                RenderEntity(entt, transform);
+            });
 
-			if (m_SceneState != SceneState::Edit)
-				m_Scene.GetPhysicsWorld().Draw(&debugDraw);
+		    if (m_SceneState != SceneState::Edit)
+		    {
+		        m_PhysicsDebugDraw.context = &renderData;
+		        m_Scene.GetPhysicsWorld().Draw(&m_PhysicsDebugDraw);
+		    }
 
-			m_Renderer.Flush(m_RenderData);
+		    m_Renderer.Flush(renderData);
 
-			m_RenderData.Reset();
+		    renderData.Reset();
 		}
 
 		void Update()
@@ -828,12 +848,14 @@ namespace wc
 							auto& p = *m_SelectedEntity.get<TransformComponent>();
 							auto& position = const_cast<glm::vec2&>(p.Translation);
 							auto& scale = const_cast<glm::vec2&>(p.Scale);
-							auto& rotation = const_cast<float&>(p.Rotation);
+						    auto& realRotation = const_cast<float&>(p.Rotation);
+						    auto rotation = glm::degrees(p.Rotation);
 
 							// Draw position UI
 							UI::DragButton2("Position", position);
 							UI::DragButton2("Scale", scale);
-							ImGui::SliderFloat("Rotation", &rotation, 0.0f, 360.0f);
+						    UI::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+						    realRotation = glm::radians(rotation);
 						}
 
 						if (!visible) m_SelectedEntity.remove<TransformComponent>(); // add modal popup
@@ -915,7 +937,7 @@ namespace wc
 					if (m_SelectedEntity.has<RigidBodyComponent>())
 					{
 						bool visible = true;
-						if (ImGui::CollapsingHeader("Rigid Body Component##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
+						if (ImGui::CollapsingHeader("Rigid Body##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 						{
 							auto p = m_SelectedEntity.get_ref<RigidBodyComponent>();
 
@@ -1487,9 +1509,44 @@ namespace wc
 			}
 		}
 
+	    void UI_DebugStats()
+	    {
+	        if (ImGui::Begin("Debug Stats", &showDebugStats))
+	        {
+	            uint32_t fps = 1.f / Globals.deltaTime;
+	            UI::Text(std::format("Frame time: {}ms", Globals.deltaTime * 1000.f));
+	            UI::Text(std::format("FPS: {}", fps));
+	            UI::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
+	            UI::Text(std::format("Min FPS: {}", m_PrevMinFPS));
+
+	            UI::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
+
+	            m_DebugTimer += Globals.deltaTime;
+
+	            m_MaxFPS = glm::max(m_MaxFPS, fps);
+	            m_MinFPS = glm::min(m_MinFPS, fps);
+
+	            m_FrameCount++;
+	            m_FrameCounter += fps;
+
+	            if (m_DebugTimer >= 1.f)
+	            {
+	                m_PrevMaxFPS = m_MaxFPS;
+	                m_PrevMinFPS = m_MinFPS;
+	                m_PrevFrameCounter = m_FrameCounter / m_FrameCount;
+	                m_DebugTimer = 0.f;
+
+	                m_FrameCount = 0;
+	                m_FrameCounter = 0;
+
+	                m_MaxFPS = m_MinFPS = fps;
+	            }
+	        }
+	        ImGui::End();
+	    }
+
 		void UI()
 		{
-
 		    const ImGuiViewport* viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(viewport->WorkPos);
 			ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -1602,7 +1659,7 @@ namespace wc
 
 					float buttonSize = ImGui::GetFrameHeightWithSpacing();
 
-					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize));
+					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + ImGui::GetStyle().ItemSpacing.x));
 					if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
 					{
 						//Globals.window.Collapse();
@@ -1634,6 +1691,7 @@ namespace wc
 				if (showProperties) UI_Properties();
 				if (showConsole) UI_Console();
 				if (showAssets) UI_Assets();
+			    if (showDebugStats) UI_DebugStats();
 			}
 			ImGui::End();
 		}
@@ -1655,9 +1713,11 @@ namespace wc
 			t_Folder.Destroy();
 			t_FolderEmpty.Destroy();
 
+	        assetManager.Free();
 			m_Renderer.Deinit();
 
-			m_RenderData.Destroy();
+	        for (int i = 0; i < FRAME_OVERLAP; i++)
+	            m_RenderData[i].Free();
 		}
 	};
 }

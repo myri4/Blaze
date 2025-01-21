@@ -27,8 +27,9 @@ namespace vk
 			bufferInfo.size = bufferSize;
 			bufferInfo.usage = usage;
 
-			VmaAllocationCreateInfo vmaallocInfo = {};
-			vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+			VmaAllocationCreateInfo vmaallocInfo = {
+				.usage = VMA_MEMORY_USAGE_CPU_ONLY,
+			};
 
 			vmaCreateBuffer(VulkanContext::GetMemoryAllocator(), &bufferInfo, &vmaallocInfo, &m_Handle, &m_Allocation, nullptr);
 		}
@@ -70,7 +71,7 @@ namespace vk
 
 			VmaAllocationCreateInfo allocInfo = {};
 			allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-			if (usage & DEVICE_ADDRESS) 
+			if (usage & DEVICE_ADDRESS)
 				allocInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 			vmaCreateBuffer(VulkanContext::GetMemoryAllocator(), &bufferInfo, &allocInfo, &m_Handle, &m_Allocation, nullptr);
 		}
@@ -84,34 +85,9 @@ namespace vk
 			return vkGetBufferDeviceAddress(VulkanContext::GetLogicalDevice(), &pInfo);
 		}
 
-		void SetData(VkCommandBuffer cmd, const VkBufferCopy& copy, const StagingBuffer& stagingBuffer) { vkCmdCopyBuffer(cmd, stagingBuffer, m_Handle, 1, &copy); }
+		void SetData(VkCommandBuffer cmd, const StagingBuffer& stagingBuffer, const VkBufferCopy& copy) { vkCmdCopyBuffer(cmd, stagingBuffer, m_Handle, 1, &copy); }
 
-		void SetData(VkCommandBuffer cmd, const VkBufferCopy& copy, const void* data)
-		{
-			StagingBuffer stb;
-			stb.Allocate(copy.size);
-			stb.SetData(data, copy.size);
-			SetData(cmd, copy, stb);
-			stb.Free();
-		}
-
-		void SetData(VkCommandBuffer cmd, const void* data, uint32_t size, uint32_t offset = 0, uint32_t srcOffset = 0)
-		{
-			VkBufferCopy copy;
-			copy.size = size;
-			copy.dstOffset = offset;
-			copy.srcOffset = srcOffset;
-			SetData(cmd, copy, data);
-		}
-
-		void SetData(VkCommandBuffer cmd, const StagingBuffer& buffer, uint32_t size, uint32_t offset = 0, uint32_t srcOffset = 0)
-		{
-			VkBufferCopy copy;
-			copy.size = size;
-			copy.dstOffset = offset;
-			copy.srcOffset = srcOffset;
-			SetData(cmd, copy, buffer);
-		}
+		void SetData(VkCommandBuffer cmd, const StagingBuffer& buffer, uint32_t size, uint32_t offset = 0, uint32_t srcOffset = 0) { SetData(cmd, buffer, { srcOffset, offset, size });	}
 
 		VkDeviceSize Size() const
 		{
@@ -122,9 +98,9 @@ namespace vk
 			return inf.size;
 		}
 
-		void Free() 
-		{ 
-			vmaDestroyBuffer(VulkanContext::GetMemoryAllocator(), m_Handle, m_Allocation); 
+		void Free()
+		{
+			vmaDestroyBuffer(VulkanContext::GetMemoryAllocator(), m_Handle, m_Allocation);
 			m_Handle = VK_NULL_HANDLE;
 			m_Allocation = VK_NULL_HANDLE;
 		}
@@ -144,22 +120,23 @@ namespace vk
 		uint32_t Counter = 0;
 
 	public:
+		auto& GetBuffer() { return m_Buffer; }
 		auto& GetBuffer() const { return m_Buffer; }
 		auto& GetStagingBuffer() const { return m_StagingBuffer; }
 
 		inline operator T* () { return m_StagingPtr; }
 		inline operator T* () const { return m_StagingPtr; }
 
-		T* Map() 
+		T* Map()
 		{
 			m_StagingPtr = (T*)m_StagingBuffer.Map();
 			return m_StagingPtr;
 		}
 
-		void Unmap() 
-		{ 
-			m_StagingPtr = nullptr; 
-			m_StagingBuffer.Unmap(); 
+		void Unmap()
+		{
+			m_StagingPtr = nullptr;
+			m_StagingBuffer.Unmap();
 		}
 
 		void Allocate(uint32_t elements, uint32_t usage = STORAGE_BUFFER)
@@ -173,8 +150,8 @@ namespace vk
 
 		void Remove(uint32_t id) { m_StagingPtr[id] = m_StagingPtr[--Counter]; }
 
-		void Free() 
-		{ 
+		void Free()
+		{
 			Unmap();
 			Counter = 0;
 			m_Buffer.Free();
@@ -184,8 +161,83 @@ namespace vk
 		void Update(VkCommandBuffer cmd, uint32_t elems = 0)
 		{
 			Unmap();
-			m_Buffer.SetData(cmd, { 0,0,sizeof(T) * (elems == 0 ? Counter : elems)}, m_StagingBuffer);
+			m_Buffer.SetData(cmd, m_StagingBuffer, { 0,0,sizeof(T) * (elems == 0 ? Counter : elems)});
 			Map();
-		}		
+		}
+	};
+
+	template<typename T, uint32_t usage>
+	struct DBufferManager // D for dynamic
+	{
+	private:
+		Buffer m_Buffer;
+		StagingBuffer m_StagingBuffer;
+		std::vector<T> m_Data;
+
+		T* m_StagingPtr = nullptr;
+	public:
+		auto& GetBuffer() { return m_Buffer; }
+		auto& GetBuffer() const { return m_Buffer; }
+
+		auto& GetStagingBuffer() { return m_StagingBuffer; }
+		auto& GetStagingBuffer() const { return m_StagingBuffer; }
+
+		uint32_t GetSize() const { return m_Data.size(); }
+
+		T* Map()
+		{
+			m_StagingPtr = (T*)m_StagingBuffer.Map();
+			return m_StagingPtr;
+		}
+
+		void Unmap()
+		{
+			m_StagingPtr = nullptr;
+			m_StagingBuffer.Unmap();
+		}
+
+		void Allocate(uint32_t elements)
+		{
+			m_Buffer.Allocate(elements * sizeof(T), usage);
+			m_StagingBuffer.Allocate(elements * sizeof(T));
+			Map();
+		}
+
+		void Push(const T& object) { m_Data.emplace_back(object); }
+
+		void Reset()
+		{
+			m_Data.clear();
+		}
+
+		void Free(bool reset = true)
+		{
+			if (m_Buffer)
+			{
+				Unmap();
+				m_Buffer.Free();
+				m_StagingBuffer.Free();
+				if (reset) m_Data.clear();
+			}
+		}
+
+		void Resize(uint32_t elements)
+		{
+			Free(false);
+			Allocate(elements);
+		}
+
+		void Update(VkCommandBuffer cmd, uint32_t elems = 0)
+		{
+			if (m_Buffer.Size() < m_Data.size() * sizeof(T))
+				Resize(m_Data.size());
+
+			uint32_t size = sizeof(T) * (elems == 0 ? m_Data.size() : elems);
+
+			memcpy(m_StagingPtr, m_Data.data(), size);
+			Unmap();
+			m_Buffer.SetData(cmd, m_StagingBuffer, { 0,0,size });
+			Map();
+		}
 	};
 }

@@ -142,10 +142,10 @@ namespace wc
 
 			for (uint32_t currentMip = 1; currentMip < m_MipLevels; currentMip++)
 			{
-				// Ping 
+				// Ping
 				GenerateDescriptor(m_Buffers[1].imageViews[currentMip], m_Buffers[0].imageViews[0]);
 
-				// Pong 
+				// Pong
 				GenerateDescriptor(m_Buffers[0].imageViews[currentMip], m_Buffers[1].imageViews[0]);
 			}
 
@@ -187,14 +187,14 @@ namespace wc
 			{
 				glm::vec2 dispatchSize = glm::ceil((glm::vec2)m_Buffers[0].image.GetMipSize(currentMip) / glm::vec2(m_ComputeWorkGroupSize));
 
-				// Ping 
+				// Ping
 				settings.LOD = float(currentMip - 1);
 				cmd.PushConstants(settings);
 
 				cmd.BindDescriptorSet(m_DescriptorSets[counter++]);
 				cmd.Dispatch(dispatchSize);
 
-				// Pong 
+				// Pong
 				settings.LOD = float(currentMip);
 				cmd.PushConstants(settings);
 
@@ -202,7 +202,7 @@ namespace wc
 				cmd.Dispatch(dispatchSize);
 			}
 
-			// First Upsample		
+			// First Upsample
 			settings.LOD = float(m_MipLevels - 2);
 			settings.Mode = UpsampleFirst;
 			cmd.PushConstants(settings);
@@ -336,7 +336,7 @@ namespace wc
 		VkDescriptorSet m_DescriptorSet;
 
 		Shader m_LineShader;
-		VkDescriptorSet m_LineDescriptorSet;
+
 
 
 		// Post processing
@@ -382,7 +382,7 @@ namespace wc
 			return glm::vec2(screenX, screenY);
 		}
 
-		void Init(RenderData& renderData)
+		void Init(const AssetManager& assetManager)
 		{
 			bloom.Init();
 			composite.Init();
@@ -461,11 +461,11 @@ namespace wc
 				createInfo.renderSize = m_RenderSize;
 				createInfo.renderPass = m_RenderPass;
 
-				VkDescriptorBindingFlags flags[2];
+				VkDescriptorBindingFlags flags[1];
 				memset(flags, 0, sizeof(VkDescriptorBindingFlags) * (std::size(flags) - 1));
 				flags[std::size(flags) - 1] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
-				uint32_t count = (uint32_t)renderData.Textures.size();
+				uint32_t count = (uint32_t)assetManager.GetTextures().size();
 
 				VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO };
 				set_counts.descriptorSetCount = 1;
@@ -484,13 +484,13 @@ namespace wc
 				vk::descriptorAllocator.Allocate(m_DescriptorSet, m_Shader.GetDescriptorLayout(), &set_counts, set_counts.descriptorSetCount);
 
 				vk::DescriptorWriter writer(m_DescriptorSet);
-				writer.BindBuffer(0, renderData.GetVertexBuffer().GetDescriptorInfo(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+
 
 				std::vector<VkDescriptorImageInfo> infos;
-				for (auto& image : renderData.Textures)
+				for (auto& image : assetManager.GetTextures())
 					infos.push_back({ image.GetSampler(), image.GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
 
-				writer.BindImages(1, infos, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.BindImages(0, infos, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			}
 
 			{
@@ -505,10 +505,10 @@ namespace wc
 
 				m_LineShader.Create(createInfo);
 
-				vk::descriptorAllocator.Allocate(m_LineDescriptorSet, m_LineShader.GetDescriptorLayout());
 
-				vk::DescriptorWriter writer(m_LineDescriptorSet);
-				writer.BindBuffer(0, renderData.GetLineVertexBuffer().GetDescriptorInfo(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+
+
+
 			}
 		}
 
@@ -574,7 +574,7 @@ namespace wc
 			sampler.addressModeV = vk::SamplerAddressMode::CLAMP_TO_EDGE;
 			sampler.addressModeW = vk::SamplerAddressMode::CLAMP_TO_EDGE;
 
-			m_ScreenSampler.Create(sampler);			
+			m_ScreenSampler.Create(sampler);
 
 			int m_PassCount = 0; // @NOTE: Not sure if this is working properly
 			int m_FinalPass = 0;
@@ -588,7 +588,7 @@ namespace wc
 			bloom.SetUp(m_OutputImageView);
 			composite.SetUp(m_ScreenSampler, GetImageBuffer(), m_OutputImageView, bloom.GetOutput());
 			//{
-			//	
+			//
 			//	auto output = GetImageBuffer();
 			//	auto input = GetImageBuffer();
 			//	crt.SetUp(m_ScreenSampler, output, input);
@@ -682,13 +682,22 @@ namespace wc
 					.extent = { (uint32_t)m_RenderSize.x, (uint32_t)m_RenderSize.y },
 				};
 
+
 				vkCmdSetViewport(cmd, 0, 1, &viewport);
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+				struct
+				{
+					glm::mat4 ViewProj;
+					VkDeviceAddress vertexBuffer;
+				} m_data;
+				m_data.ViewProj = camera->GetViewProjectionMatrix();
 				if (renderData.GetIndexCount())
 				{
 					renderData.UploadVertexData();
+					m_data.vertexBuffer = renderData.GetVertexBuffer().GetDeviceAddress();
 					vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Shader.GetPipeline());
+					vkCmdPushConstants(cmd, m_Shader.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(m_data), &m_data);
 
 					vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Shader.GetPipelineLayout(), 0, 1, &m_DescriptorSet, 0, nullptr);
 					vkCmdBindIndexBuffer(cmd, renderData.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -698,9 +707,11 @@ namespace wc
 				if (renderData.GetLineVertexCount())
 				{
 					renderData.UploadLineVertexData();
+					m_data.vertexBuffer = renderData.GetLineVertexBuffer().GetDeviceAddress();
 
 					vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_LineShader.GetPipeline());
-					vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_LineShader.GetPipelineLayout(), 0, 1, &m_LineDescriptorSet, 0, nullptr);
+					vkCmdPushConstants(cmd, m_Shader.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(m_data), &m_data);
+
 					vkCmdDraw(cmd, renderData.GetLineVertexCount(), 1, 0, 0);
 				}
 
@@ -715,7 +726,7 @@ namespace wc
 				CommandEncoder cmd;
 				//bloom.Execute(cmd);
 				//composite.Execute(cmd, m_RenderSize);
-				//crt.Execute(cmd, m_RenderSize, time);				
+				//crt.Execute(cmd, m_RenderSize, time);
 
 				//cmd.ExecuteCompute(m_ComputeCmd[CURRENT_FRAME]);
 			}
