@@ -43,7 +43,7 @@ namespace wc
 			{
 				.Width = 1280,
 				.Height = 720,
-				.Name = "WC Engine Editor",
+				.Name = "Editor",
 				.StartMode = WindowMode::Maximized,
 				.VSync = false,
 				.Resizeable = true,

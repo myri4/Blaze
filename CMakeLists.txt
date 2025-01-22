@@ -50,6 +50,7 @@ add_subdirectory("vendor/glm")
 add_subdirectory("vendor/freetype")
 add_subdirectory("vendor/box2d")
 add_subdirectory("vendor/flecs")
+add_subdirectory("vendor/luau")
 
 set(FREETYPE_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/vendor/freetype/include")
 set(FREETYPE_LIBRARY ${CMAKE_BINARY_DIR}/vendor/freetype/freetype.lib)
@@ -101,6 +102,8 @@ freetype
 freetype-interface
 msdf-atlas-gen::msdf-atlas-gen
 flecs::flecs_static
+Luau.VM
+Luau.Compiler
 )
 target_include_directories(${PROJECT_NAME} PUBLIC 
 "vendor/"
