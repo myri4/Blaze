@@ -18,6 +18,14 @@ static int printWrapper(lua_State* L)
 		{
 			WC_INFO(lua_tostring(L, -1))
 		}
+		else if (lua_isboolean(L, -1))
+		{
+			WC_INFO((bool)lua_toboolean(L, -1));
+		}
+		else
+		{
+			WC_WARN("Passed argument of unknown type.");
+		}
 	}
 
 	return 0;
@@ -49,8 +57,10 @@ namespace blaze
 
 		void Pop(int n = 1)	{ lua_pop(L, n); }
 		void NewTable()	{ lua_newtable(L); }
-		void NewUserData(const std::string& s) { lua_newtable(L, s.c_str()); }
+		//void NewUserData(const std::string& s) { lua_newtable(L, s.c_str()); }
 
+		auto IsString(int n = -1) { return lua_isstring(L, n); }
+		auto IsNumber(int n = -1) { return lua_isnumber(L, n); }
 		auto IsFunction(int n = -1) { return lua_isfunction(L, n); }
 		auto IsTable(int n = -1) { return lua_istable(L, n); }
 		auto IsLightUserData(int n = -1) { return lua_islightuserdata(L, n); }
@@ -74,6 +84,9 @@ namespace blaze
 		void PushNil() { lua_pushnil(L); }
 		void PushNumber(lua_Number n) { lua_pushnumber(L, n); }
 		void PushValue(int n) { lua_pushvalue(L, n); }
+
+		auto Next(int idx) { return lua_next(L, idx); }
+		std::string ToTypeName(int i = -1) { return std::string(lua_typename(L, lua_type(L, i))); }
 
 		std::string ToString(int i = -1) { return std::string(lua_tostring(L, i)); }
 		int32_t ToInt(int i = -1) { return lua_tointeger(L, i); }
@@ -103,19 +116,41 @@ namespace blaze
 				static_assert("Unsupported type for Lua");
 		}
 
+		void Convert(int idx)
+		{
+
+		}
+
 	public:
 
 		int Load(const char* byteCode, size_t byteCodeSize, const std::string& name)
 		{
 			L = luaL_newstate();
 			luaL_openlibs(L);
-			SetGlobal("_G");
 			Register("blaze", blazeLib);
 
 			if (luau_load(L, name.c_str(), byteCode, byteCodeSize, 0) != LUA_OK)
 				return -1;
 
 			PCall(0, LUA_MULTRET, 0); // This is really strange and has to be here.
+
+			GetGlobal("_G");
+			lua_pushnil(L);  /* first key */
+			while (lua_next(L, -2) != 0) 
+			{
+				/* uses 'key' (at index -2) and 'value' (at index -1) */
+				std::string value;
+				if (IsString())
+				{
+					value = ToString();
+				}
+				else if (IsNumber())
+					value = std::format("{}", ToNumber());
+				
+				WC_CORE_INFO("{}: {}", value, ToString(-2));
+				/* removes 'value'; keeps 'key' for next iteration */
+				lua_pop(L, 1);
+			}
 
 			return LUA_OK;
 		}
@@ -139,6 +174,13 @@ namespace blaze
 				WC_ERROR(std::string(bytecode, bytecodeSize));
 			
 			free(bytecode);
+		}
+
+		template<typename T>
+		void SetVariable(const std::string& name, const T& value)
+		{
+			PushValue(value); 
+			SetGlobal(name);
 		}
 
 		template<typename... Args>

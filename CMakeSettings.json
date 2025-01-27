@@ -20,7 +20,7 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "inheritEnvironments": [ "clang_cl_x64_x64" ],
       "variables": [
         {
           "name": "MSDF_ATLAS_GEN_BUILD_STANDALONE",
@@ -31,8 +31,19 @@
           "name": "FLECS_SHARED",
           "value": "False",
           "type": "BOOL"
+        },
+        {
+          "name": "LUAU_STATIC_CRT",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_TESTING",
+          "value": "False",
+          "type": "BOOL"
         }
-      ]
+      ],
+      "intelliSenseMode": "windows-clang-x64"
     }
   ]
 }

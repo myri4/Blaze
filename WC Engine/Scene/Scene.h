@@ -248,11 +248,9 @@ namespace wc
 				componentData["Restitution"] = component->Material.Restitution;
 				componentData["RollingResistance"] = component->Material.RollingResistance;
 
-				componentData["AllowedClipFraction"] = component->Material.AllowedClipFraction;
 				componentData["DebugColor"] = component->Material.DebugColor;
 
 				componentData["Sensor"] = component->Material.Sensor;
-				componentData["EnableSensorEvents"] = component->Material.EnableSensorEvents;
 				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
 				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
 				componentData["EnablePreSolveEvents"] = component->Material.EnablePreSolveEvents;
@@ -274,11 +272,9 @@ namespace wc
 				componentData["Restitution"] = component->Material.Restitution;
 				componentData["RollingResistance"] = component->Material.RollingResistance;
 
-				componentData["AllowedClipFraction"] = component->Material.AllowedClipFraction;
 				componentData["DebugColor"] = component->Material.DebugColor;
 
 				componentData["Sensor"] = component->Material.Sensor;
-				componentData["EnableSensorEvents"] = component->Material.EnableSensorEvents;
 				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
 				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
 				componentData["EnablePreSolveEvents"] = component->Material.EnablePreSolveEvents;
@@ -428,11 +424,9 @@ namespace wc
 					component.Material.Restitution = componentData["Restitution"].as<float>();
 					component.Material.RollingResistance = componentData["RollingResistance"].as<float>();
 
-					component.Material.AllowedClipFraction = componentData["AllowedClipFraction"].as<float>();
 					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
 
 					component.Material.Sensor = componentData["Sensor"].as<bool>();
-					component.Material.EnableSensorEvents = componentData["EnableSensorEvents"].as<bool>();
 					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
 					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();
 					component.Material.EnablePreSolveEvents = componentData["EnablePreSolveEvents"].as<bool>();
@@ -456,11 +450,9 @@ namespace wc
 					component.Material.Restitution = componentData["Restitution"].as<float>();
 					component.Material.RollingResistance = componentData["RollingResistance"].as<float>();
 
-					component.Material.AllowedClipFraction = componentData["AllowedClipFraction"].as<float>();
 					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
 
 					component.Material.Sensor = componentData["Sensor"].as<bool>();
-					component.Material.EnableSensorEvents = componentData["EnableSensorEvents"].as<bool>();
 					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
 					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();
 					component.Material.EnablePreSolveEvents = componentData["EnablePreSolveEvents"].as<bool>();

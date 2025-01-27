@@ -7,3 +7,4 @@ out/
 .vs/
 cmake-build-relwithdebinfo-visual-studio
 .idea
+build/

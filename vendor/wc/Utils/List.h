@@ -19,19 +19,18 @@ namespace wc
 
 		size_t PushBack(const T& type) 
 		{ 
-			Data[counter++] = type;
+			m_Data[counter++] = type;
 			return counter - 1;
 		}
 
-		size_t Size() const { return counter; }
+		size_t Counter() const { return counter; }
 		constexpr size_t Capacity() const { return Size; }
 		constexpr size_t ByteSize() const { return Size * sizeof(T); }
 	};
 
 	template<typename T, size_t Size>
-	class PointerList 
+	struct PointerList 
 	{
-	public:
 		size_t counter = 0;
 		T* Data = nullptr;
 
@@ -46,7 +45,7 @@ namespace wc
 
 		size_t PushBack() {	return counter++; }
 
-		size_t Size() const { return counter; }
+		size_t Counter() const { return counter; }
 		constexpr size_t Capacity() const { return Size; }
 		constexpr size_t ByteSize() const { return Size * sizeof(T); }
 	};

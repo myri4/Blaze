@@ -465,7 +465,7 @@ namespace wc
 				memset(flags, 0, sizeof(VkDescriptorBindingFlags) * (std::size(flags) - 1));
 				flags[std::size(flags) - 1] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
-				uint32_t count = (uint32_t)assetManager.GetTextures().size();
+				uint32_t count = 100;// (uint32_t)assetManager.GetTextures().size();
 
 				VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO };
 				set_counts.descriptorSetCount = 1;
@@ -504,11 +504,6 @@ namespace wc
 				createInfo.dynamicState = dynamicStates;
 
 				m_LineShader.Create(createInfo);
-
-
-
-
-
 			}
 		}
 

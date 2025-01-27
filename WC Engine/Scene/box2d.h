@@ -533,10 +533,10 @@ namespace wc
 
 		/// Enable sensor events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
 		///	@see b2ShapeDef::isSensor
-		inline void EnableSensorEvents(bool flag) { b2Shape_EnableSensorEvents(id, flag); }
+		//inline void EnableSensorEvents(bool flag) { b2Shape_EnableSensorEvents(id, flag); }
 
 		/// Returns true if sensor events are enabled
-		inline bool AreSensorEventsEnabled() { return b2Shape_AreSensorEventsEnabled(id); }
+		//inline bool AreSensorEventsEnabled() { return b2Shape_AreSensorEventsEnabled(id); }
 
 		/// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
 		///	@see b2ShapeDef::enableContactEvents
