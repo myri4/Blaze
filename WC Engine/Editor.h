@@ -33,6 +33,7 @@
 #include "Globals.h"
 #include "Rendering/Renderer2D.h"
 #include "UI/Widgets.h"
+#include "Scripting/Script.h"
 
 namespace wc
 {
@@ -221,7 +222,13 @@ namespace wc
                 true, // normals
                 true, // impulse
                 true, // friction
-                &m_RenderData };
+               // &m_RenderData 
+			};
+
+			//blaze::Script script;
+			//script.LoadFromFile("test.lua");
+			//script.SetVariable("a", "guz");
+			//script.Execute("printSmth");
 	    }
 
 		void Input()
@@ -371,8 +378,7 @@ namespace wc
 				WindowPos = *((glm::vec2*)&viewportBounds[0]);
 				glm::vec2 RenderSize = *((glm::vec2*)&viewportBounds[1]) - WindowPos;
 
-				auto image = m_Renderer.GetImguiImageID();
-				ImGui::GetWindowDrawList()->AddImage(image, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
+				ImGui::GetWindowDrawList()->AddImage((ImTextureID)m_Renderer.ImguiImageID, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
 
 				float buttonsWidth = ImGui::CalcTextSize("Play").x + ImGui::CalcTextSize("Stop").x + ImGui::CalcTextSize("Simulate").x + ImGui::GetStyle().FramePadding.x * 6.0f;
 				float totalWidth = buttonsWidth + ImGui::GetStyle().ItemSpacing.x * 2;
@@ -873,6 +879,7 @@ namespace wc
 							auto& s = *m_SelectedEntity.get<SpriteRendererComponent>();
 							auto& color = const_cast<glm::vec4&>(s.Color);
 							ImGui::ColorEdit4("color", glm::value_ptr(color));
+							ImGui::Button("Texture");
 						}
 
 						if (!visible) m_SelectedEntity.remove<SpriteRendererComponent>();
@@ -923,12 +930,10 @@ namespace wc
 							UI::Drag("Rolling Resistance", material.RollingResistance);
 
 							UI::Separator();
-							UI::Drag("Allowed Clip Fraction", material.AllowedClipFraction);
 							ImGui::ColorEdit4("Debug Color", glm::value_ptr(material.DebugColor));
 
 							UI::Separator();
 							UI::Checkbox("Sensor", material.Sensor);
-							UI::Checkbox("Enable Sensor Events", material.EnableSensorEvents);
 							UI::Checkbox("Enable Contact Events", material.EnableContactEvents);
 							UI::Checkbox("Enable Hit Events", material.EnableHitEvents);
 							UI::Checkbox("Enable Pre-Solve Events", material.EnablePreSolveEvents);

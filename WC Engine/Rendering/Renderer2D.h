@@ -352,15 +352,9 @@ namespace wc
 
 		VkCommandBuffer m_Cmd[FRAME_OVERLAP];
 		VkCommandBuffer m_ComputeCmd[FRAME_OVERLAP];
-		VkDescriptorSet m_ImguiImageID = VK_NULL_HANDLE;
+		VkDescriptorSet ImguiImageID = VK_NULL_HANDLE;
 
 		OrthographicCamera* camera = nullptr;
-
-		auto GetImguiImageID() { return (uint64_t)m_ImguiImageID; }
-		auto GetOutputImage() const { return m_OutputImage; }
-
-		auto GetRenderSize() const { return m_RenderSize; }
-		auto GetAspectRatio() const { return m_OutputImage.GetAspectRatio(); }
 
 		auto GetHalfSize() const { return (m_RenderSize / 128.f) * camera->Zoom; }
 		auto GetHalfSize(glm::vec2 size) const { return size * camera->Zoom; }
@@ -465,7 +459,7 @@ namespace wc
 				memset(flags, 0, sizeof(VkDescriptorBindingFlags) * (std::size(flags) - 1));
 				flags[std::size(flags) - 1] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
-				uint32_t count = (uint32_t)assetManager.GetTextures().size();
+				uint32_t count = 100;// (uint32_t)assetManager.GetTextures().size();
 
 				VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO };
 				set_counts.descriptorSetCount = 1;
@@ -504,11 +498,6 @@ namespace wc
 				createInfo.dynamicState = dynamicStates;
 
 				m_LineShader.Create(createInfo);
-
-
-
-
-
 			}
 		}
 
@@ -594,7 +583,7 @@ namespace wc
 			//	crt.SetUp(m_ScreenSampler, output, input);
 			//}
 
-			m_ImguiImageID = MakeImGuiDescriptor(m_ImguiImageID, { m_ScreenSampler, /*m_FinalImageView[m_FinalPass]*/m_OutputImageView, VK_IMAGE_LAYOUT_GENERAL });
+			ImguiImageID = MakeImGuiDescriptor(ImguiImageID, { m_ScreenSampler, /*m_FinalImageView[m_FinalPass]*/m_OutputImageView, VK_IMAGE_LAYOUT_GENERAL });
 		}
 
 		void Resize(glm::vec2 newSize)

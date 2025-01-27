@@ -5,6 +5,7 @@ set(VENDOR "vendor/")
 
 project("WC-Engine")
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+string(REPLACE "-Wformat" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/WC Engine/*.cpp" "${CMAKE_SOURCE_DIR}/WC Engine/*.h")
 file(GLOB IMGUI_SOURCES
@@ -30,7 +31,6 @@ add_executable("WC-Engine"
     "vendor/wc/imgui_backend/imgui_impl_glfw.cpp"
     "vendor/wc/imgui_backend/imgui_impl_vulkan.cpp"
     "vendor/imguizmo/ImGuizmo.cpp"
-        "WC Engine/Rendering/AssetManager.h"
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

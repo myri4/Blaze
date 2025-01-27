@@ -141,8 +141,6 @@ namespace wc
 
 		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
 		{
-			float position[2] = { v.x, v.y };
-
 			// Define a fixed width for the buttons
 			const float buttonWidth = 20.0f;
 
@@ -162,7 +160,7 @@ namespace wc
 			ImGui::SameLine(0, 0);
 
 			ImGui::SetNextItemWidth(inputWidth);
-			if (ImGui::DragFloat((std::string("##X") + txt).c_str(), &position[0], 0.1f)) { v.x = position[0]; }
+			ImGui::DragFloat((std::string("##X") + txt).c_str(), &v.x, 0.1f);
 
 			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 
@@ -179,7 +177,7 @@ namespace wc
 			ImGui::SameLine(0, 0);
 
 			ImGui::SetNextItemWidth(inputWidth);
-			if (ImGui::DragFloat((std::string("##Y") + txt).c_str(), &position[1], 0.1f)) { v.y = position[1]; }
+			ImGui::DragFloat((std::string("##Y") + txt).c_str(), &v.y, 0.1f);
 
 
 			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -187,8 +185,6 @@ namespace wc
 			ImGui::Text(txt);
 
 			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
-
-			return;
 		}
 
 		void Separator()
