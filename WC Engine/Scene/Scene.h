@@ -26,6 +26,7 @@ namespace wc
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
 
 	public:
+	    std::unordered_map<std::string, PhysicsMaterial> Materials = {{ "Default", {} }};
 		auto GetWorld()	{ return m_World; }
 		auto GetPhysicsWorld() { return m_PhysicsWorld; }
 		auto& GetPhysicsWorldData() { return m_PhysicsWorldData; }
@@ -147,6 +148,8 @@ namespace wc
 
 		void UpdatePhysics()
 		{
+		    m_PhysicsWorld.SetGravity(m_PhysicsWorldData.Gravity);
+
 			AccumulatedTime += Globals.deltaTime;
 
 			while (AccumulatedTime >= SimulationTime)

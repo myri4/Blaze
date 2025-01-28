@@ -145,6 +145,8 @@ namespace wc
 		Texture t_File;
 		Texture t_FolderEmpty;
 		Texture t_Folder;
+        Texture t_Reorder;
+        Texture t_Bond;
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
@@ -198,6 +200,8 @@ namespace wc
 	        t_File.Load("assets/textures/menu/file.png");
 	        t_FolderEmpty.Load("assets/textures/menu/folder-empty.png");
 	        t_Folder.Load("assets/textures/menu/folder-fill.png");
+	        t_Reorder.Load("assets/textures/menu/reorder.png");
+	        t_Bond.Load("assets/textures/menu/bond.png");
 
 	        b2AABB bounds = { { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } };
 	        m_PhysicsDebugDraw = {
@@ -324,7 +328,7 @@ namespace wc
 		void Update()
 		{
 			if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
-				m_Scene.UpdatePhysics();
+			    m_Scene.Update();
 
 			Render();
 		}
@@ -553,17 +557,26 @@ namespace wc
 
 		void ShowEntities()
 		{
+	        static bool dragMode = false;
+	        if (ImGui::BeginMenuBar())
+	        {
+	            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+	            if (ImGui::ImageButton("mode", dragMode ? t_Bond : t_Reorder, ImVec2(20, 20)) || ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
+	            {
+	                dragMode = !dragMode;
+	                WC_INFO(dragMode ? "Changed Mode to : Bond" : "Changed Mode to : Reorder");
+	            }
+	            ImGui::SetItemTooltip("Press CTRL or press to change mode");
+	            ImGui::PopStyleVar();
+	            ImGui::PopStyleColor();
+	            ImGui::EndMenuBar();
+	        }
+
 			// Reset selection if the mouse is clicked outside the tree nodes
 			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused())
 			{
 				m_SelectedEntity = flecs::entity::null();
-			}
-
-			static bool dragMode = false;
-			if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
-			{
-				dragMode = !dragMode;
-				WC_INFO(dragMode ? "Changed Mode to : Bond" : "Changed Mode to : Reorder");
 			}
 
 			// Recursive function to display entities
@@ -632,7 +645,6 @@ namespace wc
 				{
 					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
 					{
-						WC_INFO("Dragging");
 						ImGui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
 						ImGui::Text("Dragging %s", entity.name().c_str());
 						ImGui::EndDragDropSource();
@@ -770,22 +782,33 @@ namespace wc
 
 		void UI_Entities()
 		{
+            static bool showPopup = false;
 			if (ImGui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
-				ShowEntities();
+                static char filter[1024];
+                if (ImGui::BeginMenuBar())
+                {
+                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Add Entity").x - 20 - ImGui::GetStyle().ItemSpacing.x * 3);
+                    ImGui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
 
-				ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6);
-				ImGui::SetCursorPos(ImVec2(ImGui::GetWindowSize().x - 40, ImGui::GetWindowSize().y - 40));
-				if (ImGui::Button("+", { 30, 30 }))
-				{
-					ImGui::OpenPopup("Add Entity");
-				}
-				ImGui::SetItemTooltip("Add Entity");
-				ImGui::PopStyleVar();
+                    if (ImGui::Button("Add Entity"))
+                    {
+                        showPopup = true;
+                    }
+
+                    ImGui::EndMenuBar();
+                }
+
+			    ShowEntities();
+
+			    if (showPopup)
+                {
+                    ImGui::OpenPopup("Add Entity");
+			        showPopup = false;
+                }
 
 			    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-				if (ImGui::BeginPopupModal("Add Entity", NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
+				if (ImGui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
 				{
 					ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 					ImVec2 windowSize = ImGui::GetWindowSize();
@@ -793,42 +816,57 @@ namespace wc
 					ImGui::SetWindowPos(windowPos, ImGuiCond_Once);
 
 					static std::string name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-					ImGui::InputText("Name", &name);
+				    ImGui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
+                    float size = ImGui::CalcItemWidth();
 
 					if (ImGui::Button("Create") || ImGui::IsKeyPressed(ImGuiKey_Enter))
 					{
-						if (!name.empty()) 
+						if (!name.empty())
 						{
-							m_SelectedEntity = m_Scene.AddEntity(name);
-							name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-							ImGui::CloseCurrentPopup();
+						    if (m_Scene.GetWorld().lookup(name.c_str()) == flecs::entity::null())
+						    {
+						        m_SelectedEntity = m_Scene.AddEntity(name);
+						        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
+						        ImGui::CloseCurrentPopup();
+						    }
+						    else
+						    {
+						        ImGui::OpenPopup("WarnNameExists");
+						    }
 						}
-						else 
+						else
 						{
 							ImGui::SetNextWindowPos(ImGui::GetMousePos());
 							ImGui::OpenPopup("WarnEmptyName");
 						}
 					}
 
-					ImGui::SameLine();
-					if (ImGui::Button("Cancel")) 
-					{
-						//ImGui::ClosePopupsOverWindow(ImGui::FindWindowByName("Entities"), true); 
-						ImGui::CloseCurrentPopup();
-					}
+				    ImGui::SameLine();
+				    ImGui::SetCursorPosX(size);
+				    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+				    {
+				        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
+				        ImGui::CloseCurrentPopup();
+				    }
 
-					if (ImGui::BeginPopupModal("WarnEmptyName", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |		ImGuiWindowFlags_NoMove))
+					if (ImGui::BeginPopupModal("WarnEmptyName", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |	ImGuiWindowFlags_NoMove))
 					{
 						ImGui::Text("Name cannot be empty!");
 
-						if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+					    if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
 
 						ImGui::EndPopup();
 					}
 
-					ImGui::EndPopup();
-				}
+				    if (ImGui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    {
+				        ImGui::Text("Name already exists!");
+				        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+				        ImGui::EndPopup();
+				    }
 
+			        ImGui::EndPopup();
+				}
 			}
 			ImGui::End();
 		}
@@ -841,8 +879,48 @@ namespace wc
 				{
 					std::string nameBuffer = m_SelectedEntity.name().c_str(); // Buffer to hold the entity's name
 
-					// Input name
-					if (ImGui::InputText("Name", &nameBuffer)) m_SelectedEntity.set_name(nameBuffer.c_str());
+				    // Input name
+				    if (ImGui::InputText("Name", &nameBuffer))
+				    {
+				        if (!nameBuffer.empty())
+				        {
+				            if (m_Scene.GetWorld().lookup(nameBuffer.c_str()) != flecs::entity::null())
+				            {
+				                ImGui::OpenPopup("WarnNameExists");
+				            }
+				            else
+				            {
+				                // Change name in lists
+				                if (m_SelectedEntity.parent() == flecs::entity::null())
+				                {
+				                    // Change the name in the parent entity list - is not a child
+				                    auto& parentNames = m_Scene.GetParentEntityNames();
+				                    for (auto& name : parentNames)
+				                    {
+				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer; // Update the name
+				                    }
+				                }
+				                else
+				                {
+				                    auto& childrenNames = m_SelectedEntity.parent().get_ref<ChildNamesComponent>()->childNames;
+				                    for (auto& name : childrenNames)
+				                    {
+				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer; // Update the name
+				                    }
+				                }
+
+				                // change name after changing lists
+				                m_SelectedEntity.set_name(nameBuffer.c_str());
+				            }
+				        }
+				    }
+
+				    if (ImGui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    {
+				        ImGui::Text("Name already exists!");
+				        if (ImGui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+				        ImGui::EndPopup();
+				    }
 
 					// Display the entity's ID
 					//ImGui::Text("ID: %u", selected_entity.id());
@@ -923,22 +1001,91 @@ namespace wc
 
 					auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
 						{
-							UI::Separator("Material");
-							UI::Drag("Density", material.Density);
-							UI::Drag("Friction", material.Friction);
-							UI::Drag("Restitution", material.Restitution);
-							UI::Drag("Rolling Resistance", material.RollingResistance);
+				            UI::Separator("Material");
+				            static int currentMaterialIndex = 0;  // Track the selected material
+
+				            // Get the current material name directly
+				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
+				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
+
+				            // Create a combo box with dynamic names
+				            if (ImGui::BeginCombo("Materials", currentMaterialName.c_str()))
+				            {
+				                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
+                                if (ImGui::Button("New Material", {ImGui::GetContentRegionAvail().x, 0}))
+                                {
+                                    ImGui::OpenPopup("Create Material##popup");
+                                }
+				                ImGui::PopStyleColor();
+
+				                // TODO - add a popup for a new Material and save/load them
+				                ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+				                if (ImGui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+				                {
+				                    PhysicsMaterial newMaterial;
+
+				                    static std::string name = "";
+				                    ImGui::InputText("Name", &name);
+				                    float size = ImGui::CalcItemWidth();
+
+				                    if (ImGui::Button("Create"))
+				                    {
+				                        m_Scene.Materials[name] = newMaterial;
+				                        name = "";
+				                        ImGui::CloseCurrentPopup();
+				                    }
+				                    ImGui::SameLine();
+				                    ImGui::SetCursorPosX(size);
+				                    if (ImGui::Button("Cancel"))
+                                    {
+                                        ImGui::CloseCurrentPopup();
+                                    }
+				                    ImGui::EndPopup();
+				                }
+				                ImGui::Separator();
+
+				                int index = 0;
+				                for (const auto& [name, mat] : m_Scene.Materials) {
+				                    bool isSelected = (currentMaterialIndex == index);
+				                    ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
+				                    if (ImGui::Selectable(name.c_str(), isSelected)) {
+				                        currentMaterialIndex = index;
+				                    }
+                                    ImGui::PopStyleColor();
+				                    if (isSelected) {
+				                        ImGui::SetItemDefaultFocus();
+				                    }
+				                    ++index;
+				                }
+				                ImGui::EndCombo();
+				            }
+
+                            // Get the selected material
+				            auto& curMaterial = m_Scene.Materials[currentMaterialName];
+
+				            ImGui::BeginDisabled(currentMaterialName == "Default");
+				            ImGui::BeginGroup();
+				            UI::Drag("Density", curMaterial.Density);
+							UI::Drag("Friction", curMaterial.Friction);
+							UI::Drag("Restitution", curMaterial.Restitution);
+							UI::Drag("Rolling Resistance", curMaterial.RollingResistance);
 
 							UI::Separator();
-							ImGui::ColorEdit4("Debug Color", glm::value_ptr(material.DebugColor));
+							ImGui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
 
 							UI::Separator();
-							UI::Checkbox("Sensor", material.Sensor);
-							UI::Checkbox("Enable Contact Events", material.EnableContactEvents);
-							UI::Checkbox("Enable Hit Events", material.EnableHitEvents);
-							UI::Checkbox("Enable Pre-Solve Events", material.EnablePreSolveEvents);
-							UI::Checkbox("Invoke Contact Creation", material.InvokeContactCreation);
-							UI::Checkbox("Update Body Mass", material.UpdateBodyMass);
+							UI::Checkbox("Sensor", curMaterial.Sensor);
+							UI::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
+							UI::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
+							UI::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
+							UI::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
+							UI::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
+				            ImGui::EndGroup();
+				            ImGui::EndDisabled();
+				            if (currentMaterialName == "Default") ImGui::SetItemTooltip("Cannot edit Default material values");
+
+				            material = curMaterial;
+
 						};
 
 					if (m_SelectedEntity.has<RigidBodyComponent>())
@@ -1139,15 +1286,17 @@ namespace wc
 				}
 				
 				ImGui::SameLine();
-				if (ImGui::Button("Copy"))
-				{
-					std::string logData;
-					for (const auto& msg : Log::GetConsoleSink()->messages)
-					{
-						logData += msg.payload + "\n"; // Assuming msg.payload is a string
-					}
-					ImGui::SetClipboardText(logData.c_str());
-				}
+			    if (ImGui::Button("Copy"))
+			    {
+			        std::string logData;
+			        for (const auto& msg : Log::GetConsoleSink()->messages)
+			        {
+			            auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+			            std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
+			            logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
+			        }
+			        ImGui::SetClipboardText(logData.c_str());
+			    }
 
 				ImGui::SameLine();
 				ImGui::InputText("Input", const_cast<char*>(""), 0);
@@ -1170,10 +1319,12 @@ namespace wc
 						auto it = level_colors.find(msg.level);
 						if (it != level_colors.end())
 						{
-							const auto& [color, prefix] = it->second;
-							ImGui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
-							UI::Text(prefix + msg.payload);
-							ImGui::PopStyleColor();
+						    const auto& [color, prefix] = it->second;
+						    auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+						    std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
+						    ImGui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
+						    UI::Text(timeStr + prefix + msg.payload);
+						    ImGui::PopStyleColor();
 						}
 						else
 						{
@@ -1198,8 +1349,8 @@ namespace wc
 			static std::filesystem::path selectedFolderPath = assetsPath;
 			static std::vector<std::filesystem::path> openedFiles;
 			static std::unordered_set<std::string> openedFileNames;
-			static bool showIcons;
-			static bool previewAsset;
+	        static bool showIcons = true;
+	        static bool previewAsset = true;
 
 			// Expand all helper func
 			std::function<void(const std::filesystem::path&, bool)> setFolderStatesRecursively =
@@ -1221,12 +1372,6 @@ namespace wc
 					if (ImGui::MenuItem("Import"))
 					{
 						WC_INFO("TODO - Implement Import");
-					}
-
-					if (ImGui::MenuItem("Copy Path"))
-					{
-						ImGui::SetClipboardText(assetsPath.string().c_str());
-						WC_INFO("Copied path to clipboard > {}", assetsPath.string());
 					}
 
 					if (ImGui::BeginMenu("View##Assets"))
@@ -1314,7 +1459,7 @@ namespace wc
 
 									if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 									{
-									    if (entry.path().extension() != L".scene")
+									    if (entry.path().extension() != ".scene")
 									    {
 										    if (openedFileNames.insert(fullPathStr).second)
 										    {
@@ -1327,6 +1472,7 @@ namespace wc
 									    }
 									}
 
+								    ImGui::SetNextWindowPos({ImGui::GetCursorScreenPos().x + ImGui::GetItemRectSize().x, ImGui::GetCursorScreenPos().y});
 									if (ImGui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
 									{
 										ImGui::Text("Preview: %s", filenameStr.c_str());
@@ -1337,19 +1483,18 @@ namespace wc
 							    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
 							    {
 							        ImGui::Text("Are you sure you want to load this scene?");
-							        if (ImGui::Button("Yes"))
+							        if (ImGui::Button("Yes##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Enter))
 							        {
 							            m_Scene.Load(entry.path().string());
 							            ImGui::CloseCurrentPopup();
 							        }
 							        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
-							        if (ImGui::Button("Cancel"))
+							        if (ImGui::Button("Cancel##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Escape))
 							        {
 							            ImGui::CloseCurrentPopup();
 							        }
 							        ImGui::EndPopup();
 							    }
-
 							}
 						}
 
@@ -1385,9 +1530,16 @@ namespace wc
 								}
 								else if (ImGui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
-								ImGui::SameLine();
-								ImGui::Text(selectedFolderPath.string().c_str());
-								ImGui::Separator();
+							    static std::string previewPath;
+							    ImGui::SameLine();
+							    //ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy Path").x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+							    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+							    ImGui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
+							    ImGui::PopItemWidth();
+							    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) previewPath = assetsPath.string(); //
+							    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path().parent_path()).string();
+
+							    ImGui::Separator();
 
 								float totalButtonWidth = 50 + ImGui::GetStyle().ItemSpacing.x;
 								int itemsPerRow = static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / totalButtonWidth);
@@ -1478,14 +1630,14 @@ namespace wc
 										    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
                                             {
                                                 ImGui::Text("Are you sure you want to load this scene?");
-                                                if (ImGui::Button("Yes"))
+                                                if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
                                                 {
                                                     m_Scene.Load(entry.path().string());
                                                     ImGui::CloseCurrentPopup();
                                                 }
+
 										        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
-										        if (ImGui::Button("Cancel"))
-										            ImGui::CloseCurrentPopup();
+										        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
                                                 ImGui::EndPopup();
                                             }
@@ -2011,6 +2163,8 @@ namespace wc
 			t_File.Destroy();
 			t_Folder.Destroy();
 			t_FolderEmpty.Destroy();
+	        t_Reorder.Destroy();
+	        t_Bond.Destroy();
 
 	        assetManager.Free();
 			m_Renderer.Deinit();
