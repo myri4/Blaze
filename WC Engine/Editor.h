@@ -178,7 +178,8 @@ namespace wc
 		float ZoomSpeed = 2.f;
 	    b2DebugDraw m_PhysicsDebugDraw;
 
-	public:
+
+    public:
 	    AssetManager assetManager;
 
 	    void Create()
@@ -492,10 +493,14 @@ namespace wc
 		{
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
-				auto& worldData = m_Scene.GetPhysicsWorldData();
-				UI::DragButton2("Gravity", worldData.Gravity);
+				//auto& worldData = m_Scene.GetPhysicsWorldData();
+				//UI::DragButton2("Gravity", worldData.Gravity);
 
 				//tests
+
+			    m_Scene.GetWorld().each([&](flecs::entity entt, EntityTag) {
+                    ImGui::Text(entt.name().c_str());
+                });
 
 				//if (m_SelectedEntity != flecs::entity::null())
 				//{
@@ -580,7 +585,8 @@ namespace wc
 			}
 
 			// Recursive function to display entities
-			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void {
+			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
+	        {
 				const bool is_selected = (m_SelectedEntity == entity);
 
 				// Get children of the current entity from ChildNamesComponent
@@ -698,21 +704,23 @@ namespace wc
 					}
 				}
 
-				// Handle right-click and popup menu
-				if (ImGui::IsWindowHovered())
+                // Handle right-click and popup menu
+				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 				{
-					if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+					if (ImGui::IsItemHovered())
 					{
 						ImGui::OpenPopup(std::to_string(entity.id()).c_str());
 					}
-					else if (m_SelectedEntity != flecs::entity::null() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-					{
-						ImGui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
-					}
+					// TODO - ask if this is needed and fix it
+				    /*if (!ImGui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+                    {
+                        WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
+                        ImGui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+                    }*/
 				}
 
 				// Display the popup menu
-				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoFocusOnAppearing))
+				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str()))
 				{
 					ImGui::Text("%s", entity.name().c_str());
 					ImGui::Separator();
@@ -731,8 +739,8 @@ namespace wc
 
 					if (entity.parent() != flecs::entity::null() && ImGui::MenuItem("Remove Child"))
 					{
-						auto parent = entity.parent();
-						m_Scene.RemoveChild(parent, entity);
+						//auto parent = entity.parent();
+						m_Scene.RemoveChild(entity);
 					}
 
 					if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
@@ -767,7 +775,7 @@ namespace wc
 
 					ImGui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
 				}
-				};
+	        };
 
 			// Display root entities
 			for (const auto& name : m_Scene.GetParentEntityNames())
@@ -778,6 +786,33 @@ namespace wc
 					displayEntity(rootEntity, displayEntity);
 				}
 			}
+
+	        // "Empty space" drop target for clearing bonds
+	        if (dragMode && m_SelectedEntity.parent() != flecs::entity::null())
+	        {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
+	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
+	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
+                if (ImGui::IsMouseDragging(0))ImGui::Button("*Remove Parent*", ImGui::GetContentRegionAvail());
+	            else ImGui::InvisibleButton("EmptySpace", ImGui::GetContentRegionAvail());
+	            ImGui::PopStyleColor(3);
+
+                if (ImGui::BeginDragDropTarget())
+	            {
+	                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+	                {
+	                    IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+	                    flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+
+	                    // Clear the bond (remove the child-parent relationship)
+	                    if (droppedEntity.parent() != flecs::entity::null())
+	                    {
+	                        m_Scene.RemoveChild(droppedEntity);
+	                    }
+	                }
+	                ImGui::EndDragDropTarget();
+	            }
+	        }
 		}
 
 		void UI_Entities()
@@ -1517,138 +1552,142 @@ namespace wc
 						ImGui::EndChild();
 
 						ImGui::TableSetColumnIndex(1);
-
-						if (ImGui::GetContentRegionMax().x > 200)
+						
+						if (ImGui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
 						{
-							if (ImGui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
+							if (selectedFolderPath == assetsPath)
 							{
-								if (selectedFolderPath == assetsPath)
+								ImGui::BeginDisabled();
+							    ImGui::ArrowButton("Back", ImGuiDir_Left);
+								ImGui::EndDisabled();
+							}
+							else if (ImGui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+
+						    static std::string previewPath;
+						    ImGui::SameLine();
+						    //ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy Path").x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+						    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+						    ImGui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
+						    ImGui::PopItemWidth();
+						    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) previewPath = assetsPath.string(); //
+						    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path().parent_path()).string();
+
+						    ImGui::Separator();
+
+							float totalButtonWidth = 50 + ImGui::GetStyle().ItemSpacing.x;
+							int itemsPerRow = static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / totalButtonWidth);
+
+							if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
+
+							if (std::filesystem::exists(selectedFolderPath))
+							{
+								int i = 0;
+								for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
 								{
-									ImGui::BeginDisabled();
-								    ImGui::ArrowButton("Back", ImGuiDir_Left);
-									ImGui::EndDisabled();
-								}
-								else if (ImGui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+									if (i > 0 && i % itemsPerRow != 0)
+										ImGui::SameLine();
 
-							    static std::string previewPath;
-							    ImGui::SameLine();
-							    //ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy Path").x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-							    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-							    ImGui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
-							    ImGui::PopItemWidth();
-							    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) previewPath = assetsPath.string(); //
-							    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path().parent_path()).string();
-
-							    ImGui::Separator();
-
-								float totalButtonWidth = 50 + ImGui::GetStyle().ItemSpacing.x;
-								int itemsPerRow = static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / totalButtonWidth);
-
-								if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
-
-								if (std::filesystem::exists(selectedFolderPath))
-								{
-									int i = 0;
-									for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
+									if (entry.is_directory())
 									{
-										if (i > 0 && i % itemsPerRow != 0)
-											ImGui::SameLine();
+										ImGui::BeginGroup();
+										ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+										ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+										if (ImGui::ImageButton((entry.path().string() + "/").c_str(), std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder, { 50, 50 }))
+											selectedFolderPath = entry.path();
 
-										if (entry.is_directory())
+										ImGui::PopStyleColor();
+										ImGui::PopStyleVar();
+
+										std::string filename = entry.path().filename().string();
+										float wrapWidth = 50.0f; // Width for wrapping the text
+
+										// Split the text into words
+										std::istringstream stream(filename);
+										std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
+
+										// Display each line centered
+										std::string currentLine;
+										float currentLineWidth = 0.0f;
+										ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
+										for (const auto& word : words)
 										{
-											ImGui::BeginGroup();
-											ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-											ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-											if (ImGui::ImageButton((entry.path().string() + "/").c_str(), std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder, { 50, 50 }))
-												selectedFolderPath = entry.path();
-
-											ImGui::PopStyleColor();
-											ImGui::PopStyleVar();
-
-											std::string filename = entry.path().filename().string();
-											float wrapWidth = 50.0f; // Width for wrapping the text
-
-											// Split the text into words
-											std::istringstream stream(filename);
-											std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
-
-											// Display each line centered
-											std::string currentLine;
-											float currentLineWidth = 0.0f;
-											ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
-											for (const auto& word : words)
+											ImVec2 wordSize = ImGui::CalcTextSize(word.c_str());
+											if (currentLineWidth + wordSize.x > wrapWidth)
 											{
-												ImVec2 wordSize = ImGui::CalcTextSize(word.c_str());
-												if (currentLineWidth + wordSize.x > wrapWidth)
-												{
-													// Push the current line and start a new one
-													ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-													ImGui::TextUnformatted(currentLine.c_str());
-													currentLine.clear();
-													currentLineWidth = 0.0f;
-												}
-
-												if (!currentLine.empty())
-												{
-													currentLine += " "; // Add a space before the next word
-													currentLineWidth += ImGui::CalcTextSize(" ").x;
-												}
-												currentLine += word;
-												currentLineWidth += wordSize.x;
-											}
-
-											// Add the last line if there's any remaining text
-											if (!currentLine.empty())
-											{
+												// Push the current line and start a new one
 												ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
 												ImGui::TextUnformatted(currentLine.c_str());
+												currentLine.clear();
+												currentLineWidth = 0.0f;
 											}
-											ImGui::PopStyleVar(); // Restore item spacing for text
 
-											ImGui::EndGroup();
+											if (!currentLine.empty())
+											{
+												currentLine += " "; // Add a space before the next word
+												currentLineWidth += ImGui::CalcTextSize(" ").x;
+											}
+											currentLine += word;
+											currentLineWidth += wordSize.x;
 										}
-										else
+
+										// Add the last line if there's any remaining text
+										if (!currentLine.empty())
 										{
-											ImGui::BeginGroup();
-											ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-											ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-
-											if (ImGui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
-                                                if (entry.path().extension() != L".scene")
-											        if (openedFileNames.insert(entry.path().string()).second)
-												    	openedFiles.push_back(entry.path());
-											    else
-											        ImGui::OpenPopup("Confirm");
-
-											ImGui::PopStyleVar();
-											ImGui::PopStyleColor();
-											ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 50);
-											ImGui::TextWrapped(entry.path().filename().string().c_str());
-											ImGui::PopTextWrapPos();
-											ImGui::EndGroup();
-
-										    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
-                                            {
-                                                ImGui::Text("Are you sure you want to load this scene?");
-                                                if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
-                                                {
-                                                    m_Scene.Load(entry.path().string());
-                                                    ImGui::CloseCurrentPopup();
-                                                }
-
-										        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
-										        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-
-                                                ImGui::EndPopup();
-                                            }
-
+											ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+											ImGui::TextUnformatted(currentLine.c_str());
 										}
-										i++;
+										ImGui::PopStyleVar(); // Restore item spacing for text
+
+										ImGui::EndGroup();
 									}
+									else
+									{
+										ImGui::BeginGroup();
+										ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+										ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+										if (ImGui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
+										{
+                                               if (entry.path().extension() != ".scene")
+                                               {
+										            if (openedFileNames.insert(entry.path().string()).second)
+										            {
+											    	    openedFiles.push_back(entry.path());
+										            }
+                                               }
+                                               else
+										        ImGui::OpenPopup("Confirm");
+										}
+
+										ImGui::PopStyleVar();
+										ImGui::PopStyleColor();
+										ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 50);
+										ImGui::TextWrapped(entry.path().filename().string().c_str());
+										ImGui::PopTextWrapPos();
+										ImGui::EndGroup();
+
+									    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+                                           {
+                                               ImGui::Text("Are you sure you want to load this scene?");
+                                               if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                               {
+                                                   m_Scene.Load(entry.path().string());
+                                                   ImGui::CloseCurrentPopup();
+                                               }
+
+									        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+									        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+
+                                               ImGui::EndPopup();
+                                           }
+
+									}
+									i++;
 								}
 							}
-							ImGui::EndChild();
 						}
+						ImGui::EndChild();
+
 
 						ImGui::EndTable();
 					}

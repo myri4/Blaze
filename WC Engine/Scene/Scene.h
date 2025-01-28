@@ -36,9 +36,13 @@ namespace wc
 
 		auto AddEntity(const std::string& name) { m_ParentEntityNames.push_back(name); return m_World.entity(name.c_str()).add<EntityTag>(); }
 		
-		void RemoveChild(flecs::entity& parent, flecs::entity& child)
+		void RemoveChild(flecs::entity& child)
 		{
+		    if (child.parent() == flecs::entity::null()) return;
+
+		    auto parent = child.parent();
 			child.remove(flecs::ChildOf, parent);
+
 			auto names = parent.get_ref<ChildNamesComponent>();
 
 			if (names)
@@ -64,11 +68,10 @@ namespace wc
 		void SetChild(flecs::entity& parent, flecs::entity& child)
 		{
 			// Check if the child already has a parent
-			auto currentParent = child.parent();
 			if (child.parent() != flecs::entity::null())
 			{
 				// Remove the child from the current parent
-				RemoveChild(currentParent, child);
+				RemoveChild(child);
 			}
 
 			parent.add<ChildNamesComponent>();
