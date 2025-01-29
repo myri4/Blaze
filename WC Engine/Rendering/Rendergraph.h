@@ -6,7 +6,6 @@
 namespace wc
 {
 	// Rendergraph
-	// @TODO: add support for depth buffer
 
 	enum class RDGResourceAccess : uint8_t
 	{

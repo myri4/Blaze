@@ -788,7 +788,7 @@ namespace wc
 			}
 
 	        // "Empty space" drop target for clearing bonds
-	        if (dragMode && m_SelectedEntity.parent() != flecs::entity::null())
+	        if (dragMode && m_SelectedEntity != flecs::entity::null() && m_SelectedEntity.parent() != flecs::entity::null())
 	        {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
 	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
