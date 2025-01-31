@@ -2,11 +2,261 @@
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+//#include <Windows.h> // Needed for file attributes
 
 namespace wc
 {
 	namespace UI
 	{
+	    const std::unordered_map<std::string, std::string> fileTypeExt = {{".*", "(All)"}, {".", "(Folder)"}, {".png", "(Image)"}, {".wav", "(Audio)"}};
+
+        // FileDialog - A simple file dialog for opening files or selecting directories
+	    // filters: [.* - All] [. - Folder] [.png - Image] [.wav - Audio]
+        std::string FileDialog(const char* name, const std::string &filter = ".*", const bool selectDir = false)
+        {
+            bool showPopup = true;
+            static std::filesystem::path currentPath = std::filesystem::current_path().root_path();
+            static std::vector<std::filesystem::path> disks;
+            static std::string selectedPath;
+            std::string finalPath;
+            static std::vector<std::filesystem::directory_entry> fileEntries;
+
+            // Initialize disks (only once)
+            if (disks.empty())
+            {
+                for (char drive = 'A'; drive <= 'Z'; ++drive)
+                {
+                    std::filesystem::path drive_path = std::string(1, drive) + ":\\";
+                    std::error_code ec;
+                    if (std::filesystem::exists(drive_path, ec))
+                    {
+                        disks.push_back(drive_path);
+                    }
+                }
+            }
+
+            if (ImGui::BeginPopupModal(name, &showPopup))
+            {
+                // Navigation controls
+                ImGui::BeginDisabled(currentPath == currentPath.root_path());
+                if (ImGui::ArrowButton("##back", ImGuiDir_Left))
+                {
+                    if (currentPath.has_parent_path())
+                        currentPath = currentPath.parent_path();
+                    else
+                        currentPath = currentPath.root_path();
+                    fileEntries.clear();
+                }
+                ImGui::EndDisabled();
+
+                ImGui::SameLine();
+                float comboWidth = std::max(ImGui::CalcTextSize(currentPath.string().c_str()).x + 50, 300.0f);
+                ImGui::SetWindowSize(ImVec2(ImGui::GetItemRectSize().x + comboWidth + ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 3, 0));
+                ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Refresh").x - ImGui::GetStyle().FramePadding.x * 2);
+                if (ImGui::BeginCombo("##disks", currentPath.string().c_str()))
+                {
+                    for (const auto& disk : disks)
+                    {
+                        if (ImGui::Selectable(disk.string().c_str()))
+                        {
+                            currentPath = disk;
+                            fileEntries.clear();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                // Refresh button
+                ImGui::SameLine();
+                if (ImGui::Button("Refresh"))
+                {
+                    fileEntries.clear();
+                    std::error_code ec;
+                    std::filesystem::directory_iterator(currentPath, ec); // Force refresh
+                }
+
+                // File list
+                if (ImGui::BeginChild("##file_list", ImVec2(0,  300.0f), true))
+                {
+                    try
+                    {
+                        // Refresh directory contents if empty
+                        if (fileEntries.empty())
+                        {
+                            std::error_code ec;
+                            auto dir_iter = std::filesystem::directory_iterator(currentPath, ec);
+                            if (ec)
+                            {
+                                ImGui::TextColored(ImVec4(1,0,0,1), "Error: %s", ec.message().c_str());
+                            }
+                            else
+                            {
+                                for (const auto& entry : dir_iter)
+                                {
+                                    try
+                                    {
+                                        //TODO - add for other systems
+
+                                        // Skip hidden/system files using attributes
+                                        #ifdef _WIN32
+                                        DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
+                                        if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+                                            continue;
+                                        #endif
+
+                                        // Skip reserved system files
+                                        if (entry.path().filename().string()[0] == '$')
+                                            continue;
+
+                                        fileEntries.push_back(entry);
+                                    }
+                                    catch (...)
+                                    {
+                                        // Skip problematic entries
+                                        continue;
+                                    }
+                                }
+
+                                // Sort directories first (case-insensitive)
+                                std::sort(fileEntries.begin(), fileEntries.end(),
+                                    [](const auto& a, const auto& b) {
+                                        std::string a_name = a.path().filename().string();
+                                        std::string b_name = b.path().filename().string();
+                                        std::transform(a_name.begin(), a_name.end(), a_name.begin(), ::tolower);
+                                        std::transform(b_name.begin(), b_name.end(), b_name.begin(), ::tolower);
+
+                                        if (a.is_directory() == b.is_directory())
+                                            return a_name < b_name;
+                                        return a.is_directory() > b.is_directory();
+                                    });
+                            }
+                        }
+
+                        // Display entries
+                        for (const auto& entry : fileEntries)
+                        {
+                            const bool isDirectory = entry.is_directory();
+                            std::string filename = entry.path().filename().string();
+
+                            // File type filtering (case-insensitive)
+                            if (!isDirectory && !filter.empty() && filter != ".*")
+                            {
+                                std::string target_ext = filter;
+                                std::transform(target_ext.begin(), target_ext.end(), target_ext.begin(), ::tolower);
+
+                                std::string entry_ext = entry.path().extension().string();
+                                std::transform(entry_ext.begin(), entry_ext.end(), entry_ext.begin(), ::tolower);
+
+                                if (entry_ext != target_ext)
+                                    continue;
+                            }
+
+                            // Display as tree node
+                            ImGui::PushID(filename.c_str());
+
+                            // Set tree node flags
+                            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
+                                                      ImGuiTreeNodeFlags_NoTreePushOnOpen |
+                                                      ImGuiTreeNodeFlags_OpenOnArrow;
+
+                            if (!isDirectory) {
+                                flags |= ImGuiTreeNodeFlags_Leaf;
+                            }
+
+                            if (selectedPath == entry.path().string())
+                            {
+                                flags |= ImGuiTreeNodeFlags_Selected;
+                            }
+
+                            // Display tree node (returns true if clicked, but doesn't actually open)
+                            bool nodeClicked = ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
+
+                            // Handle single click
+                            if (ImGui::IsItemClicked())
+                            {
+                                if (isDirectory)
+                                {
+                                    if (selectDir)
+                                    {
+                                        selectedPath = entry.path().string();
+                                    }
+                                    else
+                                    {
+                                        currentPath = entry.path();
+                                        fileEntries.clear();
+                                    }
+                                }
+                                else
+                                {
+                                    selectedPath = entry.path().string();
+                                }
+                            }
+
+                            // Handle double-click
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                            {
+                                if (isDirectory)
+                                {
+                                    currentPath = entry.path();
+                                    fileEntries.clear();
+                                }
+                                else
+                                {
+                                    selectedPath = entry.path().string();
+                                }
+                            }
+
+                            ImGui::PopID();
+                        }
+                    }
+                    catch (const std::exception& e)
+                    {
+                        ImGui::TextColored(ImVec4(1,0,0,1), "Error: %s", e.what());
+                    }
+                }
+                ImGui::EndChild();
+
+                // Selected file path
+                ImGui::SetNextItemWidth(std::max(ImGui::CalcTextSize(selectedPath.c_str()).x + ImGui::GetStyle().FramePadding.x * 2, 300.0f));
+                ImGui::Text("Selected:"); ImGui::SameLine();
+                auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+                ImGui::InputText("##SelectedFile", &selectedFileName, ImGuiInputTextFlags_ReadOnly);
+
+                 // Filter text
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(ImGui::CalcTextSize(filter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
+                auto filterText = filter + " " + fileTypeExt.at(filter);
+                ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
+
+                // Action buttons
+                ImGui::BeginDisabled(selectedPath.empty());
+                if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
+                {
+                    finalPath = selectedPath;
+                    selectedPath.clear();
+                    currentPath = disks[0];
+                    fileEntries.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2);
+                if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+                {
+                    selectedPath.clear();
+                    currentPath = disks[0];
+                    fileEntries.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            }
+
+            return finalPath;
+        }
+
 	    void ApplyHue(ImGuiStyle& style, float hue)
 	    {
 	        for (int i = 0; i < ImGuiCol_COUNT; i++)
@@ -19,6 +269,7 @@ namespace wc
 	            ImGui::ColorConvertHSVtoRGB(h, s, v, col.x, col.y, col.z);
 	        }
 	    }
+
 		ImVec2 ImConv(glm::vec2 v) { return ImVec2(v.x, v.y); }
 
 		ImGuiStyle SoDark(float hue)

@@ -6,8 +6,6 @@
 
 namespace wc 
 {
-
-
 	struct GlobalVariables
 	{
 		Window window; // @TODO: maybe rename to main window

@@ -31,6 +31,7 @@
 #include <imguizmo/ImGuizmo.h>
 
 #include "Globals.h"
+#include "Project/Project.h"
 #include "Rendering/Renderer2D.h"
 #include "UI/Widgets.h"
 #include "Scripting/Script.h"
@@ -331,7 +332,7 @@ namespace wc
 			if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
 			    m_Scene.Update();
 
-			Render();
+			if (Project::Exists())Render();
 		}
 
 		void ChangeSceneState(SceneState newState)
@@ -788,7 +789,7 @@ namespace wc
 			}
 
 	        // "Empty space" drop target for clearing bonds
-	        if (dragMode && m_SelectedEntity.parent() != flecs::entity::null())
+	        if (dragMode && m_SelectedEntity && m_SelectedEntity.parent() != flecs::entity::null())
 	        {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
 	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
@@ -1377,7 +1378,7 @@ namespace wc
 			ImGui::End();
 		}
 
-		void UI_FileExplorer()
+		void UI_Assets()
 		{
 			static const std::filesystem::path assetsPath = std::filesystem::current_path();
 			static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
@@ -2031,157 +2032,231 @@ namespace wc
 
 		void UI()
 		{
+	        static bool showPopup = false;
 		    const ImGuiViewport* viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(viewport->WorkPos);
 			ImGui::SetNextWindowSize(viewport->WorkSize);
 			ImGui::SetNextWindowViewport(viewport->ID);
 
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+			/*ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));*/
 
 			if (ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
 				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
 				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground))
 			{
-				ImGuiIO& io = ImGui::GetIO();
-				if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
-				{
-					ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-					ImGui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
-				}
+				// ImGui::PopStyleVar(3);
 
-				ImGui::PopStyleVar(3);
+			    if (!Project::Exists())
+			    {
+			        static bool shouldOpenProjPopup = false; // New persistent flag
 
-				// Main Menu Bar
+			        if (ImGui::Button("New Project"))
+			        {
+			            ImGui::OpenPopup("New Project");
+			        }
 
-				if (ImGui::BeginMenuBar())
-				{
-					// TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
-					if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
-					{
-						//WC_CORE_INFO("Empty space on main menu bar is hovered)"
-					}
+			        // File dialog logic
+			        std::string path = UI::FileDialog("New Project", ".", true);
+			        static std::string savePath;
+			        if (!path.empty())
+			        {
+			            savePath = path;
+			            shouldOpenProjPopup = true;
+			        }
 
-					if (ImGui::BeginMenu("File"))
-					{
-						if (ImGui::MenuItem("New Project"))
-						{
-							WC_CORE_INFO("New");
-						}
+			        if (shouldOpenProjPopup)
+			        {
+			            ImGui::OpenPopup("Proj");
+			        }
 
-						if (ImGui::MenuItem("Open Project"))
-						{
-						    auto filepath = FileDialogs::OpenFile(Globals.window, "Blaze Scene (*.scene)\0*.scene\0");
+			        if (ImGui::BeginPopupModal("Proj", nullptr, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+			        {
+			            static std::string projName = "Untitled";
+			            ImGui::InputText("Project Name", &projName);
 
-						    if (!filepath.empty())
+			            ImGui::BeginDisabled(projName.empty());
+			            if (ImGui::Button("OK"))
+			            {
+			                //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
+			                Project::Create(savePath, projName);
+			                savePath.clear();
+			                shouldOpenProjPopup = false;
+			                ImGui::CloseCurrentPopup();
+			            }
+			            ImGui::EndDisabled();
+			            if (projName.empty())ImGui::SetItemTooltip("Project name cannot be empty!");
+
+			            ImGui::SameLine();
+			            if (ImGui::Button("Cancel"))
+			            {
+			                projName = "Untitled";
+			                savePath.clear();
+			                shouldOpenProjPopup = false;
+			                ImGui::CloseCurrentPopup();
+			            }
+
+			            ImGui::EndPopup();
+			        }
+			    }
+			    else
+			    {
+			        ImGuiIO& io = ImGui::GetIO();
+			        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+			        {
+			            ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+			            ImGui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
+			        }
+
+			        if (ImGui::BeginMenuBar())
+			        {
+			            // TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
+			            if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
+			            {
+			                //WC_CORE_INFO("Empty space on main menu bar is hovered)"
+			            }
+
+			            //ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+
+			            if (ImGui::BeginMenu("File"))
+			            {
+                            ImGui::SeparatorText("Project");
+			                ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - (ImGui::CalcTextSize(Project::name.c_str()).x + ImGui::CalcTextSize("[]").x)) * 0.5f);
+			                ImGui::Text("[%s]", Project::name.c_str());
+
+			                if (ImGui::MenuItem("Change Project", "CTRL + P"))
                             {
-                                m_Scene.Load(filepath);
+                                Project::Clear();
                             }
-						}
 
-						if (ImGui::MenuItem("Save"))
-						{
-							m_Scene.Save("testScene.scene");
-						}
+			                ImGui::SeparatorText("Scene");
 
-						if (ImGui::MenuItem("Save As"))
-						{
-							WC_CORE_INFO("Save As");
-						}
+			                if (ImGui::MenuItem("New"))
+			                {
+			                    WC_INFO("New Scene");
+			                }
 
-						ImGui::EndMenu();
-					}
+			                if (ImGui::MenuItem("Open"))
+			                {
+			                    auto filepath = FileDialogs::OpenFile(Globals.window, "Blaze Scene (*.scene)\0*.scene\0");
 
-					if (ImGui::BeginMenu("View"))
-					{
-						ImGui::MenuItem("Editor", NULL, &showEditor);
-						ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
-						ImGui::MenuItem("Entities", NULL, &showEntities);
-						ImGui::MenuItem("Properties", NULL, &showProperties);
-						ImGui::MenuItem("Console", NULL, &showConsole);
-						ImGui::MenuItem("File Explorer", NULL, &showFileExplorer);
-					    ImGui::MenuItem("Debug Statistics", NULL, &showDebugStats);
-					    ImGui::MenuItem("Style Editor", NULL, &showStyleEditor);
+			                    if (!filepath.empty())
+			                    {
+			                        m_Scene.Load(filepath);
+			                    }
+			                }
 
-					    if (ImGui::BeginMenu("Theme"))
-					    {
-					        // TODO - Add more themes / custom themes / save themes
-					        static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
-					        static int currentTheme = 0; // Default to SoDark
-					        static float hue = 0.0f;
+			                ImGui::SeparatorText("File");
 
-					        if (ImGui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
-					        {
-					            switch (currentTheme)
-					            {
-					                case 0: // SoDark
-					                    ImGui::GetStyle() = UI::SoDark(hue);
-					                break;
-					                case 1: // Classic
-					                    ImGui::StyleColorsClassic();
-					                break;
-					                case 2: // Dark
-					                    ImGui::StyleColorsDark();
-					                break;
-					                case 3: // Light
-					                    ImGui::StyleColorsLight();
-					                break;
-					            }
-					        }
+			                if (ImGui::MenuItem("Save", "CTRL + S"))
+			                {
+			                    m_Scene.Save("testScene.scene");
+			                }
 
-					        if (currentTheme == 0 && ImGui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
-					        {
-					            ImGui::GetStyle() = UI::SoDark(hue);
-					        }
+			                if (ImGui::MenuItem("Undo", "CTRL + Z"))
+                            {
+                                WC_INFO("Undo");
+                            }
 
-					        ImGui::EndMenu();
-					    }
+			                if (ImGui::MenuItem("Redo", "CTRL + Y"))
+                            {
+                                WC_INFO("Redo");
+                            }
 
-						ImGui::EndMenu();
-					}
+			                ImGui::EndMenu();
+			            }
 
-					// Buttons
-					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-					ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			            if (ImGui::BeginMenu("View"))
+			            {
+			                ImGui::MenuItem("Editor", NULL, &showEditor);
+			                ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
+			                ImGui::MenuItem("Entities", NULL, &showEntities);
+			                ImGui::MenuItem("Properties", NULL, &showProperties);
+			                ImGui::MenuItem("Console", NULL, &showConsole);
+			                ImGui::MenuItem("File Explorer", NULL, &showFileExplorer);
+			                ImGui::MenuItem("Debug Statistics", NULL, &showDebugStats);
+			                ImGui::MenuItem("Style Editor", NULL, &showStyleEditor);
 
-					float buttonSize = ImGui::GetFrameHeightWithSpacing();
+			                if (ImGui::BeginMenu("Theme"))
+			                {
+			                    // TODO - Add more themes / custom themes / save themes
+			                    static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
+			                    static int currentTheme = 0; // Default to SoDark
+			                    static float hue = 0.0f;
 
-					ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + ImGui::GetStyle().ItemSpacing.x));
-					if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
-					{
-						//Globals.window.Collapse();
-					}
+			                    if (ImGui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
+			                    {
+			                        switch (currentTheme)
+			                        {
+			                            case 0: // SoDark
+			                                ImGui::GetStyle() = UI::SoDark(hue);
+			                            break;
+			                            case 1: // Classic
+			                                ImGui::StyleColorsClassic();
+			                            break;
+			                            case 2: // Dark
+			                                ImGui::StyleColorsDark();
+			                            break;
+			                            case 3: // Light
+			                                ImGui::StyleColorsLight();
+			                            break;
+			                        }
+			                    }
 
-					ImGui::SameLine();
-					if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-					{
-						//Globals.window.Maximize();
-					}
+			                    if (currentTheme == 0 && ImGui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
+			                    {
+			                        ImGui::GetStyle() = UI::SoDark(hue);
+			                    }
 
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
-				    ImGui::SameLine();
-					if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
-					{
-						Globals.window.Close();
-					}
+			                    ImGui::EndMenu();
+			                }
 
-					ImGui::PopStyleVar();
-					ImGui::PopStyleColor(4);
+			                ImGui::EndMenu();
+			            }
 
-					ImGui::EndMenuBar();
-				}
+			            // Buttons
+			            /*ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+			            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+			            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+			            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 
-				if (showEditor) UI_Editor();
-				if (showSceneProperties) UI_SceneProperties();
-				if (showEntities) UI_Entities();
-				if (showProperties) UI_Properties();
-				if (showConsole) UI_Console();
-				if (showFileExplorer) UI_FileExplorer();
-			    if (showDebugStats) UI_DebugStats();
-			    if (showStyleEditor) UI_StyleEditor();
+			            float buttonSize = ImGui::GetFrameHeightWithSpacing();
+
+			            ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + ImGui::GetStyle().ItemSpacing.x));
+			            if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
+			            {
+			                //Globals.window.Collapse();
+			            }
+
+			            ImGui::SameLine();
+			            if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
+			            {
+			                //Globals.window.Maximize();
+			            }
+
+			            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
+			            ImGui::SameLine();
+			            if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+			            {
+			                Globals.window.Close();
+			            }
+
+			            ImGui::PopStyleVar();
+			            ImGui::PopStyleColor(4);*/
+
+			            ImGui::EndMenuBar();
+			        }
+
+			        if (showEditor) UI_Editor();
+			        if (showSceneProperties) UI_SceneProperties();
+			        if (showEntities) UI_Entities();
+			        if (showProperties) UI_Properties();
+			        if (showConsole) UI_Console();
+			        if (showFileExplorer) UI_Assets();
+			        if (showDebugStats) UI_DebugStats();
+			        if (showStyleEditor) UI_StyleEditor();
+			    }
 			}
 			ImGui::End();
 		}
