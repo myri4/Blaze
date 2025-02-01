@@ -204,7 +204,6 @@ namespace wc
 	        t_Reorder.Load("assets/textures/menu/reorder.png");
 	        t_Bond.Load("assets/textures/menu/bond.png");
 
-	        b2AABB bounds = { { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } };
 	        m_PhysicsDebugDraw = {
 	            DrawPolygonFcn,
                 DrawSolidPolygonFcn,
@@ -215,19 +214,7 @@ namespace wc
                 DrawTransformFcn,
                 DrawPointFcn,
                 DrawStringFcn,
-                bounds,
-                true, // drawUsingBounds
-                true, // shapes
-                true, // joints
-                true, // joint extras
-                true, // aabbs
-                true, // mass
-                true, // contacts
-                true, // colors
-                true, // normals
-                true, // impulse
-                true, // friction
-               // &m_RenderData 
+				{ { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } },
 			};
 
 			//blaze::Script script;
@@ -271,7 +258,7 @@ namespace wc
 					m_StartPan = glm::vec2(0.f);
 					m_BeginCameraPosition = camera.Position;
 					m_Panning = false;
-				}
+				}				
 			}
 		}
 
@@ -282,18 +269,18 @@ namespace wc
 		    {
 		        auto& data = *entt.get<SpriteRendererComponent>();
 
-		        renderData.DrawQuad(transform, data.Texture, data.Color);
+		        renderData.DrawQuad(transform, data.Texture, data.Color, entt.id());
 		    }
 		    else if (entt.has<CircleRendererComponent>())
 		    {
 		        auto& data = *entt.get<CircleRendererComponent>();
-		        renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color);
+		        renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color, entt.id());
 		    }
 		    else if (entt.has<TextRendererComponent>())
 		    {
 		        auto& data = *entt.get<TextRendererComponent>();
 
-		        //renderData.DrawString(data.Text, data.Font, transform, data.Color);
+		        //renderData.DrawString(data.Text, data.Font, transform, data.Color, entt.id());
 		    }
 			m_Scene.GetWorld().query_builder<TransformComponent, EntityTag>()
 				.with(flecs::ChildOf, entt)
@@ -373,6 +360,43 @@ namespace wc
 					Resize(ViewPortSize);
 				}
 
+				if (Mouse::GetMouse(Mouse::LEFT) && !ImGuizmo::IsOver())
+				{
+					auto mousePos = (glm::ivec2)(Mouse::GetCursorPosition() - (glm::uvec2)WindowPos);
+
+					uint32_t width = m_Renderer.m_RenderSize.x;
+					uint32_t height = m_Renderer.m_RenderSize.y;
+
+					if (mousePos.x > 0 && mousePos.y > 0 && mousePos.x < width && mousePos.y < height)
+					{
+						VulkanContext::GetLogicalDevice().WaitIdle();
+
+						vk::StagingBuffer stagingBuffer;
+						stagingBuffer.Allocate(sizeof(uint64_t) * width * height, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+						vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
+							auto image = m_Renderer.m_EntityImage;
+							image.SetLayout(cmd, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+							VkBufferImageCopy copyRegion = {
+								.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+								.imageSubresource.layerCount = 1,
+								.imageExtent = { width, height, 1 },
+							};
+
+							vkCmdCopyImageToBuffer(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &copyRegion);
+
+							image.SetLayout(cmd, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+							});
+
+						auto imagedata = (uint64_t*)stagingBuffer.Map();
+						auto id = imagedata[mousePos.x + mousePos.y * width];
+						m_SelectedEntity = flecs::entity(m_Scene.GetWorld(), id);
+
+						stagingBuffer.Unmap();
+						stagingBuffer.Free();
+					}
+				}
+
 				auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
 				auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
 				auto viewportOffset = ImGui::GetWindowPos();
@@ -411,7 +435,6 @@ namespace wc
 				ImGuizmo::SetOrthographic(true);
 				ImGuizmo::SetDrawlist();
 				ImGuizmo::SetRect(WindowPos.x, WindowPos.y, RenderSize.x, RenderSize.y);
-
 				if (m_SelectedEntity != flecs::entity::null() && m_SelectedEntity.has<TransformComponent>())
 				{
 					glm::mat4 local_transform = m_SelectedEntity.get<TransformComponent>()->GetTransform();
@@ -493,69 +516,53 @@ namespace wc
 		{
 			if (ImGui::Begin("Scene Properties", &showSceneProperties))
 			{
-				//auto& worldData = m_Scene.GetPhysicsWorldData();
-				//UI::DragButton2("Gravity", worldData.Gravity);
+				if (ImGui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					auto& worldData = m_Scene.GetPhysicsWorldData();
+					UI::DragButton2("Gravity", worldData.Gravity);
+					//{
+					//	auto rt = physicsWorld.GetRestitutionThreshold();
+					//	UI::Drag("Restitution Threshold", rt);
+					//	physicsWorld.SetRestitutionThreshold(rt);
+					//}
+					//{
+					//	auto ht = physicsWorld.GetHitEventThreshold();
+					//	UI::Drag("Hit Event Threshold", ht);
+					//	physicsWorld.SetRestitutionThreshold(ht);
+					//}
+					//{
+					//	auto ht = physicsWorld.GetContactHertz();
+					//	UI::DragButton2("Hit Event Threshold", ht);
+					//	physicsWorld.SetRestitutionThreshold(rt);
+					//}
+					//{
+					//	auto ht = physicsWorld.GetContactDampingRatio();
+					//	UI::DragButton2("Hit Event Threshold", ht);
+					//	physicsWorld.SetRestitutionThreshold(rt);
+					//}
+					//{
+					//	auto ht = physicsWorld.GetContactPushMaxSpeed();
+					//	UI::DragButton2("Hit Event Threshold", ht);
+					//	physicsWorld.SetRestitutionThreshold(rt);
+					//}
+				}
 
-				//tests
+				if (ImGui::CollapsingHeader("Physics debug draw", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					UI::Checkbox("Use drawing bounds", m_PhysicsDebugDraw.useDrawingBounds);
+					UI::Checkbox("Draw shapes", m_PhysicsDebugDraw.drawShapes);
+					UI::Checkbox("Draw joints", m_PhysicsDebugDraw.drawJoints);
+					UI::Checkbox("Draw joint extras", m_PhysicsDebugDraw.drawJointExtras);
+					UI::Checkbox("Draw AABBs", m_PhysicsDebugDraw.drawAABBs);
+					UI::Checkbox("Draw mass", m_PhysicsDebugDraw.drawMass);
+					UI::Checkbox("Draw body names", m_PhysicsDebugDraw.drawBodyNames);
+					UI::Checkbox("Draw contacts", m_PhysicsDebugDraw.drawContacts);
+					UI::Checkbox("Draw graph colors", m_PhysicsDebugDraw.drawGraphColors);
+					UI::Checkbox("Draw contact normals", m_PhysicsDebugDraw.drawContactNormals);
+					UI::Checkbox("Draw contact impulses", m_PhysicsDebugDraw.drawContactImpulses);
+					UI::Checkbox("Draw friction impulses", m_PhysicsDebugDraw.drawFrictionImpulses);
 
-			    m_Scene.GetWorld().each([&](flecs::entity entt, EntityTag) {
-                    ImGui::Text(entt.name().c_str());
-                });
-
-				//if (m_SelectedEntity != flecs::entity::null())
-				//{
-				//	//WC_INFO(m_SelectedEntity.has<ChildNamesComponent>());
-				//	auto names = m_SelectedEntity.get_ref<ChildNamesComponent>();
-				//	if (names)
-				//	{
-				//		for (const auto& name : names->childNames)
-				//		{
-				//			ImGui::Button(name.c_str());
-				//		}
-				//	}
-				//}
-
-				//for (const auto& name : m_Scene.GetParentEntityNames())
-				//{
-				//	auto entity = m_Scene.GetWorld().lookup(name.c_str());
-				//	if (entity)
-				//	{
-				//		if (ImGui::Button(name.c_str()))
-				//		{
-				//			m_SelectedEntity = entity;
-				//		}
-				//	}
-				//}
-
-
-
-
-				//}
-				//{
-				//	auto rt = physicsWorld.GetRestitutionThreshold();
-				//	UI::Drag("Restitution Threshold", rt);
-				//	physicsWorld.SetRestitutionThreshold(rt);
-				//}
-				//{
-				//	auto ht = physicsWorld.GetHitEventThreshold();
-				//	UI::Drag("Hit Event Threshold", ht);
-				//	physicsWorld.SetRestitutionThreshold(ht);
-				//}
-				//{
-				//	auto ht = physicsWorld.GetContactHertz();
-				//	UI::DragButton2("Hit Event Threshold", ht);
-				//	physicsWorld.SetRestitutionThreshold(rt);
-				//}
-				//{
-				//	auto ht = physicsWorld.GetContactDampingRatio();
-				//	UI::DragButton2("Hit Event Threshold", ht);
-				//	physicsWorld.SetRestitutionThreshold(rt);
-				//}
-				//{
-				//	auto ht = physicsWorld.GetContactPushMaxSpeed();
-				//	UI::DragButton2("Hit Event Threshold", ht);
-				//	physicsWorld.SetRestitutionThreshold(rt);
-				//}
+				}				
 			}
 			ImGui::End();
 		}
@@ -578,18 +585,12 @@ namespace wc
 	            ImGui::EndMenuBar();
 	        }
 
-			// Reset selection if the mouse is clicked outside the tree nodes
-			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused())
-			{
-				m_SelectedEntity = flecs::entity::null();
-			}
+			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
 
-			// Recursive function to display entities
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 	        {
 				const bool is_selected = (m_SelectedEntity == entity);
 
-				// Get children of the current entity from ChildNamesComponent
 				std::vector<flecs::entity> children;
 				if (entity.has<ChildNamesComponent>())
 				{
@@ -598,23 +599,19 @@ namespace wc
 					{
 						std::string fullChildName = std::string(entity.name()) + "::" + childName;
 
-						// Now ensure the lookup takes into account the parent and grandparent names
-						flecs::entity childEntity = entity; // Start with current entity (parent)
-						while (childEntity.parent() != flecs::entity::null()) {
-							childEntity = childEntity.parent();  // Traverse upwards to ensure the full entity path
-							fullChildName = std::string(childEntity.name()) + "::" + fullChildName;  // Add parent names to the lookup path
+						flecs::entity childEntity = entity;
+						while (childEntity.parent() != flecs::entity::null()) 
+						{
+							childEntity = childEntity.parent();
+							fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
 						}
 
-						// Lookup the child entity using the constructed full path
 						auto childEntityResolved = m_Scene.GetWorld().lookup(fullChildName.c_str());
 						if (childEntityResolved)
-						{
 							children.push_back(childEntityResolved);
-						}
 					}
 				}
 
-				// Set up the tree node flags
 				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
 				if (is_selected)
 					node_flags |= ImGuiTreeNodeFlags_Selected;
@@ -622,10 +619,13 @@ namespace wc
 				if (children.empty())
 					node_flags |= ImGuiTreeNodeFlags_Leaf;
 
-				if (m_SelectedEntity != flecs::entity::null()) {
+				if (m_SelectedEntity != flecs::entity::null()) 
+				{
 					auto parent = m_SelectedEntity.parent();
-					while (parent != flecs::entity::null()) {
-						if (parent == entity) {
+					while (parent != flecs::entity::null()) 
+					{
+						if (parent == entity) 
+						{
 							ImGui::SetNextItemOpen(true);
 							break;
 						}
@@ -642,9 +642,12 @@ namespace wc
 				ImGui::PopItemFlag();
 
 				// Handle selection on click
-				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) m_SelectedEntity = entity;
+
+				if (ImGui::IsMouseDoubleClicked(0) && ImGui::IsItemHovered())
 				{
-					m_SelectedEntity = entity;
+					if (entity.has<TransformComponent>())
+						camera.Position = glm::vec3(entity.get<TransformComponent>()->Translation, 0.f);
 				}
 
 				if(dragMode)
@@ -665,14 +668,10 @@ namespace wc
 
 							// Check if the drop target is empty space
 							 if (droppedEntity != entity.parent())
-							{
 								m_Scene.SetChild(entity, droppedEntity);
-							}
 						}
 						ImGui::EndDragDropTarget();
 					}
-
-
 				}
 				else if(ImGui::IsItemActive() && !ImGui::IsItemHovered())
 				{
@@ -683,34 +682,26 @@ namespace wc
 					{
 						int index = std::distance(entitiyNames.begin(), it);
 
-						// Get the drag delta in Y-axis
 						float drag_delta_y = ImGui::GetMouseDragDelta(0).y;
 
-						// Only consider a drag if the delta is significant
-						if (std::abs(drag_delta_y) > 5.0f)  // A threshold to ignore small drags
+						if (std::abs(drag_delta_y) > 5.0f)
 						{
-							// Calculate the target index based on drag direction
 							int n_next = index + (drag_delta_y < 0.f ? -1 : 1);
 
-							// Ensure the index stays within bounds and we don't swap to the same position
 							if (n_next >= 0 && n_next < entitiyNames.size() && n_next != index)
 							{
 								std::swap(entitiyNames[index], entitiyNames[n_next]);
 
-								// Reset the mouse drag delta after a swap
 								ImGui::ResetMouseDragDelta();
 							}
 						}
 					}
 				}
 
-                // Handle right-click and popup menu
 				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 				{
 					if (ImGui::IsItemHovered())
-					{
 						ImGui::OpenPopup(std::to_string(entity.id()).c_str());
-					}
 					// TODO - ask if this is needed and fix it
 				    /*if (!ImGui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
                     {
@@ -746,9 +737,7 @@ namespace wc
 					if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
 					{
 						if (ImGui::MenuItem("Set Child of Selected"))
-						{
 							m_Scene.SetChild(m_SelectedEntity, entity);
-						}
 					}
 
 					ImGui::Separator();
@@ -769,25 +758,19 @@ namespace wc
 				if (is_open)
 				{
 					for (const auto& child : children)
-					{
 						displayEntityRef(child, displayEntityRef);
-					}
 
 					ImGui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
 				}
 	        };
 
-			// Display root entities
 			for (const auto& name : m_Scene.GetParentEntityNames())
 			{
 				auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
 				if (rootEntity)
-				{
 					displayEntity(rootEntity, displayEntity);
-				}
 			}
 
-	        // "Empty space" drop target for clearing bonds
 	        if (dragMode && m_SelectedEntity != flecs::entity::null() && m_SelectedEntity.parent() != flecs::entity::null())
 	        {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
@@ -804,11 +787,8 @@ namespace wc
 	                    IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
 	                    flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
 
-	                    // Clear the bond (remove the child-parent relationship)
 	                    if (droppedEntity.parent() != flecs::entity::null())
-	                    {
 	                        m_Scene.RemoveChild(droppedEntity);
-	                    }
 	                }
 	                ImGui::EndDragDropTarget();
 	            }
@@ -827,9 +807,7 @@ namespace wc
                     ImGui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
 
                     if (ImGui::Button("Add Entity"))
-                    {
                         showPopup = true;
-                    }
 
                     ImGui::EndMenuBar();
                 }
@@ -865,9 +843,7 @@ namespace wc
 						        ImGui::CloseCurrentPopup();
 						    }
 						    else
-						    {
 						        ImGui::OpenPopup("WarnNameExists");
-						    }
 						}
 						else
 						{
@@ -906,6 +882,21 @@ namespace wc
 			ImGui::End();
 		}
 
+		template<typename T, typename UIFunc>
+		void EditComponent(const std::string& name, UIFunc uiFunc)
+		{
+			if (m_SelectedEntity.has<T>())
+			{
+				bool visible = true;
+
+				auto& component = *m_SelectedEntity.get_mut<T>();
+				if (ImGui::CollapsingHeader((name + "##header").c_str(), m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
+					uiFunc(component);
+
+				if (!visible) m_SelectedEntity.remove<T>(); // add modal popup
+			}
+		}
+
 		void UI_Properties()
 		{
 			if (ImGui::Begin("Properties", &showProperties))
@@ -920,31 +911,22 @@ namespace wc
 				        if (!nameBuffer.empty())
 				        {
 				            if (m_Scene.GetWorld().lookup(nameBuffer.c_str()) != flecs::entity::null())
-				            {
 				                ImGui::OpenPopup("WarnNameExists");
-				            }
 				            else
 				            {
-				                // Change name in lists
 				                if (m_SelectedEntity.parent() == flecs::entity::null())
 				                {
-				                    // Change the name in the parent entity list - is not a child
 				                    auto& parentNames = m_Scene.GetParentEntityNames();
 				                    for (auto& name : parentNames)
-				                    {
-				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer; // Update the name
-				                    }
+				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
 				                }
 				                else
 				                {
 				                    auto& childrenNames = m_SelectedEntity.parent().get_ref<ChildNamesComponent>()->childNames;
 				                    for (auto& name : childrenNames)
-				                    {
-				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer; // Update the name
-				                    }
+				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
 				                }
 
-				                // change name after changing lists
 				                m_SelectedEntity.set_name(nameBuffer.c_str());
 				            }
 				        }
@@ -963,94 +945,47 @@ namespace wc
 					//NOTE: for every new component, a new if statement is needed
 					ImGui::SeparatorText("Components");
 
-					if (m_SelectedEntity.has<TransformComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Transform##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto& p = *m_SelectedEntity.get<TransformComponent>();
-							auto& position = const_cast<glm::vec2&>(p.Translation);
-							auto& scale = const_cast<glm::vec2&>(p.Scale);
-						    auto& realRotation = const_cast<float&>(p.Rotation);
-						    auto rotation = glm::degrees(p.Rotation);
+					EditComponent<TransformComponent>("Transform", [](auto& component){
+						auto& realRotation = const_cast<float&>(component.Rotation);
+						auto rotation = glm::degrees(realRotation);
 
-							// Draw position UI
-							UI::DragButton2("Position", position);
-							UI::DragButton2("Scale", scale);
-						    UI::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
-						    realRotation = glm::radians(rotation);
-						}
+						UI::DragButton2("Position", component.Translation);
+						UI::DragButton2("Scale", component.Scale);
+						UI::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+						realRotation = glm::radians(rotation);
+					});
 
-						if (!visible) m_SelectedEntity.remove<TransformComponent>(); // add modal popup
-					}
+					EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
+						ImGui::ColorEdit4("color", glm::value_ptr(component.Color));
+						ImGui::Button("Texture");
+					});
 
-					if (m_SelectedEntity.has<SpriteRendererComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Sprite Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto& s = *m_SelectedEntity.get<SpriteRendererComponent>();
-							auto& color = const_cast<glm::vec4&>(s.Color);
-							ImGui::ColorEdit4("color", glm::value_ptr(color));
-							ImGui::Button("Texture");
-						}
+					EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
+						UI::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
+						UI::Slider("Fade", component.Fade, 0.0f, 1.0f);
+						ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+						});
 
-						if (!visible) m_SelectedEntity.remove<SpriteRendererComponent>();
-					}
-
-					if (m_SelectedEntity.has<CircleRendererComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Circle Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto& c = *m_SelectedEntity.get<CircleRendererComponent>();
-							auto& thickness = const_cast<float&>(c.Thickness);
-							auto& fade = const_cast<float&>(c.Fade);
-							auto& color = const_cast<glm::vec4&>(c.Color);
-
-							// Draw circle renderer UI
-							ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
-							ImGui::SliderFloat("Fade", &fade, 0.0f, 1.0f);
-							ImGui::ColorEdit4("Color", glm::value_ptr(color));
-						}
-
-						if (!visible) m_SelectedEntity.remove<CircleRendererComponent>(); // add modal popup
-					}
-
-					if (m_SelectedEntity.has<TextRendererComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Text Renderer##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto& t = *m_SelectedEntity.get<TextRendererComponent>();
-							auto& text = const_cast<std::string&>(t.Text);
-							//auto& font = const_cast<std::string&>(t.Font);
-							auto& color = const_cast<glm::vec4&>(t.Color);
-							// Draw text renderer UI
-							ImGui::InputText("Text", &text);
-							//ImGui::InputText("Font", &font);
-							ImGui::ColorEdit4("Color", glm::value_ptr(color));
-						}
-						if (!visible) m_SelectedEntity.remove<TextRendererComponent>(); // add modal popup
-					}
+					EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
+						//auto& font = const_cast<std::string&>(t.Font);
+						ImGui::InputText("Text", &component.Text);
+						//ImGui::InputText("Font", &font);
+						ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+					});
 
 					auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
 						{
 				            UI::Separator("Material");
 				            static int currentMaterialIndex = 0;  // Track the selected material
 
-				            // Get the current material name directly
 				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
 				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
 
-				            // Create a combo box with dynamic names
 				            if (ImGui::BeginCombo("Materials", currentMaterialName.c_str()))
 				            {
 				                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
                                 if (ImGui::Button("New Material", {ImGui::GetContentRegionAvail().x, 0}))
-                                {
                                     ImGui::OpenPopup("Create Material##popup");
-                                }
 				                ImGui::PopStyleColor();
 
 				                // TODO - add a popup for a new Material and save/load them
@@ -1059,7 +994,7 @@ namespace wc
 				                {
 				                    PhysicsMaterial newMaterial;
 
-				                    static std::string name = "";
+				                    static std::string name;
 				                    ImGui::InputText("Name", &name);
 				                    float size = ImGui::CalcItemWidth();
 
@@ -1072,24 +1007,24 @@ namespace wc
 				                    ImGui::SameLine();
 				                    ImGui::SetCursorPosX(size);
 				                    if (ImGui::Button("Cancel"))
-                                    {
                                         ImGui::CloseCurrentPopup();
-                                    }
+
 				                    ImGui::EndPopup();
 				                }
 				                ImGui::Separator();
 
 				                int index = 0;
-				                for (const auto& [name, mat] : m_Scene.Materials) {
+				                for (const auto& [name, mat] : m_Scene.Materials) 
+								{
 				                    bool isSelected = (currentMaterialIndex == index);
 				                    ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
-				                    if (ImGui::Selectable(name.c_str(), isSelected)) {
+				                    if (ImGui::Selectable(name.c_str(), isSelected))
 				                        currentMaterialIndex = index;
-				                    }
+				                    
                                     ImGui::PopStyleColor();
-				                    if (isSelected) {
+				                    if (isSelected) 
 				                        ImGui::SetItemDefaultFocus();
-				                    }
+				                    
 				                    ++index;
 				                }
 				                ImGui::EndCombo();
@@ -1117,85 +1052,56 @@ namespace wc
 							UI::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
 				            ImGui::EndGroup();
 				            ImGui::EndDisabled();
-				            if (currentMaterialName == "Default") ImGui::SetItemTooltip("Cannot edit Default material values");
+				            if (currentMaterialName == "Default") 
+								ImGui::SetItemTooltip("Cannot edit Default material values");
 
 				            material = curMaterial;
 
 						};
 
-					if (m_SelectedEntity.has<RigidBodyComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Rigid Body##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
+					EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
+
+						const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
+						const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
+
+						if (ImGui::BeginCombo("Body Type", currentBodyTypeString))
 						{
-							auto p = m_SelectedEntity.get_ref<RigidBodyComponent>();
-
-							const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
-							const char* currentBodyTypeString = bodyTypeStrings[(int)p->Type];
-
-							if (ImGui::BeginCombo("Body Type", currentBodyTypeString))
+							for (int i = 0; i < 3; i++)
 							{
-								for (int i = 0; i < 3; i++)
+								bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
+								if (ImGui::Selectable(bodyTypeStrings[i], &isSelected))
 								{
-									bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
-									if (ImGui::Selectable(bodyTypeStrings[i], &isSelected))
-									{
-										currentBodyTypeString = bodyTypeStrings[i];
-										p->Type = BodyType(i);
-									}
-
-									if (isSelected)
-										ImGui::SetItemDefaultFocus();
+									currentBodyTypeString = bodyTypeStrings[i];
+									component.Type = BodyType(i);
 								}
-								ImGui::EndCombo();
+
+								if (isSelected)
+									ImGui::SetItemDefaultFocus();
 							}
-
-							UI::Drag("Gravity Scale", p->GravityScale);
-							UI::Drag("Linear Damping", p->LinearDamping);
-							UI::Drag("Angular Damping", p->AngularDamping);
-							UI::Checkbox("Fixed Rotation", p->FixedRotation);
-							UI::Checkbox("Bullet", p->Bullet);
-							UI::Checkbox("Fast Rotation", p->FastRotation);
+							ImGui::EndCombo();
 						}
 
-						if (!visible) m_SelectedEntity.remove<RigidBodyComponent>(); // add modal popup
-					}
+						UI::Drag("Gravity Scale", component.GravityScale);
+						UI::Drag("Linear Damping", component.LinearDamping);
+						UI::Drag("Angular Damping", component.AngularDamping);
+						UI::Checkbox("Fixed Rotation", component.FixedRotation);
+						UI::Checkbox("Bullet", component.Bullet);
+						UI::Checkbox("Fast Rotation", component.FastRotation);
+					});
 
-					if (m_SelectedEntity.has<BoxCollider2DComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Box Collider##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto p = m_SelectedEntity.get_ref<BoxCollider2DComponent>();
-							auto& offset = const_cast<glm::vec2&>(p->Offset);
-							auto& size = const_cast<glm::vec2&>(p->Size);
+					EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
+						UI::DragButton2("Offset", component.Offset);
+						UI::DragButton2("Size", component.Size);
 
-							UI::DragButton2("Offset", offset);
-							UI::DragButton2("Size", size);
+						UI_PhysicsMaterial(component.Material);
+					});
 
-							UI_PhysicsMaterial(p->Material);
-						}
+					EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
+						UI::DragButton2("Offset", component.Offset);
+						UI::Drag("Radius", component.Radius);
 
-						if (!visible) m_SelectedEntity.remove<BoxCollider2DComponent>(); // add modal popup
-					}
-
-					if (m_SelectedEntity.has<CircleCollider2DComponent>())
-					{
-						bool visible = true;
-						if (ImGui::CollapsingHeader("Circle Collider##header", m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
-						{
-							auto p = m_SelectedEntity.get_ref<CircleCollider2DComponent>();
-							auto& offset = const_cast<glm::vec2&>(p->Offset);
-							auto& radius = const_cast<float&>(p->Radius);
-
-							UI::DragButton2("Offset", offset);
-							UI::Drag("Radius", radius);
-
-							UI_PhysicsMaterial(p->Material);
-						}
-
-						if (!visible) m_SelectedEntity.remove<CircleCollider2DComponent>(); // add modal popup
-					}
+						UI_PhysicsMaterial(component.Material);
+					});
 
 					static bool showAddComponent = false;
 					static enum { None, Transform, Render, Rigid } menu = None;
@@ -1213,9 +1119,7 @@ namespace wc
 								return true;
 							}
 							if (disabled)
-							{
 								ImGui::SetItemTooltip("You can't have more than one of this component!");
-							}
 
 							return false;
 						};
@@ -1250,9 +1154,8 @@ namespace wc
 
 							//Replace with an arrow button
 							if (menu != None && ImGui::ArrowButton("Back", ImGuiDir_Left))
-							{
 								menu = None;
-							}
+
 							ImGui::SameLine();
 
 						    const char* menuText = "";
@@ -1302,9 +1205,7 @@ namespace wc
 						}
 						ImGui::End();
 					}
-
 				}
-
 			}
 			ImGui::End();
 		}
@@ -1317,7 +1218,6 @@ namespace wc
 				{
 					//Globals.console.Clear();
 					Log::GetConsoleSink()->messages.clear();
-					
 				}
 				
 				ImGui::SameLine();
@@ -1362,9 +1262,7 @@ namespace wc
 						    ImGui::PopStyleColor();
 						}
 						else
-						{
 							UI::Text(msg.payload);
-						}
 					}
 
 					if (/*ScrollToBottom ||*/
@@ -1372,7 +1270,6 @@ namespace wc
 						ImGui::SetScrollHereY(1.f);
 				}
 				ImGui::EndChild();
-
 			}
 			ImGui::End();
 		}
@@ -1398,41 +1295,29 @@ namespace wc
 						setFolderStatesRecursively(entry.path(), state);
 					}
 				}
-				};
+			};
 
 			if (ImGui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
 			{
 				if (ImGui::BeginMenuBar())
 				{
 					if (ImGui::MenuItem("Import"))
-					{
 						WC_INFO("TODO - Implement Import");
-					}
 
 					if (ImGui::BeginMenu("View##Assets"))
 					{
 						if (ImGui::MenuItem("Show Icons", nullptr, &showIcons))
-						{
 							WC_INFO("Show Icons: {}", showIcons);
-						}
 
 						if (ImGui::MenuItem("Preview Assets", nullptr, &previewAsset))
-						{
 							WC_INFO("Preview Asset: {}", previewAsset);
-						}
 
 						if (ImGui::MenuItem("Collapse All"))
-						{
 							for (auto& [key, value] : folderStates)
-							{
 								value = false;
-							}
-						}
 
 						if (ImGui::MenuItem("Expand All"))
-						{
 							setFolderStatesRecursively(assetsPath, true);
-						}
 
 						ImGui::EndMenu();
 					}
@@ -1452,40 +1337,29 @@ namespace wc
 							const auto& fullPathStr = entry.path().string();
 							if (entry.is_directory())
 							{
-								// Use a selectable item for directories with a manual toggle for expanding/collapsing
-
-								// Initialize folder state if it doesn't exist
 								auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
 								bool& isOpen = it->second;
 
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 								ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
 								if (ImGui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
-								{
-									isOpen = !isOpen; // Toggle state
-								}
+									isOpen = !isOpen;
+
 								ImGui::PopStyleColor();
 								ImGui::PopStyleVar();
 								ImGui::SameLine();
-								// Handle the selectable for toggling folder expansion
-								if (ImGui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
-								{
-									selectedFolderPath = entry.path();
-								}
-								if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-								{
-									isOpen = !isOpen; // Toggle state
-								}
 
-								// If the folder is open, recursively display its contents
+								if (ImGui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+									selectedFolderPath = entry.path();
+								
+								if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+									isOpen = !isOpen;
+
 								if (isOpen)
-								{
-									displayDirectory(entry.path());  // Recursively show folder contents
-								}
+									displayDirectory(entry.path());
 							}
 							else
 							{
-								// Handle files (no expansion, just display)
 								ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 								ImGui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
 								if (ImGui::IsItemHovered())
@@ -1493,19 +1367,11 @@ namespace wc
 									if (previewAsset) ImGui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
 									if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-									{
 									    if (entry.path().extension() != ".scene")
-									    {
 										    if (openedFileNames.insert(fullPathStr).second)
-										    {
 											    openedFiles.push_back(entry.path());
-										    }
-									    }
 									    else
-									    {
 									        ImGui::OpenPopup("Confirm");
-									    }
-									}
 
 								    ImGui::SetNextWindowPos({ImGui::GetCursorScreenPos().x + ImGui::GetItemRectSize().x, ImGui::GetCursorScreenPos().y});
 									if (ImGui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
@@ -1525,9 +1391,8 @@ namespace wc
 							        }
 							        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
 							        if (ImGui::Button("Cancel##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Escape))
-							        {
 							            ImGui::CloseCurrentPopup();
-							        }
+
 							        ImGui::EndPopup();
 							    }
 							}
@@ -1651,9 +1516,7 @@ namespace wc
                                                if (entry.path().extension() != ".scene")
                                                {
 										            if (openedFileNames.insert(entry.path().string()).second)
-										            {
 											    	    openedFiles.push_back(entry.path());
-										            }
                                                }
                                                else
 										        ImGui::OpenPopup("Confirm");
@@ -1667,19 +1530,19 @@ namespace wc
 										ImGui::EndGroup();
 
 									    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
-                                           {
-                                               ImGui::Text("Are you sure you want to load this scene?");
-                                               if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
-                                               {
-                                                   m_Scene.Load(entry.path().string());
-                                                   ImGui::CloseCurrentPopup();
-                                               }
+                                        {
+                                            ImGui::Text("Are you sure you want to load this scene?");
+                                            if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                            {
+                                                m_Scene.Load(entry.path().string());
+                                                ImGui::CloseCurrentPopup();
+                                            }
 
-									        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
-									        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+									     ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+									     if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
-                                               ImGui::EndPopup();
-                                           }
+                                            ImGui::EndPopup();
+                                        }
 
 									}
 									i++;
@@ -1707,10 +1570,7 @@ namespace wc
 			{
 				bool open = true;
 				if (ImGui::Begin(it->filename().string().c_str(), &open))
-				{
 					ImGui::Text("File: %s", it->string().c_str());
-
-				}
 				ImGui::End();
 
 				if (!open)
@@ -1719,9 +1579,7 @@ namespace wc
 					it = openedFiles.erase(it);
 				}
 				else
-				{
 					++it;
-				}
 			}
 		}
 
@@ -1830,7 +1688,7 @@ namespace wc
 				}
 
 				// Simplified Settings (expose floating-pointer border sizes as boolean representing 0.0f or 1.0f)
-				if (ImGui::SliderFloat("FrameRounding", &style.FrameRounding, 0.0f, 12.0f, "%.0f"))
+				if (UI::Slider("Frame rounding", style.FrameRounding, 0.0f, 12.0f, "%.0f"))
 					style.GrabRounding = style.FrameRounding; // Make GrabRounding always the same value as FrameRounding
 				{ bool border = (style.WindowBorderSize > 0.0f); if (UI::Checkbox("WindowBorder", border)) { style.WindowBorderSize = border ? 1.0f : 0.0f; } }
 				ImGui::SameLine();
@@ -1846,53 +1704,53 @@ namespace wc
 					if (ImGui::BeginTabItem("Sizes"))
 					{
 						UI::Separator("Main");
-						ImGui::SliderFloat2("WindowPadding", (float*)&style.WindowPadding, 0.0f, 20.0f, "%.0f");
-						ImGui::SliderFloat2("FramePadding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
-						ImGui::SliderFloat2("ItemSpacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
-						ImGui::SliderFloat2("ItemInnerSpacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
-						ImGui::SliderFloat2("TouchExtraPadding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
-						ImGui::SliderFloat("IndentSpacing", &style.IndentSpacing, 0.0f, 30.0f, "%.0f");
-						ImGui::SliderFloat("ScrollbarSize", &style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
-						ImGui::SliderFloat("GrabMinSize", &style.GrabMinSize, 1.0f, 20.0f, "%.0f");
+						UI::Slider2("WindowPadding", (float*)(&style.WindowPadding), 0.0f, 20.0f, "%.0f");
+						UI::Slider2("FramePadding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
+						UI::Slider2("ItemSpacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
+						UI::Slider2("ItemInnerSpacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
+						UI::Slider2("TouchExtraPadding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
+						UI::Slider("IndentSpacing", style.IndentSpacing, 0.0f, 30.0f, "%.0f");
+						UI::Slider("ScrollbarSize", style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
+						UI::Slider("GrabMinSize", style.GrabMinSize, 1.0f, 20.0f, "%.0f");
 
 						UI::Separator("Borders");
-						ImGui::SliderFloat("WindowBorderSize", &style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
-						ImGui::SliderFloat("ChildBorderSize", &style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
-						ImGui::SliderFloat("PopupBorderSize", &style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
-						ImGui::SliderFloat("FrameBorderSize", &style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
-						ImGui::SliderFloat("TabBorderSize", &style.TabBorderSize, 0.0f, 1.0f, "%.0f");
-						ImGui::SliderFloat("TabBarBorderSize", &style.TabBarBorderSize, 0.0f, 2.0f, "%.0f");
+						UI::Slider("WindowBorderSize", style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
+						UI::Slider("ChildBorderSize", style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
+						UI::Slider("PopupBorderSize", style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
+						UI::Slider("FrameBorderSize", style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
+						UI::Slider("TabBorderSize", style.TabBorderSize, 0.0f, 1.0f, "%.0f");
+						UI::Slider("TabBarBorderSize", style.TabBarBorderSize, 0.0f, 2.0f, "%.0f");
 
 						UI::Separator("Rounding");
-						ImGui::SliderFloat("WindowRounding", &style.WindowRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("ChildRounding", &style.ChildRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("FrameRounding", &style.FrameRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("PopupRounding", &style.PopupRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("ScrollbarRounding", &style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("GrabRounding", &style.GrabRounding, 0.0f, 12.0f, "%.0f");
-						ImGui::SliderFloat("TabRounding", &style.TabRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("WindowRounding", style.WindowRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("ChildRounding", style.ChildRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("FrameRounding", style.FrameRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("PopupRounding", style.PopupRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("ScrollbarRounding", style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("GrabRounding", style.GrabRounding, 0.0f, 12.0f, "%.0f");
+						UI::Slider("TabRounding", style.TabRounding, 0.0f, 12.0f, "%.0f");
 
 						UI::Separator("Tables");
-						ImGui::SliderFloat2("CellPadding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
+						UI::Slider2("CellPadding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
 						ImGui::SliderAngle("TableAngledHeadersAngle", &style.TableAngledHeadersAngle, -50.0f, +50.0f);
 
 						UI::Separator("Widgets");
-						ImGui::SliderFloat2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
+						UI::Slider2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
 						auto window_menu_button_position = style.WindowMenuButtonPosition + 1;
 						if (ImGui::Combo("WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
 							style.WindowMenuButtonPosition = (ImGuiDir)(window_menu_button_position - 1);
 						ImGui::Combo("ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
-						ImGui::SliderFloat2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
+						UI::Slider2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
 						ImGui::SameLine(); UI::HelpMarker("Alignment applies when a button is larger than its text content.");
-						ImGui::SliderFloat2("SelectableTextAlign", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
+						UI::Slider2("SelectableTextAlign", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
 						ImGui::SameLine(); UI::HelpMarker("Alignment applies when a selectable is larger than its text content.");
-						ImGui::SliderFloat("SeparatorTextBorderSize", &style.SeparatorTextBorderSize, 0.0f, 10.0f, "%.0f");
-						ImGui::SliderFloat2("SeparatorTextAlign", (float*)&style.SeparatorTextAlign, 0.0f, 1.0f, "%.2f");
-						ImGui::SliderFloat2("SeparatorTextPadding", (float*)&style.SeparatorTextPadding, 0.0f, 40.0f, "%.0f");
-						ImGui::SliderFloat("LogSliderDeadzone", &style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
+						UI::Slider("SeparatorTextBorderSize", style.SeparatorTextBorderSize, 0.0f, 10.0f, "%.0f");
+						UI::Slider2("SeparatorTextAlign", (float*)&style.SeparatorTextAlign, 0.0f, 1.0f, "%.2f");
+						UI::Slider2("SeparatorTextPadding", (float*)&style.SeparatorTextPadding, 0.0f, 40.0f, "%.0f");
+						UI::Slider("LogSliderDeadzone", style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
 
 						UI::Separator("Docking");
-						ImGui::SliderFloat("DockingSplitterSize", &style.DockingSeparatorSize, 0.0f, 12.0f, "%.0f");
+						UI::Slider("DockingSplitterSize", style.DockingSeparatorSize, 0.0f, 12.0f, "%.0f");
 
 						ImGui::SeparatorText("Tooltips");
 						for (int n = 0; n < 2; n++)
@@ -1908,7 +1766,7 @@ namespace wc
 							}
 
 						ImGui::SeparatorText("Misc");
-						ImGui::SliderFloat2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f"); ImGui::SameLine(); UI::HelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
+						UI::Slider2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f"); ImGui::SameLine(); UI::HelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
 
 						ImGui::EndTabItem();
 					}
@@ -2066,29 +1924,21 @@ namespace wc
 					if (ImGui::BeginMenu("File"))
 					{
 						if (ImGui::MenuItem("New Project"))
-						{
 							WC_CORE_INFO("New");
-						}
 
 						if (ImGui::MenuItem("Open Project"))
 						{
 						    auto filepath = FileDialogs::OpenFile(Globals.window, "Blaze Scene (*.scene)\0*.scene\0");
 
 						    if (!filepath.empty())
-                            {
                                 m_Scene.Load(filepath);
-                            }
 						}
 
 						if (ImGui::MenuItem("Save"))
-						{
 							m_Scene.Save("testScene.scene");
-						}
 
 						if (ImGui::MenuItem("Save As"))
-						{
 							WC_CORE_INFO("Save As");
-						}
 
 						ImGui::EndMenu();
 					}
@@ -2130,10 +1980,8 @@ namespace wc
 					            }
 					        }
 
-					        if (currentTheme == 0 && ImGui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
-					        {
+					        if (currentTheme == 0 && UI::Slider("Hue", hue, 0.0f, 1.0f))
 					            ImGui::GetStyle() = UI::SoDark(hue);
-					        }
 
 					        ImGui::EndMenu();
 					    }

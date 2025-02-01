@@ -209,9 +209,6 @@ namespace wc
 			createInfo.renderPass = rp.renderPass;
 			createInfo.renderSize = { rp.renderWidth, rp.renderHeight };
 
-			createInfo.blending = true;
-			createInfo.depthTest = false;
-
 			createInfo.topology = spec.topology;
 			createInfo.bindingFlags = spec.bindingFlags;
 			createInfo.bindingFlagCount = spec.bindingFlagCount;

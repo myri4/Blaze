@@ -480,11 +480,13 @@ void ImGui_ImplVulkan_Init(VkRenderPass rp)
     bd->RenderPass = rp;
 
 	// Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling.
-	//color_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	wc::ShaderCreateInfo createInfo;
 	createInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	wc::ReadBinary("assets/shaders/imgui.vert", createInfo.binaries[0]);
 	wc::ReadBinary("assets/shaders/imgui.frag", createInfo.binaries[1]);
+    auto blending = wc::CreateBlendAttachment();
+    blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    createInfo.blendAttachments.push_back(blending);
 	createInfo.renderPass = bd->RenderPass;
 	VkDynamicState dynamic_states[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	createInfo.dynamicStateCount = std::size(dynamic_states);

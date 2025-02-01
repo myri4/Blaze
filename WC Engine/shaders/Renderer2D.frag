@@ -3,13 +3,16 @@
 
 layout(binding = 0) uniform sampler2D u_Textures[];
 
-layout(location = 0) in vec2 v_TexCoords;
-layout(location = 1) in flat uint v_TexID;
-layout(location = 2) in vec4 v_Color;
-layout(location = 3) in float v_Fade;
-layout(location = 4) in float v_Thickness;
+
+layout(location = 0) in flat uint v_TexID;
+layout(location = 1) in vec2 v_TexCoords;
+layout(location = 2) in float v_Fade;
+layout(location = 3) in float v_Thickness;
+layout(location = 4) in flat ivec2 v_EntityID;
+layout(location = 5) in vec4 v_Color;
 
 layout(location = 0) out vec4 FragColor;
+layout(location = 1) out ivec2 EntityID;
 
 const float pxRange = 2.f;
 
@@ -52,5 +55,6 @@ void main()
         FragColor = mix(vec4(0.f), v_Color, opacity);
     }
 
-    if (v_TexID != 0 && v_Thickness >= 0.f) FragColor.rgb *= 0.3f;
+    EntityID = v_EntityID;
+    if (FragColor.a <= 0.f) discard; 
 }

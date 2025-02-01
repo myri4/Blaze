@@ -99,13 +99,13 @@ namespace wc
 				// Remove the child's name from the parent's ChildNamesComponent
 				auto& childNames = parent.get_ref<ChildNamesComponent>()->childNames;
 				auto childIt = std::remove(childNames.begin(), childNames.end(), ent.name().c_str());
-				if (childIt != childNames.end()) {
+				if (childIt != childNames.end()) 
+				{
 					childNames.erase(childIt, childNames.end());
 
 					// If it was the last child, remove the ChildNamesComponent from the parent
-					if (childNames.empty()) {
-						parent.remove<ChildNamesComponent>();
-					}
+					if (childNames.empty()) 
+						parent.remove<ChildNamesComponent>();					
 				}
 			}
 
@@ -493,8 +493,7 @@ namespace wc
 
 		bool Load(const std::string& filepath, const bool clear = true)
 		{
-
-		    if (clear)DeleteAllEntities();
+		    if (clear) DeleteAllEntities();
 			if (!std::filesystem::exists(filepath))
 			{
 				WC_CORE_ERROR("{} does not exist.", filepath);
@@ -502,6 +501,7 @@ namespace wc
 			}
 
 			fromYAML(YAML::LoadFile(filepath));
+			return true;
 		}
 
 		void Copy(const Scene& FromWorld)
