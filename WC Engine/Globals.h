@@ -10,6 +10,12 @@ namespace wc
 	{
 		Window window; // @TODO: maybe rename to main window
 
+	    // Change size if needed
+	    ImFont* fontDeffault = nullptr;
+	    ImFont* fontBig = nullptr;
+	    //ImFont* fontSmall = nullptr;
+	    //ImFont* fontBold = nullptr;
+
 		Clock deltaTimer;
 		float deltaTime = 0.f;
 

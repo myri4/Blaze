@@ -21,19 +21,19 @@
 #include <wc/Utils/YAML.h>
 #include <wc/Utils/FileDialogs.h>
 
-//ECS
-#include "Scene/Scene.h"
-
 // GUI
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 #include <imguizmo/ImGuizmo.h>
 
+//ECS
+#include "Scene/Scene.h"
+
 #include "Globals.h"
+#include "UI/Widgets.h"
 #include "Project/Project.h"
 #include "Rendering/Renderer2D.h"
-#include "UI/Widgets.h"
 #include "Scripting/Script.h"
 
 namespace wc
@@ -179,7 +179,6 @@ namespace wc
 		float ZoomSpeed = 2.f;
 	    b2DebugDraw m_PhysicsDebugDraw;
 
-
     public:
 	    AssetManager assetManager;
 
@@ -230,6 +229,8 @@ namespace wc
                 true, // friction
                // &m_RenderData 
 			};
+
+	        Project::LoadSavedProjects();
 
 			//blaze::Script script;
 			//script.LoadFromFile("test.lua");
@@ -332,7 +333,7 @@ namespace wc
 			if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
 			    m_Scene.Update();
 
-			if (Project::Exists())Render();
+	        if (Project::Exists()) Render();
 		}
 
 		void ChangeSceneState(SceneState newState)
@@ -844,7 +845,7 @@ namespace wc
                 }
 
 			    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				if (ImGui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+				if (ImGui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 				{
 					ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 					ImVec2 windowSize = ImGui::GetWindowSize();
@@ -1056,7 +1057,7 @@ namespace wc
 
 				                // TODO - add a popup for a new Material and save/load them
 				                ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				                if (ImGui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+				                if (ImGui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 				                {
 				                    PhysicsMaterial newMaterial;
 
@@ -1516,7 +1517,7 @@ namespace wc
 									}
 								}
 
-							    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+							    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollbar))
 							    {
 							        ImGui::Text("Are you sure you want to load this scene?");
 							        if (ImGui::Button("Yes##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Enter))
@@ -1524,7 +1525,7 @@ namespace wc
 							            m_Scene.Load(entry.path().string());
 							            ImGui::CloseCurrentPopup();
 							        }
-							        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+							        ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
 							        if (ImGui::Button("Cancel##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Escape))
 							        {
 							            ImGui::CloseCurrentPopup();
@@ -1667,7 +1668,7 @@ namespace wc
 										ImGui::PopTextWrapPos();
 										ImGui::EndGroup();
 
-									    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+									    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
                                            {
                                                ImGui::Text("Are you sure you want to load this scene?");
                                                if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
@@ -1676,7 +1677,7 @@ namespace wc
                                                    ImGui::CloseCurrentPopup();
                                                }
 
-									        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
+									        ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
 									        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
                                                ImGui::EndPopup();
@@ -2038,40 +2039,45 @@ namespace wc
 			ImGui::SetNextWindowSize(viewport->WorkSize);
 			ImGui::SetNextWindowViewport(viewport->ID);
 
-			/*ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));*/
+	        if (Project::Exists())
+	        {
+			    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+			    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	        }
 
 			if (ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
 				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
 				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground))
 			{
-				// ImGui::PopStyleVar(3);
-
 			    if (!Project::Exists())
 			    {
-			        static bool shouldOpenProjPopup = false; // New persistent flag
+			        static bool openProjNamePopup = false; // New persistent flag
 
+			        ImGui::PushFont(Globals.fontBig);
 			        if (ImGui::Button("New Project"))
 			        {
 			            ImGui::OpenPopup("New Project");
 			        }
+			        ImGui::PopFont();
 
 			        // File dialog logic
-			        std::string path = UI::FileDialog("New Project", ".", true);
-			        static std::string savePath;
-			        if (!path.empty())
+			        std::string newProjectPath = UI::FileDialog("New Project", ".");
+			        static std::string newProjectSavePath;
+			        if (!newProjectPath.empty())
 			        {
-			            savePath = path;
-			            shouldOpenProjPopup = true;
+			            newProjectSavePath = newProjectPath;
+			            openProjNamePopup = true;
 			        }
 
-			        if (shouldOpenProjPopup)
+			        if (openProjNamePopup)
 			        {
-			            ImGui::OpenPopup("Proj");
+			            ImGui::OpenPopup("New Project - Name");
+			            openProjNamePopup = false;
 			        }
 
-			        if (ImGui::BeginPopupModal("Proj", nullptr, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+			        UI::CenterNextWindow();
+			        if (ImGui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 			        {
 			            static std::string projName = "Untitled";
 			            ImGui::InputText("Project Name", &projName);
@@ -2079,29 +2085,105 @@ namespace wc
 			            ImGui::BeginDisabled(projName.empty());
 			            if (ImGui::Button("OK"))
 			            {
-			                //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
-			                Project::Create(savePath, projName);
-			                savePath.clear();
-			                shouldOpenProjPopup = false;
-			                ImGui::CloseCurrentPopup();
+			                if (Project::ExistListProj(projName))
+			                {
+			                    ImGui::OpenPopup("Project Already Exists");
+			                }
+			                else
+			                {
+			                    Project::Create(newProjectSavePath, projName);
+			                    newProjectSavePath.clear();
+			                    openProjNamePopup = false;
+			                    ImGui::CloseCurrentPopup();
+			                }
 			            }
 			            ImGui::EndDisabled();
 			            if (projName.empty())ImGui::SetItemTooltip("Project name cannot be empty!");
 
-			            ImGui::SameLine();
+			            ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
 			            if (ImGui::Button("Cancel"))
 			            {
 			                projName = "Untitled";
-			                savePath.clear();
-			                shouldOpenProjPopup = false;
+			                newProjectSavePath.clear();
+			                openProjNamePopup = false;
 			                ImGui::CloseCurrentPopup();
 			            }
 
+			            UI::CenterNextWindow();
+                        if (ImGui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+                        {
+                            ImGui::Text("Project with this name already exists!");
+                            if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
 			            ImGui::EndPopup();
 			        }
+
+			        ImGui::SameLine();
+
+			        ImGui::PushFont(Globals.fontBig);
+			        if (ImGui::Button("Open Project"))
+			        {
+			            ImGui::OpenPopup("Open Project");
+			        }
+			        ImGui::PopFont();
+			        std::string openProjectPath = UI::FileDialog("Open Project", ".");
+			        if (!openProjectPath.empty())
+                    {
+                        Project::Load(openProjectPath);
+                    }
+
+			        ImGui::Separator();
+
+			        if (ImGui::BeginChild("Project Display", ImVec2(0, 0)))
+			        {
+			            ImGui::PushFont(Globals.fontBig);
+			            for (auto project : Project::savedProjectPaths)
+                        {
+			                std::filesystem::path path = project;
+			                if (std::filesystem::exists(path))
+			                {
+			                    if (ImGui::Button((path.filename().string() + "##" + path.string()).c_str()))
+                                {
+                                    Project::Load(project);
+                                }
+
+			                    ImGui::SameLine(0, 100);
+			                    ImGui::Text("FullPath: %s", project.c_str());
+			                    ImGui::SameLine();
+			                    if (ImGui::Button(("Delete##" + path.string()).c_str()))
+			                    {
+			                        ImGui::OpenPopup("Delete Project");
+			                    }
+			                }
+			                else WC_CORE_WARN("Project path does not exist: {0}", project);
+
+			                UI::CenterNextWindow();
+			                if (ImGui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			                {
+			                    ImGui::Text("Are you sure you want to delete this project?");
+			                    if (ImGui::Button("Yes##Delete"))
+			                    {
+			                        Project::Delete(project);
+			                        ImGui::CloseCurrentPopup();
+			                    }
+
+			                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("No").x - ImGui::GetStyle().FramePadding.x * 2);
+			                    if (ImGui::Button("No##Delete")) ImGui::CloseCurrentPopup();
+
+			                    ImGui::EndPopup();
+			                }
+                        }
+			            ImGui::PopFont();
+			        }
+			        ImGui::EndChild();
+
 			    }
 			    else
 			    {
+			        ImGui::PopStyleVar(3);
+
 			        ImGuiIO& io = ImGui::GetIO();
 			        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 			        {
@@ -2121,30 +2203,74 @@ namespace wc
 
 			            if (ImGui::BeginMenu("File"))
 			            {
-                            ImGui::SeparatorText("Project");
-			                ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - (ImGui::CalcTextSize(Project::name.c_str()).x + ImGui::CalcTextSize("[]").x)) * 0.5f);
-			                ImGui::Text("[%s]", Project::name.c_str());
+                            ImGui::SeparatorText(("Project: [" + Project::name + "]").c_str());
 
-			                if (ImGui::MenuItem("Change Project", "CTRL + P"))
+			                if (ImGui::MenuItem("Change", "CTRL + P"))
                             {
                                 Project::Clear();
                             }
 
 			                ImGui::SeparatorText("Scene");
 
-			                if (ImGui::MenuItem("New"))
+			                static bool openSceneNamePopup = false; // New persistent flag
+			                if (UI::MenuItemButton("New", "CTRL + N", false))
 			                {
-			                    WC_INFO("New Scene");
+                                ImGui::OpenPopup("New Scene");
+			                }
+			                std::string newScenePath = UI::FileDialog("New Scene", ".", Project::rootPath);
+			                static std::string newSceneSavePath;
+			                if (!newScenePath.empty())
+                            {
+			                    newSceneSavePath = newScenePath;
+                                openSceneNamePopup = true;
+                            }
+
+			                if (openSceneNamePopup)
+			                {
+			                    ImGui::OpenPopup("New Scene - Name");
+			                    openSceneNamePopup = false;
 			                }
 
-			                if (ImGui::MenuItem("Open"))
+			                UI::CenterNextWindow();
+			                if (ImGui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 			                {
-			                    auto filepath = FileDialogs::OpenFile(Globals.window, "Blaze Scene (*.scene)\0*.scene\0");
+			                    static std::string projName = "Untitled";
+			                    ImGui::InputText("Project Name", &projName);
 
-			                    if (!filepath.empty())
+			                    ImGui::BeginDisabled(projName.empty());
+			                    if (ImGui::Button("OK"))
 			                    {
-			                        m_Scene.Load(filepath);
+			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
+			                        Project::Create(newSceneSavePath, projName);
+			                        projName = "Untitled";
+			                        newSceneSavePath.clear();
+			                        openSceneNamePopup = false;
+			                        ImGui::CloseCurrentPopup();
 			                    }
+			                    ImGui::EndDisabled();
+			                    if (projName.empty())ImGui::SetItemTooltip("Project name cannot be empty!");
+
+			                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
+			                    if (ImGui::Button("Cancel"))
+			                    {
+			                        projName = "Untitled";
+			                        newSceneSavePath.clear();
+			                        openSceneNamePopup = false;
+			                        ImGui::CloseCurrentPopup();
+			                    }
+
+			                    ImGui::EndPopup();
+			                }
+
+			                if (UI::MenuItemButton("Open", "CTRL + O", false))
+			                {
+			                    ImGui::OpenPopup("Open Scene");
+			                }
+			                std::string sOpenPath = UI::FileDialog("Open Scene", ".scene", Project::rootPath);
+			                if (!sOpenPath.empty())
+			                {
+			                    m_Scene.Load(sOpenPath);
+			                    ImGui::CloseCurrentPopup();
 			                }
 
 			                ImGui::SeparatorText("File");
