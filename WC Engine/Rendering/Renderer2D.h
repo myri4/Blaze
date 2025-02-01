@@ -331,6 +331,9 @@ namespace wc
 		vk::Image m_OutputImage;
 		vk::ImageView m_OutputImageView;
 
+		vk::Image m_EntityImage;
+		vk::ImageView m_EntityImageView;
+
 
 		Shader m_Shader;
 		VkDescriptorSet m_DescriptorSet;
@@ -389,21 +392,34 @@ namespace wc
 			}
 
 			{
-				VkAttachmentDescription attachmentDescription = {
-					.format = VK_FORMAT_R32G32B32A32_SFLOAT, // @WARNING: if the image format is changed this should also be changed
-					.samples = VK_SAMPLE_COUNT_1_BIT,
-					.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-					.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-					.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-					.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-					.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-					.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+				VkAttachmentDescription attachmentDescriptions[] = {
+					{
+						.format = VK_FORMAT_R32G32B32A32_SFLOAT, // @WARNING: if the image format is changed this should also be changed
+						.samples = VK_SAMPLE_COUNT_1_BIT,
+						.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+						.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+						.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+						.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+						.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+						.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+					},
+					{
+						.format = VK_FORMAT_R32G32_SINT, // @WARNING: if the image format is changed this should also be changed
+						.samples = VK_SAMPLE_COUNT_1_BIT,
+						.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+						.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+						.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+						.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+						.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+						.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+					}
 				};
 
 				// Collect attachment references
 				std::vector<VkAttachmentReference> colorReferences;
 
 				colorReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+				colorReferences.push_back({ 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 				VkSubpassDescription subpass = {
 					.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 					.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size()),
@@ -436,8 +452,8 @@ namespace wc
 				// Create render pass
 				VkRenderPassCreateInfo renderPassInfo = {
 					.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-					.attachmentCount = 1,
-					.pAttachments = &attachmentDescription,
+					.attachmentCount = std::size(attachmentDescriptions),
+					.pAttachments = attachmentDescriptions,
 					.subpassCount = 1,
 					.pSubpasses = &subpass,
 					.dependencyCount = dependencies.size(),
@@ -472,6 +488,8 @@ namespace wc
 
 				createInfo.dynamicStateCount = std::size(dynamicStates);
 				createInfo.dynamicState = dynamicStates;
+				createInfo.blendAttachments.push_back(CreateBlendAttachment());
+				createInfo.blendAttachments.push_back(CreateBlendAttachment(false));
 
 				m_Shader.Create(createInfo);
 
@@ -496,6 +514,8 @@ namespace wc
 				createInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 				createInfo.dynamicStateCount = std::size(dynamicStates);
 				createInfo.dynamicState = dynamicStates;
+				createInfo.blendAttachments.push_back(CreateBlendAttachment());
+				createInfo.blendAttachments.push_back(CreateBlendAttachment(false));
 
 				m_LineShader.Create(createInfo);
 			}
@@ -512,20 +532,35 @@ namespace wc
 				imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 				imageInfo.width = m_RenderSize.x;
 				imageInfo.height = m_RenderSize.y;
-				imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT /*| VK_IMAGE_USAGE_STORAGE_BIT*/;
+				imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT/*| VK_IMAGE_USAGE_STORAGE_BIT*/;
 
 				m_OutputImage.Create(imageInfo);
 				m_OutputImage.SetName(std::format("Renderer2D::OutputImage"));
 
 				m_OutputImageView.Create(m_OutputImage);
-				m_OutputImageView.SetName(std::format("Renderer2D::OutputImage"));
+				m_OutputImageView.SetName(std::format("Renderer2D::OutputImageView"));
 			}
 
+			{
+				vk::ImageSpecification imageInfo;
+				imageInfo.format = VK_FORMAT_R32G32_SINT;
+				imageInfo.width = m_RenderSize.x;
+				imageInfo.height = m_RenderSize.y;
+				imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+				m_EntityImage.Create(imageInfo);
+				m_EntityImage.SetName(std::format("Renderer2D::EntityImage"));
+
+				m_EntityImageView.Create(m_EntityImage);
+				m_EntityImageView.SetName(std::format("Renderer2D::EntityImageView"));
+			}
+
+			VkImageView attachments[] = { m_OutputImageView,m_EntityImageView };
 			VkFramebufferCreateInfo framebufferInfo = {
 				.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass = m_RenderPass,
-				.attachmentCount = 1,
-				.pAttachments = &m_OutputImageView,
+				.attachmentCount = std::size(attachments),
+				.pAttachments = attachments,
 				.width = (uint32_t)m_RenderSize.x,
 				.height = (uint32_t)m_RenderSize.y,
 				.layers = 1,
@@ -576,14 +611,14 @@ namespace wc
 
 			bloom.SetUp(m_OutputImageView);
 			composite.SetUp(m_ScreenSampler, GetImageBuffer(), m_OutputImageView, bloom.GetOutput());
-			//{
-			//
-			//	auto output = GetImageBuffer();
-			//	auto input = GetImageBuffer();
-			//	crt.SetUp(m_ScreenSampler, output, input);
-			//}
+			{
 
-			ImguiImageID = MakeImGuiDescriptor(ImguiImageID, { m_ScreenSampler, /*m_FinalImageView[m_FinalPass]*/m_OutputImageView, VK_IMAGE_LAYOUT_GENERAL });
+				auto output = GetImageBuffer();
+				auto input = GetImageBuffer();
+				crt.SetUp(m_ScreenSampler, output, input);
+			}
+
+			ImguiImageID = MakeImGuiDescriptor(ImguiImageID, { m_ScreenSampler, m_FinalImageView[0]/*m_OutputImageView*/, VK_IMAGE_LAYOUT_GENERAL});
 		}
 
 		void Resize(glm::vec2 newSize)
@@ -599,6 +634,9 @@ namespace wc
 
 			m_OutputImage.Destroy();
 			m_OutputImageView.Destroy();
+
+			m_EntityImage.Destroy();
+			m_EntityImageView.Destroy();
 
 			m_ScreenSampler.Destroy();
 
@@ -646,10 +684,12 @@ namespace wc
 
 				rpInfo.renderPass = m_RenderPass;
 				rpInfo.framebuffer = m_Framebuffer;
-				rpInfo.clearValueCount = 1;
-				VkClearValue clearValue;
-				clearValue.color = { 0.f, 0.f, 0.f, 1.f };
-				rpInfo.pClearValues = &clearValue;
+				VkClearValue clearValues[] = { 
+					{.color = {0.f, 0.f, 0.f, 1.f}},
+					{.color = {0, 0, 0, 0}}
+				};
+				rpInfo.clearValueCount = std::size(clearValues);
+				rpInfo.pClearValues = clearValues;
 
 				rpInfo.renderArea.extent = { (uint32_t)m_RenderSize.x, (uint32_t)m_RenderSize.y };
 
@@ -713,11 +753,11 @@ namespace wc
 
 			{
 				CommandEncoder cmd;
-				//bloom.Execute(cmd);
-				//composite.Execute(cmd, m_RenderSize);
-				//crt.Execute(cmd, m_RenderSize, time);
+				bloom.Execute(cmd);
+				composite.Execute(cmd, m_RenderSize);
+				crt.Execute(cmd, m_RenderSize, time);
 
-				//cmd.ExecuteCompute(m_ComputeCmd[CURRENT_FRAME]);
+				cmd.ExecuteCompute(m_ComputeCmd[CURRENT_FRAME]);
 			}
 		}
 	};

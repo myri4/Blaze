@@ -334,5 +334,47 @@ namespace wc
 		//bool DragIntRange2(const char* label, int* v_current_min, int* v_current_max, float v_speed = 1.0f, int v_min = 0, int v_max = 0, const char* format = "%d", const char* format_max = NULL, ImGuiSliderFlags flags = 0);
 		//bool DragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed = 1.0f, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
 		//bool DragScalarN(const char* label, ImGuiDataType data_type, void* p_data, int components, float v_speed = 1.0f, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
+
+		bool Slider(const std::string& label, float& v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalar(label.c_str(), ImGuiDataType_Float, &v, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider2(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 2, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider3(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 3, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider4(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 4, &v_min, &v_max, format, flags);
+		}
+
+		//bool ImGui::SliderAngle(const char* label, float* v_rad, float v_degrees_min, float v_degrees_max, const char* format, ImGuiSliderFlags flags)
+
+		bool Slider(const std::string& label, int& v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalar(label.c_str(), ImGuiDataType_S32, &v, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider2(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 2, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider3(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 3, &v_min, &v_max, format, flags);
+		}
+
+		bool Slider4(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 4, &v_min, &v_max, format, flags);
+		}
 	}
 }

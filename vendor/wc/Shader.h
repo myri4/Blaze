@@ -32,6 +32,23 @@ namespace wc
 		file.close();
 	}
 
+	inline auto CreateBlendAttachment(bool enable = true)
+	{
+		VkPipelineColorBlendAttachmentState colorBlend = {
+			.blendEnable = enable,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+		};
+		return colorBlend;
+	}
+
 	struct ShaderCreateInfo
 	{
 		std::vector<uint32_t> binaries[2];
@@ -39,7 +56,7 @@ namespace wc
 		glm::vec2 renderSize = glm::vec2(0.f);
 		VkRenderPass renderPass;
 
-		bool blending = true;
+		std::vector<VkPipelineColorBlendAttachmentState> blendAttachments;
 		bool depthTest = false;
 
 		VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -294,21 +311,7 @@ namespace wc
 			VkRect2D scissor = {
 				.offset = { 0, 0 },
 				.extent = { (uint32_t)createInfo.renderSize.x, (uint32_t)createInfo.renderSize.y },
-			};
-
-			//a single blend attachment with no blending and writing to RGBA
-			VkPipelineColorBlendAttachmentState colorBlend = {
-				.blendEnable = createInfo.blending,
-				.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-				.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-
-				.colorBlendOp = VK_BLEND_OP_ADD,
-				.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-				.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-				.alphaBlendOp = VK_BLEND_OP_ADD,
-
-				.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-			};
+			};			
 
 			VkPipelineDepthStencilStateCreateInfo depthStencil = {
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -329,28 +332,25 @@ namespace wc
 				.pViewports = &viewport,
 				.scissorCount = 1,
 				.pScissors = &scissor,
-			};
+			};			
 
 			VkPipelineColorBlendStateCreateInfo colorBlending = { 
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 
 				.logicOpEnable = false,
 				.logicOp = VK_LOGIC_OP_COPY,
-				.attachmentCount = 1,
-				.pAttachments = &colorBlend,
+				.attachmentCount = (uint32_t)createInfo.blendAttachments.size(),
+				.pAttachments = createInfo.blendAttachments.data(),
+				.blendConstants = { 1.f, 1.f, 1.f, 1.f }
 			};
-			colorBlending.blendConstants[0] = 1.f;
-			colorBlending.blendConstants[1] = 1.f;
-			colorBlending.blendConstants[2] = 1.f;
-			colorBlending.blendConstants[3] = 1.f;
 
 			VkPipelineVertexInputStateCreateInfo vertexInputState = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
-			VkPipelineInputAssemblyStateCreateInfo inputAssembly = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-
-			inputAssembly.topology = createInfo.topology;
-			inputAssembly.primitiveRestartEnable = false;
-
+			VkPipelineInputAssemblyStateCreateInfo inputAssembly = { 
+				.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+				.topology = createInfo.topology,
+				.primitiveRestartEnable = false,
+			};
 
 			VkPipelineRasterizationStateCreateInfo rasterizer = { 
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,

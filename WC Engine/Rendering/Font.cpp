@@ -43,7 +43,7 @@ namespace wc
         atlasPacker.setMiterLimit(1.0);
         atlasPacker.setPadding(0);
         atlasPacker.setScale(emSize);
-        int remaining = atlasPacker.pack(m_Glyphs.data(), (int)m_Glyphs.size());
+        //int remaining = atlasPacker.pack(m_Glyphs.data(), (int)m_Glyphs.size());
 
 
         int width, height;

@@ -68,6 +68,8 @@ namespace wc
 			Data[y * bytes_per_scanline + x * Channels + 3] = (uint8_t)color.a;
 		}
 
+		auto AllocSize() { return Width * Height * Channels; }
+
 		void Free() { free(Data); }
 	};
 }

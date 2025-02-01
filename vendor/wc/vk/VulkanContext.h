@@ -547,7 +547,7 @@ namespace VulkanContext
 
 			if (indices.IsComplete() && extensionsSupported /*&& swapChainAdequate*/)
 			{
-				physicalDevice = physDevice;
+				physicalDevice.SetDevice(physDevice);
 
 				break;
 			}
@@ -559,9 +559,18 @@ namespace VulkanContext
 			return false;
 		}
 
-		{ // Create Logical Device	
+		{ // Create Logical Device
 			VkPhysicalDeviceFeatures deviceFeatures = {};
-			if (physicalDevice.GetFeatures().samplerAnisotropy) deviceFeatures.samplerAnisotropy = true;
+			auto supportedFeatures = physicalDevice.GetFeatures();
+			if (supportedFeatures.samplerAnisotropy)
+				deviceFeatures.samplerAnisotropy = true;
+			else
+				WC_CORE_WARN("Sampler anisotropy feature is not supported")
+
+			if (supportedFeatures.independentBlend)
+				deviceFeatures.independentBlend = true;
+			else 
+				WC_CORE_WARN("Independent blend feature is not supported")
 
 			VkPhysicalDeviceVulkan12Features features12 = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
