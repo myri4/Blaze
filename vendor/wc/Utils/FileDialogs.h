@@ -2,6 +2,9 @@
 
 #include "Window.h"
 #include <filesystem>
+#include <shlobj.h> // remove this
+#include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 
 namespace wc 
 {
@@ -53,6 +56,34 @@ namespace wc
 				return ofn.lpstrFile;
 
 			return std::string();
+		}
+
+	    //TODO - see to be able to use different file explorer
+	    std::string OpenFolder(GLFWwindow* window)
+		{
+		    BROWSEINFOA bi = { 0 };
+		    bi.hwndOwner = glfwGetWin32Window(window);
+		    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+
+		    // Show the folder selection dialog
+		    LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);
+
+		    if (pidl != nullptr)
+		    {
+		        CHAR path[MAX_PATH];
+		        // Convert the selected folder's PIDL to a path
+		        if (SHGetPathFromIDListA(pidl, path))
+		        {
+		            // Free the PIDL allocated by SHBrowseForFolder
+		            CoTaskMemFree(pidl);
+		            return std::string(path);
+		        }
+
+		        // Free the PIDL if SHGetPathFromIDListA fails
+		        CoTaskMemFree(pidl);
+		    }
+
+		    return std::string(); // Return an empty string if the user cancels the dialog
 		}
 	};
 }

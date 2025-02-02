@@ -98,13 +98,14 @@ namespace wc
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.IniFilename = "assets/imgui.ini"; // TODO - remove and find alternative
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
+	    Globals.fontDeffault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
+	    Globals.fontBig = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 30.f);
+		io.FontDefault = Globals.fontDeffault;
 
 		ImGui_ImplGlfw_Init(Globals.window, false);
 
 		ImGui_ImplVulkan_Init(swapchain.RenderPass);
 		ImGui_ImplVulkan_CreateFontsTexture();
-
 
 		ImGuiStyle& style = ImGui::GetStyle();
 		style = UI::SoDark(0.0f);
