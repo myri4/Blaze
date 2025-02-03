@@ -1376,10 +1376,10 @@ namespace wc
 
 									if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 									    if (entry.path().extension() != ".scene")
-										    if (openedFileNames.insert(fullPathStr).second)
-											    openedFiles.push_back(entry.path());
-									    else
-									        gui::OpenPopup("Confirm");
+									    {
+										    if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
+									    }
+									    else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
 
 								    gui::SetNextWindowPos({gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y});
 									if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
@@ -1392,13 +1392,14 @@ namespace wc
 							    ui::CenterNextWindow();
 							    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							    {
-							        gui::Text("Are you sure you want to load this scene?");
+							        gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+							        const float widgetWidth = gui::GetItemRectSize().x;
 							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 							        {
 							            m_Scene.Load(entry.path().string());
 							            gui::CloseCurrentPopup();
 							        }
-							        gui::SameLine(gui::CalcTextSize("Are you sure you want to load this scene?").x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+							        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 							        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
 							            gui::CloseCurrentPopup();
 
@@ -1528,7 +1529,7 @@ namespace wc
 											    	    openedFiles.push_back(entry.path());
                                                }
                                                else
-										        gui::OpenPopup("Confirm");
+										        gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
 										}
 
 										gui::PopStyleVar();
@@ -1541,19 +1542,20 @@ namespace wc
 									    ui::CenterNextWindow();
 									    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
                                         {
-                                            gui::Text("Are you sure you want to load this scene?");
-                                            if (gui::Button("Yes") || gui::IsKeyPressed(ImGuiKey_Enter))
+                                            gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+									        const float widgetWidth = gui::GetItemRectSize().x;
+
+                                            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
                                             {
                                                 m_Scene.Load(entry.path().string());
                                                 gui::CloseCurrentPopup();
                                             }
 
-									        gui::SameLine(gui::CalcTextSize("Are you sure you want to load this scene?").x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x * 2 - 5);
-									        if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+									        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+									        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
 									        gui::EndPopup();
                                         }
-
 									}
 									i++;
 								}
@@ -1951,7 +1953,7 @@ namespace wc
 			        {
 			            static std::string projName = "Untitled";
 			            gui::InputText("Project Name", &projName);
-			            const float widgetSize = gui::GetItemRectSize().x;
+			            const float widgetWidth = gui::GetItemRectSize().x;
 
 			            gui::BeginDisabled(projName.empty());
 			            if (gui::Button("OK"))
@@ -1971,7 +1973,7 @@ namespace wc
 			            gui::EndDisabled();
 			            if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			            gui::SameLine(widgetSize - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			            if (gui::Button("Cancel"))
 			            {
 			                projName = "Untitled";
@@ -2009,9 +2011,9 @@ namespace wc
 
 			        if (gui::BeginChild("Project Display", ImVec2(0, 0)))
 			        {
-			            gui::PushFont(Globals.fontBig);
 			            for (auto project : Project::savedProjectPaths)
                         {
+			                gui::PushFont(Globals.fontBig);
 			                std::filesystem::path path = project;
 			                if (std::filesystem::exists(path))
 			                {
@@ -2025,13 +2027,14 @@ namespace wc
 			                    gui::SameLine();
 			                    if (gui::Button(("Delete##" + path.string()).c_str()))
 			                    {
-			                        gui::OpenPopup("Delete Project");
+			                        gui::OpenPopup(("Delete Project##" + project).c_str());
 			                    }
 			                }
 			                else WC_CORE_WARN("Project path does not exist: {0}", project);
+			                gui::PopFont();
 
 			                ui::CenterNextWindow();
-			                if (gui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			                if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
 			                    gui::Text("Are you sure you want to delete this project?");
 			                    if (gui::Button("Yes##Delete"))
@@ -2046,7 +2049,6 @@ namespace wc
 			                    gui::EndPopup();
 			                }
                         }
-			            gui::PopFont();
 			        }
 			        gui::EndChild();
 
@@ -2272,7 +2274,7 @@ namespace wc
 			            gui::EndMenuBar();
 			        }
 
-			        // check again because we can change state with menu bar (inside this else-case)
+			        //Display tabs - check project again because we can change state with menu bar (inside this else-case)
 			        if (Project::Exists())
 			        {
 			            if (showEditor) UI_Editor();

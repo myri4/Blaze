@@ -20,6 +20,7 @@ namespace wc
         {
             YAML::Node data;
             data["savedProjectPaths"] = savedProjectPaths;
+            WC_CORE_INFO("List Saving Successful -> Saved Projects: {0}", savedProjectPaths.size());
 
             YAMLUtils::SaveFile(std::filesystem::current_path().string() + "/SavedProjects.yaml", data);
         }
@@ -49,7 +50,7 @@ namespace wc
             }
         }
 
-        inline void SaveListProject()
+        inline void AddProjectToList()
         {
             // add if doesnt exist
             if (std::find(savedProjectPaths.begin(), savedProjectPaths.end(), rootPath) == savedProjectPaths.end())
@@ -59,9 +60,9 @@ namespace wc
             }
         }
 
-        inline void RemoveListProject()
+        inline void RemoveProjectFromList(const std::string &filepath)
         {
-            std::erase(savedProjectPaths, rootPath);
+            std::erase(savedProjectPaths, filepath);
             SaveSavedProjects();
         }
 
@@ -94,7 +95,7 @@ namespace wc
 
             name = pName;
             rootPath = filepath + "/" + pName + ".blz";
-            SaveListProject();
+            AddProjectToList();
             std::filesystem::create_directory(filepath + "/" + pName + ".blz");
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Scenes");
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Assets");
@@ -129,7 +130,7 @@ namespace wc
                 //Everything is fine - open project
                 name = std::filesystem::path(filepath).stem().string();
                 rootPath = filepath;
-                SaveListProject();
+                AddProjectToList();
                 WC_CORE_INFO("Load Successful -> Opened project: {0} at {1}", name, filepath);
             }
 
@@ -148,12 +149,11 @@ namespace wc
         {
             if (std::filesystem::exists(filepath))
             {
-                WC_CORE_INFO(std::filesystem::path(filepath).extension().string());
                 if (std::filesystem::path(filepath).extension().string() == ".blz")
                 {
-                    std::filesystem::remove_all(filepath);
-                    RemoveListProject();
+                    RemoveProjectFromList(filepath);
                     Clear();
+                    std::filesystem::remove_all(filepath);
                     WC_CORE_INFO("Delete Successful -> Deleted project: {0}", filepath);
                 }
                 else WC_CORE_WARN("Delete Failed -> Directory is not a .blz project: {0}", filepath);
