@@ -108,7 +108,7 @@ namespace wc
 		ImGui_ImplVulkan_CreateFontsTexture();
 
 		ImGuiStyle& style = ImGui::GetStyle();
-		style = UI::SoDark(0.0f);
+		style = ui::SoDark(0.0f);
 		editor.Create();
 
 		return true;

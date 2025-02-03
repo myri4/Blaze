@@ -36,6 +36,8 @@
 #include "Rendering/Renderer2D.h"
 #include "Scripting/Script.h"
 
+namespace gui = ImGui;
+
 namespace wc
 {
     glm::vec4 decompress(uint32_t num)
@@ -148,6 +150,9 @@ namespace wc
 		Texture t_Folder;
         Texture t_Reorder;
         Texture t_Bond;
+        Texture t_Play;
+        Texture t_Simulate;
+        Texture t_Stop;
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
@@ -203,6 +208,9 @@ namespace wc
 	        t_Folder.Load("assets/textures/menu/folder-fill.png");
 	        t_Reorder.Load("assets/textures/menu/reorder.png");
 	        t_Bond.Load("assets/textures/menu/bond.png");
+	        t_Play.Load("assets/textures/menu/play.png");
+	        t_Simulate.Load("assets/textures/menu/simulate.png");
+	        t_Stop.Load("assets/textures/menu/stop.png");
 
 	        m_PhysicsDebugDraw = {
 	            DrawPolygonFcn,
@@ -231,9 +239,9 @@ namespace wc
 		{
 			if (allowInput)
 			{
-				if (ImGui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
-				else if (ImGui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
-				else if (ImGui::IsKeyPressed(ImGuiKey_S)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
+				if (gui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
+				else if (gui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
+				else if (gui::IsKeyPressed(ImGuiKey_S)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
 
 				float scroll = Mouse::GetMouseScroll().y;
 				if (scroll != 0.f)
@@ -350,12 +358,12 @@ namespace wc
 
 		void UI_Editor()
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-			if (ImGui::Begin("Editor", &showEditor))
+			gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+			if (gui::Begin("Editor", &showEditor))
 			{
-				allowInput = ImGui::IsWindowFocused() && ImGui::IsWindowHovered();
+				allowInput = gui::IsWindowFocused() && gui::IsWindowHovered();
 
-				ImVec2 viewPortSize = ImGui::GetContentRegionAvail();
+				ImVec2 viewPortSize = gui::GetContentRegionAvail();
 				if (ViewPortSize != *((glm::vec2*)&viewPortSize))
 				{
 					ViewPortSize = { viewPortSize.x, viewPortSize.y };
@@ -403,9 +411,9 @@ namespace wc
 					}
 				}
 
-				auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
-				auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
-				auto viewportOffset = ImGui::GetWindowPos();
+				auto viewportMinRegion = gui::GetWindowContentRegionMin();
+				auto viewportMaxRegion = gui::GetWindowContentRegionMax();
+				auto viewportOffset = gui::GetWindowPos();
 				ImVec2 viewportBounds[2];
 				viewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
 				viewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
@@ -413,27 +421,23 @@ namespace wc
 				WindowPos = *((glm::vec2*)&viewportBounds[0]);
 				glm::vec2 RenderSize = *((glm::vec2*)&viewportBounds[1]) - WindowPos;
 
-				ImGui::GetWindowDrawList()->AddImage((ImTextureID)m_Renderer.ImguiImageID, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
+				gui::GetWindowDrawList()->AddImage((ImTextureID)m_Renderer.ImguiImageID, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
 
-				float buttonsWidth = ImGui::CalcTextSize("Play").x + ImGui::CalcTextSize("Stop").x + ImGui::CalcTextSize("Simulate").x + ImGui::GetStyle().FramePadding.x * 6.0f;
-				float totalWidth = buttonsWidth + ImGui::GetStyle().ItemSpacing.x * 2;
-				ImGui::SetCursorPosX((ImGui::GetWindowSize().x - totalWidth) * 0.5f);
+				gui::SetCursorPosX((gui::GetWindowSize().x - 60 + gui::GetStyle().ItemSpacing.x * 2) * 0.5f);
 				bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
 				bool isPaused = (m_SceneState == SceneState::Edit);
 
-				if (isPlayingOrSimulating)
-					ImGui::BeginDisabled();
-				if (ImGui::Button("Play") && isPaused) ChangeSceneState(SceneState::Play);
-				ImGui::SameLine();
-				if (ImGui::Button("Simulate") && isPaused) ChangeSceneState(SceneState::Simulate);
-				if (isPlayingOrSimulating)
-					ImGui::EndDisabled();
-				ImGui::SameLine();
-				if (isPaused)
-					ImGui::BeginDisabled();
-				if (ImGui::Button("Stop")) ChangeSceneState(SceneState::Edit); 
-				if (isPaused)
-					ImGui::EndDisabled();
+			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+				if (isPlayingOrSimulating) gui::BeginDisabled();
+				if (gui::ImageButton("play", t_Play, {20, 20}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine();
+
+			    if (gui::ImageButton("simulate", t_Simulate, {20, 20}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine();
+				if (isPlayingOrSimulating) gui::EndDisabled();
+
+				if (isPaused) gui::BeginDisabled();
+				if (gui::ImageButton("stop", t_Stop, {20, 20})) ChangeSceneState(SceneState::Edit);
+				if (isPaused) gui::EndDisabled();
+			    ImGui::PopStyleVar();
 
 				glm::mat4 projection = camera.GetProjectionMatrix();
 				projection[1][1] *= -1;
@@ -514,18 +518,18 @@ namespace wc
 					}
 				}
 			}
-			ImGui::PopStyleVar();
-			ImGui::End();
+			gui::PopStyleVar();
+			gui::End();
 		}
 
 		void UI_SceneProperties()
 		{
-			if (ImGui::Begin("Scene Properties", &showSceneProperties))
+			if (gui::Begin("Scene Properties", &showSceneProperties))
 			{
-				if (ImGui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+				if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					auto& worldData = m_Scene.GetPhysicsWorldData();
-					UI::DragButton2("Gravity", worldData.Gravity);
+					ui::DragButton2("Gravity", worldData.Gravity);
 					//{
 					//	auto rt = physicsWorld.GetRestitutionThreshold();
 					//	UI::Drag("Restitution Threshold", rt);
@@ -553,45 +557,45 @@ namespace wc
 					//}
 				}
 
-				if (ImGui::CollapsingHeader("Physics debug draw", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+				if (gui::CollapsingHeader("Physics debug draw", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					UI::Checkbox("Use drawing bounds", m_PhysicsDebugDraw.useDrawingBounds);
-					UI::Checkbox("Draw shapes", m_PhysicsDebugDraw.drawShapes);
-					UI::Checkbox("Draw joints", m_PhysicsDebugDraw.drawJoints);
-					UI::Checkbox("Draw joint extras", m_PhysicsDebugDraw.drawJointExtras);
-					UI::Checkbox("Draw AABBs", m_PhysicsDebugDraw.drawAABBs);
-					UI::Checkbox("Draw mass", m_PhysicsDebugDraw.drawMass);
-					UI::Checkbox("Draw body names", m_PhysicsDebugDraw.drawBodyNames);
-					UI::Checkbox("Draw contacts", m_PhysicsDebugDraw.drawContacts);
-					UI::Checkbox("Draw graph colors", m_PhysicsDebugDraw.drawGraphColors);
-					UI::Checkbox("Draw contact normals", m_PhysicsDebugDraw.drawContactNormals);
-					UI::Checkbox("Draw contact impulses", m_PhysicsDebugDraw.drawContactImpulses);
-					UI::Checkbox("Draw friction impulses", m_PhysicsDebugDraw.drawFrictionImpulses);
+					ui::Checkbox("Use drawing bounds", m_PhysicsDebugDraw.useDrawingBounds);
+					ui::Checkbox("Draw shapes", m_PhysicsDebugDraw.drawShapes);
+					ui::Checkbox("Draw joints", m_PhysicsDebugDraw.drawJoints);
+					ui::Checkbox("Draw joint extras", m_PhysicsDebugDraw.drawJointExtras);
+					ui::Checkbox("Draw AABBs", m_PhysicsDebugDraw.drawAABBs);
+					ui::Checkbox("Draw mass", m_PhysicsDebugDraw.drawMass);
+					ui::Checkbox("Draw body names", m_PhysicsDebugDraw.drawBodyNames);
+					ui::Checkbox("Draw contacts", m_PhysicsDebugDraw.drawContacts);
+					ui::Checkbox("Draw graph colors", m_PhysicsDebugDraw.drawGraphColors);
+					ui::Checkbox("Draw contact normals", m_PhysicsDebugDraw.drawContactNormals);
+					ui::Checkbox("Draw contact impulses", m_PhysicsDebugDraw.drawContactImpulses);
+					ui::Checkbox("Draw friction impulses", m_PhysicsDebugDraw.drawFrictionImpulses);
 
-				}				
+				}
 			}
-			ImGui::End();
+			gui::End();
 		}
 
 		void ShowEntities()
 		{
 	        static bool dragMode = false;
-	        if (ImGui::BeginMenuBar())
+	        if (gui::BeginMenuBar())
 	        {
-	            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-	            if (ImGui::ImageButton("mode", dragMode ? t_Bond : t_Reorder, ImVec2(20, 20)) || ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
+	            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+	            if (gui::ImageButton("mode", dragMode ? t_Bond : t_Reorder, ImVec2(20, 20)) || gui::IsWindowFocused() && gui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
 	            {
 	                dragMode = !dragMode;
 	                WC_INFO(dragMode ? "Changed Mode to : Bond" : "Changed Mode to : Reorder");
 	            }
-	            ImGui::SetItemTooltip("Press CTRL or press to change mode");
-	            ImGui::PopStyleVar();
-	            ImGui::PopStyleColor();
-	            ImGui::EndMenuBar();
+	            gui::SetItemTooltip("Press CTRL or press to change mode");
+	            gui::PopStyleVar();
+	            gui::PopStyleColor();
+	            gui::EndMenuBar();
 	        }
 
-			if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
+			if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
 
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 	        {
@@ -606,7 +610,7 @@ namespace wc
 						std::string fullChildName = std::string(entity.name()) + "::" + childName;
 
 						flecs::entity childEntity = entity;
-						while (childEntity.parent() != flecs::entity::null()) 
+						while (childEntity.parent() != flecs::entity::null())
 						{
 							childEntity = childEntity.parent();
 							fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
@@ -625,14 +629,14 @@ namespace wc
 				if (children.empty())
 					node_flags |= ImGuiTreeNodeFlags_Leaf;
 
-				if (m_SelectedEntity != flecs::entity::null()) 
+				if (m_SelectedEntity != flecs::entity::null())
 				{
 					auto parent = m_SelectedEntity.parent();
-					while (parent != flecs::entity::null()) 
+					while (parent != flecs::entity::null())
 					{
-						if (parent == entity) 
+						if (parent == entity)
 						{
-							ImGui::SetNextItemOpen(true);
+							gui::SetNextItemOpen(true);
 							break;
 						}
 						parent = parent.parent();
@@ -640,17 +644,17 @@ namespace wc
 				}
 
 				// Push a flag to allow duplicate IDs in the same window
-				ImGui::PushItemFlag(ImGuiItemFlags_AllowDuplicateId, true);
+				gui::PushItemFlag(ImGuiItemFlags_AllowDuplicateId, true);
 
 				// Render the entity
-				bool is_open = ImGui::TreeNodeEx(entity.name().c_str(), node_flags);
+				bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 
-				ImGui::PopItemFlag();
+				gui::PopItemFlag();
 
 				// Handle selection on click
-				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) m_SelectedEntity = entity;
+				if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
 
-				if (ImGui::IsMouseDoubleClicked(0) && ImGui::IsItemHovered())
+				if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
 				{
 					if (entity.has<TransformComponent>())
 						camera.Position = glm::vec3(entity.get<TransformComponent>()->Translation, 0.f);
@@ -658,16 +662,16 @@ namespace wc
 
 				if(dragMode)
 				{
-					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+					if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
 					{
-						ImGui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
-						ImGui::Text("Dragging %s", entity.name().c_str());
-						ImGui::EndDragDropSource();
+						gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
+						gui::Text("Dragging %s", entity.name().c_str());
+						gui::EndDragDropSource();
 					}
 
-					if (ImGui::BeginDragDropTarget())
+					if (gui::BeginDragDropTarget())
 					{
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
 						{
 							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
 							flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
@@ -676,10 +680,10 @@ namespace wc
 							 if (droppedEntity != entity.parent())
 								m_Scene.SetChild(entity, droppedEntity);
 						}
-						ImGui::EndDragDropTarget();
+						gui::EndDragDropTarget();
 					}
 				}
-				else if(ImGui::IsItemActive() && !ImGui::IsItemHovered())
+				else if(gui::IsItemActive() && !gui::IsItemHovered())
 				{
 					auto& entitiyNames = entity.parent() == flecs::entity::null() ? m_Scene.GetParentEntityNames() : entity.parent().get_ref<ChildNamesComponent>()->childNames;
 					auto it = std::find(entitiyNames.begin(), entitiyNames.end(), std::string(entity.name()));
@@ -688,7 +692,7 @@ namespace wc
 					{
 						int index = std::distance(entitiyNames.begin(), it);
 
-						float drag_delta_y = ImGui::GetMouseDragDelta(0).y;
+						float drag_delta_y = gui::GetMouseDragDelta(0).y;
 
 						if (std::abs(drag_delta_y) > 5.0f)
 						{
@@ -698,43 +702,43 @@ namespace wc
 							{
 								std::swap(entitiyNames[index], entitiyNames[n_next]);
 
-								ImGui::ResetMouseDragDelta();
+								gui::ResetMouseDragDelta();
 							}
 						}
 					}
 				}
 
-				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+				if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 				{
-					if (ImGui::IsItemHovered())
-						ImGui::OpenPopup(std::to_string(entity.id()).c_str());
+					if (gui::IsItemHovered())
+						gui::OpenPopup(std::to_string(entity.id()).c_str());
 					// TODO - ask if this is needed and fix it
-				    /*if (!ImGui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+				    /*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
                     {
                         WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
-                        ImGui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+                        gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
                     }*/
 				}
 
 				// Display the popup menu
-				if (ImGui::BeginPopup(std::to_string(entity.id()).c_str()))
+				if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
 				{
-					ImGui::Text("%s", entity.name().c_str());
-					ImGui::Separator();
+					gui::Text("%s", entity.name().c_str());
+					gui::Separator();
 
-					if (ImGui::MenuItem("Clone"))
+					if (gui::MenuItem("Clone"))
 					{
 						WC_CORE_INFO("Implement Clone");
-						ImGui::CloseCurrentPopup();
+						gui::CloseCurrentPopup();
 					}
 
-					if (ImGui::MenuItem("Export"))
+					if (gui::MenuItem("Export"))
 					{
 						WC_CORE_INFO("Implement Export");
-						ImGui::CloseCurrentPopup();
+						gui::CloseCurrentPopup();
 					}
 
-					if (entity.parent() != flecs::entity::null() && ImGui::MenuItem("Remove Child"))
+					if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
 					{
 						//auto parent = entity.parent();
 						m_Scene.RemoveChild(entity);
@@ -742,22 +746,22 @@ namespace wc
 
 					if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
 					{
-						if (ImGui::MenuItem("Set Child of Selected"))
+						if (gui::MenuItem("Set Child of Selected"))
 							m_Scene.SetChild(m_SelectedEntity, entity);
 					}
 
-					ImGui::Separator();
+					gui::Separator();
 
-					ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-					if (ImGui::MenuItem("Delete"))
+					gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+					if (gui::MenuItem("Delete"))
 					{
 						m_Scene.KillEntity(entity);
 						m_SelectedEntity = flecs::entity::null();
-						ImGui::CloseCurrentPopup();
+						gui::CloseCurrentPopup();
 					}
-					ImGui::PopStyleColor();
+					gui::PopStyleColor();
 
-					ImGui::EndPopup();
+					gui::EndPopup();
 				}
 
 				// If the node is open, recursively display children
@@ -766,7 +770,7 @@ namespace wc
 					for (const auto& child : children)
 						displayEntityRef(child, displayEntityRef);
 
-					ImGui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
+					gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
 				}
 	        };
 
@@ -780,16 +784,16 @@ namespace wc
 	        // "Empty space" drop target for clearing bonds
 	        if (dragMode && m_SelectedEntity && m_SelectedEntity.parent() != flecs::entity::null())
 	        {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
-	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
-	            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
-                if (ImGui::IsMouseDragging(0))ImGui::Button("*Remove Parent*", ImGui::GetContentRegionAvail());
-	            else ImGui::InvisibleButton("EmptySpace", ImGui::GetContentRegionAvail());
-	            ImGui::PopStyleColor(3);
+                gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+                if (gui::IsMouseDragging(0))gui::Button("*Remove Parent*", gui::GetContentRegionAvail());
+	            else gui::InvisibleButton("EmptySpace", gui::GetContentRegionAvail());
+	            gui::PopStyleColor(3);
 
-                if (ImGui::BeginDragDropTarget())
+                if (gui::BeginDragDropTarget())
 	            {
-	                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY"))
+	                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
 	                {
 	                    IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
 	                    flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
@@ -797,7 +801,7 @@ namespace wc
 	                    if (droppedEntity.parent() != flecs::entity::null())
 	                        m_Scene.RemoveChild(droppedEntity);
 	                }
-	                ImGui::EndDragDropTarget();
+	                gui::EndDragDropTarget();
 	            }
 	        }
 		}
@@ -805,41 +809,41 @@ namespace wc
 		void UI_Entities()
 		{
             static bool showPopup = false;
-			if (ImGui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
+			if (gui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
                 static char filter[1024];
-                if (ImGui::BeginMenuBar())
+                if (gui::BeginMenuBar())
                 {
-                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Add Entity").x - 20 - ImGui::GetStyle().ItemSpacing.x * 3);
-                    ImGui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
+                    gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Add Entity").x - 20 - gui::GetStyle().ItemSpacing.x * 3);
+                    gui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
 
-                    if (ImGui::Button("Add Entity"))
+                    if (gui::Button("Add Entity"))
                         showPopup = true;
 
-                    ImGui::EndMenuBar();
+                    gui::EndMenuBar();
                 }
 
 			    ShowEntities();
 
 			    if (showPopup)
                 {
-                    ImGui::OpenPopup("Add Entity");
+                    gui::OpenPopup("Add Entity");
 			        showPopup = false;
                 }
 
-			    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				if (ImGui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			    gui::SetNextWindowPos(gui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+				if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 				{
-					ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-					ImVec2 windowSize = ImGui::GetWindowSize();
+					ImVec2 center = gui::GetMainViewport()->GetCenter();
+					ImVec2 windowSize = gui::GetWindowSize();
 					ImVec2 windowPos = ImVec2(center.x - windowSize.x * 0.5f, center.y - windowSize.y * 0.5f);
-					ImGui::SetWindowPos(windowPos, ImGuiCond_Once);
+					gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
 					static std::string name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-				    ImGui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
-                    float size = ImGui::CalcItemWidth();
+				    gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
+                    float size = gui::CalcItemWidth();
 
-					if (ImGui::Button("Create") || ImGui::IsKeyPressed(ImGuiKey_Enter))
+					if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 					{
 						if (!name.empty())
 						{
@@ -847,46 +851,46 @@ namespace wc
 						    {
 						        m_SelectedEntity = m_Scene.AddEntity(name);
 						        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-						        ImGui::CloseCurrentPopup();
+						        gui::CloseCurrentPopup();
 						    }
 						    else
-						        ImGui::OpenPopup("WarnNameExists");
+						        gui::OpenPopup("WarnNameExists");
 						}
 						else
 						{
-							ImGui::SetNextWindowPos(ImGui::GetMousePos());
-							ImGui::OpenPopup("WarnEmptyName");
+							gui::SetNextWindowPos(gui::GetMousePos());
+							gui::OpenPopup("WarnEmptyName");
 						}
 					}
 
-				    ImGui::SameLine();
-				    ImGui::SetCursorPosX(size);
-				    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+				    gui::SameLine();
+				    gui::SetCursorPosX(size);
+				    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 				    {
 				        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-				        ImGui::CloseCurrentPopup();
+				        gui::CloseCurrentPopup();
 				    }
 
-					if (ImGui::BeginPopupModal("WarnEmptyName", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |	ImGuiWindowFlags_NoMove))
+					if (gui::BeginPopupModal("WarnEmptyName", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |	ImGuiWindowFlags_NoMove))
 					{
-						ImGui::Text("Name cannot be empty!");
+						gui::Text("Name cannot be empty!");
 
-					    if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+					    if (gui::Button("Close")) gui::CloseCurrentPopup();
 
-						ImGui::EndPopup();
+						gui::EndPopup();
 					}
 
-				    if (ImGui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    if (gui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
 				    {
-				        ImGui::Text("Name already exists!");
-				        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
-				        ImGui::EndPopup();
+				        gui::Text("Name already exists!");
+				        if (gui::Button("Close")) gui::CloseCurrentPopup();
+				        gui::EndPopup();
 				    }
 
-			        ImGui::EndPopup();
+			        gui::EndPopup();
 				}
 			}
-			ImGui::End();
+			gui::End();
 		}
 
 		template<typename T, typename UIFunc>
@@ -897,7 +901,7 @@ namespace wc
 				bool visible = true;
 
 				auto& component = *m_SelectedEntity.get_mut<T>();
-				if (ImGui::CollapsingHeader((name + "##header").c_str(), m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
+				if (gui::CollapsingHeader((name + "##header").c_str(), m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 					uiFunc(component);
 
 				if (!visible) m_SelectedEntity.remove<T>(); // add modal popup
@@ -906,19 +910,19 @@ namespace wc
 
 		void UI_Properties()
 		{
-			if (ImGui::Begin("Properties", &showProperties))
+			if (gui::Begin("Properties", &showProperties))
 			{
 				if (m_SelectedEntity != flecs::entity::null())
 				{
 					std::string nameBuffer = m_SelectedEntity.name().c_str(); // Buffer to hold the entity's name
 
 				    // Input name
-				    if (ImGui::InputText("Name", &nameBuffer))
+				    if (gui::InputText("Name", &nameBuffer))
 				    {
 				        if (!nameBuffer.empty())
 				        {
 				            if (m_Scene.GetWorld().lookup(nameBuffer.c_str()) != flecs::entity::null())
-				                ImGui::OpenPopup("WarnNameExists");
+				                gui::OpenPopup("WarnNameExists");
 				            else
 				            {
 				                if (m_SelectedEntity.parent() == flecs::entity::null())
@@ -939,128 +943,128 @@ namespace wc
 				        }
 				    }
 
-				    if (ImGui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    if (gui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
 				    {
-				        ImGui::Text("Name already exists!");
-				        if (ImGui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-				        ImGui::EndPopup();
+				        gui::Text("Name already exists!");
+				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+				        gui::EndPopup();
 				    }
 
 					// Display the entity's ID
-					//ImGui::Text("ID: %u", selected_entity.id());
+					//gui::Text("ID: %u", selected_entity.id());
 
 					//NOTE: for every new component, a new if statement is needed
-					ImGui::SeparatorText("Components");
+					gui::SeparatorText("Components");
 
 					EditComponent<TransformComponent>("Transform", [](auto& component){
 						auto& realRotation = const_cast<float&>(component.Rotation);
 						auto rotation = glm::degrees(realRotation);
 
-						UI::DragButton2("Position", component.Translation);
-						UI::DragButton2("Scale", component.Scale);
-						UI::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+						ui::DragButton2("Position", component.Translation);
+						ui::DragButton2("Scale", component.Scale);
+						ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
 						realRotation = glm::radians(rotation);
 					});
 
 					EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
-						ImGui::ColorEdit4("color", glm::value_ptr(component.Color));
-						ImGui::Button("Texture");
+						gui::ColorEdit4("color", glm::value_ptr(component.Color));
+						gui::Button("Texture");
 					});
 
 					EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
-						UI::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
-						UI::Slider("Fade", component.Fade, 0.0f, 1.0f);
-						ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+						ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
+						ui::Slider("Fade", component.Fade, 0.0f, 1.0f);
+						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
 						});
 
 					EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
 						//auto& font = const_cast<std::string&>(t.Font);
-						ImGui::InputText("Text", &component.Text);
-						//ImGui::InputText("Font", &font);
-						ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+						gui::InputText("Text", &component.Text);
+						//gui::InputText("Font", &font);
+						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
 					});
 
 					auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
 						{
-				            UI::Separator("Material");
+				            ui::Separator("Material");
 				            static int currentMaterialIndex = 0;  // Track the selected material
 
 				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
 				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
 
-				            if (ImGui::BeginCombo("Materials", currentMaterialName.c_str()))
+				            if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
 				            {
-				                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
-                                if (ImGui::Button("New Material", {ImGui::GetContentRegionAvail().x, 0}))
-                                    ImGui::OpenPopup("Create Material##popup");
-				                ImGui::PopStyleColor();
+				                gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+                                if (gui::Button("New Material", {gui::GetContentRegionAvail().x, 0}))
+                                    gui::OpenPopup("Create Material##popup");
+				                gui::PopStyleColor();
 
 				                // TODO - add a popup for a new Material and save/load them
-				                ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				                if (ImGui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+				                gui::SetNextWindowPos(gui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 				                {
 				                    PhysicsMaterial newMaterial;
 
 				                    static std::string name;
-				                    ImGui::InputText("Name", &name);
-				                    float size = ImGui::CalcItemWidth();
+				                    gui::InputText("Name", &name);
+				                    float size = gui::CalcItemWidth();
 
-				                    if (ImGui::Button("Create"))
+				                    if (gui::Button("Create"))
 				                    {
 				                        m_Scene.Materials[name] = newMaterial;
 				                        name = "";
-				                        ImGui::CloseCurrentPopup();
+				                        gui::CloseCurrentPopup();
 				                    }
-				                    ImGui::SameLine();
-				                    ImGui::SetCursorPosX(size);
-				                    if (ImGui::Button("Cancel"))
-                                        ImGui::CloseCurrentPopup();
+				                    gui::SameLine();
+				                    gui::SetCursorPosX(size);
+				                    if (gui::Button("Cancel"))
+                                        gui::CloseCurrentPopup();
 
-				                    ImGui::EndPopup();
+				                    gui::EndPopup();
 				                }
-				                ImGui::Separator();
+				                gui::Separator();
 
 				                int index = 0;
-				                for (const auto& [name, mat] : m_Scene.Materials) 
+				                for (const auto& [name, mat] : m_Scene.Materials)
 								{
 				                    bool isSelected = (currentMaterialIndex == index);
-				                    ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
-				                    if (ImGui::Selectable(name.c_str(), isSelected))
+				                    gui::PushStyleColor(ImGuiCol_Header, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+				                    if (gui::Selectable(name.c_str(), isSelected))
 				                        currentMaterialIndex = index;
-				                    
-                                    ImGui::PopStyleColor();
-				                    if (isSelected) 
-				                        ImGui::SetItemDefaultFocus();
-				                    
+
+                                    gui::PopStyleColor();
+				                    if (isSelected)
+				                        gui::SetItemDefaultFocus();
+
 				                    ++index;
 				                }
-				                ImGui::EndCombo();
+				                gui::EndCombo();
 				            }
 
                             // Get the selected material
 				            auto& curMaterial = m_Scene.Materials[currentMaterialName];
 
-				            ImGui::BeginDisabled(currentMaterialName == "Default");
-				            ImGui::BeginGroup();
-				            UI::Drag("Density", curMaterial.Density);
-							UI::Drag("Friction", curMaterial.Friction);
-							UI::Drag("Restitution", curMaterial.Restitution);
-							UI::Drag("Rolling Resistance", curMaterial.RollingResistance);
+				            gui::BeginDisabled(currentMaterialName == "Default");
+				            gui::BeginGroup();
+				            ui::Drag("Density", curMaterial.Density);
+							ui::Drag("Friction", curMaterial.Friction);
+							ui::Drag("Restitution", curMaterial.Restitution);
+							ui::Drag("Rolling Resistance", curMaterial.RollingResistance);
 
-							UI::Separator();
-							ImGui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
+							ui::Separator();
+							gui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
 
-							UI::Separator();
-							UI::Checkbox("Sensor", curMaterial.Sensor);
-							UI::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
-							UI::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
-							UI::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
-							UI::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
-							UI::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
-				            ImGui::EndGroup();
-				            ImGui::EndDisabled();
-				            if (currentMaterialName == "Default") 
-								ImGui::SetItemTooltip("Cannot edit Default material values");
+							ui::Separator();
+							ui::Checkbox("Sensor", curMaterial.Sensor);
+							ui::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
+							ui::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
+							ui::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
+							ui::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
+							ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
+				            gui::EndGroup();
+				            gui::EndDisabled();
+				            if (currentMaterialName == "Default")
+								gui::SetItemTooltip("Cannot edit Default material values");
 
 				            material = curMaterial;
 
@@ -1071,48 +1075,48 @@ namespace wc
 						const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
 						const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
 
-						if (ImGui::BeginCombo("Body Type", currentBodyTypeString))
+						if (gui::BeginCombo("Body Type", currentBodyTypeString))
 						{
 							for (int i = 0; i < 3; i++)
 							{
 								bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
-								if (ImGui::Selectable(bodyTypeStrings[i], &isSelected))
+								if (gui::Selectable(bodyTypeStrings[i], &isSelected))
 								{
 									currentBodyTypeString = bodyTypeStrings[i];
 									component.Type = BodyType(i);
 								}
 
 								if (isSelected)
-									ImGui::SetItemDefaultFocus();
+									gui::SetItemDefaultFocus();
 							}
-							ImGui::EndCombo();
+							gui::EndCombo();
 						}
 
-						UI::Drag("Gravity Scale", component.GravityScale);
-						UI::Drag("Linear Damping", component.LinearDamping);
-						UI::Drag("Angular Damping", component.AngularDamping);
-						UI::Checkbox("Fixed Rotation", component.FixedRotation);
-						UI::Checkbox("Bullet", component.Bullet);
-						UI::Checkbox("Fast Rotation", component.FastRotation);
+						ui::Drag("Gravity Scale", component.GravityScale);
+						ui::Drag("Linear Damping", component.LinearDamping);
+						ui::Drag("Angular Damping", component.AngularDamping);
+						ui::Checkbox("Fixed Rotation", component.FixedRotation);
+						ui::Checkbox("Bullet", component.Bullet);
+						ui::Checkbox("Fast Rotation", component.FastRotation);
 					});
 
 					EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
-						UI::DragButton2("Offset", component.Offset);
-						UI::DragButton2("Size", component.Size);
+						ui::DragButton2("Offset", component.Offset);
+						ui::DragButton2("Size", component.Size);
 
 						UI_PhysicsMaterial(component.Material);
 					});
 
 					EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
-						UI::DragButton2("Offset", component.Offset);
-						UI::Drag("Radius", component.Radius);
+						ui::DragButton2("Offset", component.Offset);
+						ui::Drag("Radius", component.Radius);
 
 						UI_PhysicsMaterial(component.Material);
 					});
 
 					static bool showAddComponent = false;
 					static enum { None, Transform, Render, Rigid } menu = None;
-					if (ImGui::Button("Add Component"))
+					if (gui::Button("Add Component"))
 					{
 						showAddComponent = true;
 						menu = None;
@@ -1120,13 +1124,13 @@ namespace wc
 
 					auto ItemAutoClose = [](const char* label, bool disabled) -> bool
 						{
-							if (ImGui::MenuItem(label, nullptr, nullptr, !disabled))
+							if (gui::MenuItem(label, nullptr, nullptr, !disabled))
 							{
 								showAddComponent = false;
 								return true;
 							}
 							if (disabled)
-								ImGui::SetItemTooltip("You can't have more than one of this component!");
+								gui::SetItemTooltip("You can't have more than one of this component!");
 
 							return false;
 						};
@@ -1136,12 +1140,12 @@ namespace wc
 						// Calculate clamp
 						{
 							// Calculate the desired position for the popup
-							ImVec2 popupPos = ImGui::GetItemRectMin();
-							popupPos.y = ImGui::GetItemRectMax().y + 5;
+							ImVec2 popupPos = gui::GetItemRectMin();
+							popupPos.y = gui::GetItemRectMax().y + 5;
 							ImVec2 popupSize = { 200, 150 }; // Desired size of the popup
 
 							// Get the view port's boundaries
-							const ImGuiViewport* viewport = ImGui::GetWindowViewport();
+							const ImGuiViewport* viewport = gui::GetWindowViewport();
 							ImVec2 viewportMin = viewport->Pos;
 							ImVec2 viewportMax = { viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
 
@@ -1150,20 +1154,20 @@ namespace wc
 							popupPos.y = std::clamp(popupPos.y, viewportMin.y, viewportMax.y - popupSize.y);
 
 							// Set the position and size of the popup
-							ImGui::SetNextWindowPos(popupPos);
-							ImGui::SetNextWindowSize(popupSize, ImGuiCond_Once);
+							gui::SetNextWindowPos(popupPos);
+							gui::SetNextWindowSize(popupSize, ImGuiCond_Once);
 						}
 
 						// Begin the popup window
-						if (ImGui::Begin("Add##Component", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar))
+						if (gui::Begin("Add##Component", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar))
 						{
-							if (!ImGui::IsWindowFocused()) showAddComponent = false;
+							if (!gui::IsWindowFocused()) showAddComponent = false;
 
 							//Replace with an arrow button
-							if (menu != None && ImGui::ArrowButton("Back", ImGuiDir_Left))
+							if (menu != None && gui::ArrowButton("Back", ImGuiDir_Left))
 								menu = None;
 
-							ImGui::SameLine();
+							gui::SameLine();
 
 						    const char* menuText = "";
 						    switch (menu)
@@ -1173,18 +1177,18 @@ namespace wc
 						        case Render: menuText = "Render"; break;
 						        case Rigid: menuText = "Rigid Body"; break;
 						    }
-						    ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize(menuText).x) * 0.5f);
-						    ImGui::Text("%s", menuText);
+						    gui::SetCursorPosX((gui::GetWindowSize().x - gui::CalcTextSize(menuText).x) * 0.5f);
+						    gui::Text("%s", menuText);
 
-							ImGui::Separator();
+							gui::Separator();
 
 							switch (menu)
 							{
 							case None:
 							{
-								if (ImGui::MenuItem("Transform")) { menu = Transform; } UI::RenderArrowIcon();
-								if (ImGui::MenuItem("Render")) { menu = Render; } UI::RenderArrowIcon();
-								if (ImGui::MenuItem("Rigid Body")) { menu = Rigid; } UI::RenderArrowIcon();
+								if (gui::MenuItem("Transform")) { menu = Transform; } ui::RenderArrowIcon();
+								if (gui::MenuItem("Render")) { menu = Render; } ui::RenderArrowIcon();
+								if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon();
 								break;
 							}
 							case Transform:
@@ -1210,25 +1214,25 @@ namespace wc
 							}
 							}
 						}
-						ImGui::End();
+						gui::End();
 					}
 				}
 			}
-			ImGui::End();
+			gui::End();
 		}
 
 		void UI_Console()
 		{
-			if (ImGui::Begin("Console", &showConsole))
+			if (gui::Begin("Console", &showConsole))
 			{
-				if (ImGui::Button("Clear"))
+				if (gui::Button("Clear"))
 				{
 					//Globals.console.Clear();
 					Log::GetConsoleSink()->messages.clear();
 				}
-				
-				ImGui::SameLine();
-			    if (ImGui::Button("Copy"))
+
+				gui::SameLine();
+			    if (gui::Button("Copy"))
 			    {
 			        std::string logData;
 			        for (const auto& msg : Log::GetConsoleSink()->messages)
@@ -1237,16 +1241,16 @@ namespace wc
 			            std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
 			            logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
 			        }
-			        ImGui::SetClipboardText(logData.c_str());
+			        gui::SetClipboardText(logData.c_str());
 			    }
 
-				ImGui::SameLine();
-				ImGui::InputText("Input", const_cast<char*>(""), 0);
+				gui::SameLine();
+				gui::InputText("Input", const_cast<char*>(""), 0);
 
-				ImGui::Separator();
+				gui::Separator();
 
-				const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-				if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
+				const float footer_height_to_reserve = gui::GetStyle().ItemSpacing.y + gui::GetFrameHeightWithSpacing();
+				if (gui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 				{
 					static const std::unordered_map<spdlog::level::level_enum, std::pair<glm::vec4, std::string>> level_colors = {
 						{spdlog::level::debug, {glm::vec4(58.f, 150.f, 221.f, 255.f) / 255.f, "[debug] "}},
@@ -1264,21 +1268,21 @@ namespace wc
 						    const auto& [color, prefix] = it->second;
 						    auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
 						    std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
-						    ImGui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
-						    UI::Text(timeStr + prefix + msg.payload);
-						    ImGui::PopStyleColor();
+						    gui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
+						    ui::Text(timeStr + prefix + msg.payload);
+						    gui::PopStyleColor();
 						}
 						else
-							UI::Text(msg.payload);
+							ui::Text(msg.payload);
 					}
 
 					if (/*ScrollToBottom ||*/
-						(/*m_ConsoleAutoScroll && */ ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
-						ImGui::SetScrollHereY(1.f);
+						(/*m_ConsoleAutoScroll && */ gui::GetScrollY() >= gui::GetScrollMaxY()))
+						gui::SetScrollHereY(1.f);
 				}
-				ImGui::EndChild();
+				gui::EndChild();
 			}
-			ImGui::End();
+			gui::End();
 		}
 
 		void UI_Assets()
@@ -1305,39 +1309,39 @@ namespace wc
 				}
 			};
 
-			if (ImGui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
+			if (gui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
 			{
-				if (ImGui::BeginMenuBar())
+				if (gui::BeginMenuBar())
 				{
-					if (ImGui::MenuItem("Import"))
+					if (gui::MenuItem("Import"))
 						WC_INFO("TODO - Implement Import");
 
-					if (ImGui::BeginMenu("View##Assets"))
+					if (gui::BeginMenu("View##Assets"))
 					{
-						if (ImGui::MenuItem("Show Icons", nullptr, &showIcons))
+						if (gui::MenuItem("Show Icons", nullptr, &showIcons))
 							WC_INFO("Show Icons: {}", showIcons);
 
-						if (ImGui::MenuItem("Preview Assets", nullptr, &previewAsset))
+						if (gui::MenuItem("Preview Assets", nullptr, &previewAsset))
 							WC_INFO("Preview Asset: {}", previewAsset);
 
-						if (ImGui::MenuItem("Collapse All"))
+						if (gui::MenuItem("Collapse All"))
 							for (auto& [key, value] : folderStates)
 								value = false;
 
-						if (ImGui::MenuItem("Expand All"))
+						if (gui::MenuItem("Expand All"))
 							setFolderStatesRecursively(assetsPath, true);
 
-						ImGui::EndMenu();
+						gui::EndMenu();
 					}
 
-					ImGui::EndMenuBar();
+					gui::EndMenuBar();
 				}
 
 				std::function<void(const std::filesystem::path&)> displayDirectory;
 
 				displayDirectory = [&](const std::filesystem::path& path)
 					{
-						if (path != assetsPath) ImGui::Indent(20);
+						if (path != assetsPath) gui::Indent(20);
 
 						for (const auto& entry : std::filesystem::directory_iterator(path))
 						{
@@ -1348,19 +1352,19 @@ namespace wc
 								auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
 								bool& isOpen = it->second;
 
-								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-								ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
-								if (ImGui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+								gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+								gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+								if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
 									isOpen = !isOpen;
 
-								ImGui::PopStyleColor();
-								ImGui::PopStyleVar();
-								ImGui::SameLine();
+								gui::PopStyleColor();
+								gui::PopStyleVar();
+								gui::SameLine();
 
-								if (ImGui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+								if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
 									selectedFolderPath = entry.path();
-								
-								if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+
+								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
 									isOpen = !isOpen;
 
 								if (isOpen)
@@ -1369,86 +1373,86 @@ namespace wc
 							else
 							{
 								ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-								ImGui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
-								if (ImGui::IsItemHovered())
+								gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
+								if (gui::IsItemHovered())
 								{
-									if (previewAsset) ImGui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
+									if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-									if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+									if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 									    if (entry.path().extension() != ".scene")
 										    if (openedFileNames.insert(fullPathStr).second)
 											    openedFiles.push_back(entry.path());
 									    else
-									        ImGui::OpenPopup("Confirm");
+									        gui::OpenPopup("Confirm");
 
-								    ImGui::SetNextWindowPos({ImGui::GetCursorScreenPos().x + ImGui::GetItemRectSize().x, ImGui::GetCursorScreenPos().y});
-									if (ImGui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
+								    gui::SetNextWindowPos({gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y});
+									if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
 									{
-										ImGui::Text("Preview: %s", filenameStr.c_str());
-										ImGui::EndPopup();
+										gui::Text("Preview: %s", filenameStr.c_str());
+										gui::EndPopup();
 									}
 								}
 
-							    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollbar))
+							    if (gui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollbar))
 							    {
-							        ImGui::Text("Are you sure you want to load this scene?");
-							        if (ImGui::Button("Yes##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Enter))
+							        gui::Text("Are you sure you want to load this scene?");
+							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 							        {
 							            m_Scene.Load(entry.path().string());
-							            ImGui::CloseCurrentPopup();
+							            gui::CloseCurrentPopup();
 							        }
-							        ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
-							        if (ImGui::Button("Cancel##Confirm") || ImGui::IsKeyPressed(ImGuiKey_Escape))
-							            ImGui::CloseCurrentPopup();
+							        gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+							        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+							            gui::CloseCurrentPopup();
 
-							        ImGui::EndPopup();
+							        gui::EndPopup();
 							    }
 							}
 						}
 
-						if (path != assetsPath) ImGui::Unindent(20);
+						if (path != assetsPath) gui::Unindent(20);
 					};
 
 				if (showIcons)
 				{
-					if (ImGui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+					if (gui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
 					{
-						ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-						ImGui::TableSetupColumn("Files", ImGuiTableColumnFlags_WidthStretch);
+						gui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+						gui::TableSetupColumn("Files", ImGuiTableColumnFlags_WidthStretch);
 
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0);
+						gui::TableNextRow();
+						gui::TableSetColumnIndex(0);
 
 						// Display directories in a scrollable child window
-						ImGui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+						gui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
 						displayDirectory(assetsPath);
-						ImGui::EndChild();
+						gui::EndChild();
 
-						ImGui::TableSetColumnIndex(1);
-						
-						if (ImGui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
+						gui::TableSetColumnIndex(1);
+
+						if (gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
 						{
 							if (selectedFolderPath == assetsPath)
 							{
-								ImGui::BeginDisabled();
-							    ImGui::ArrowButton("Back", ImGuiDir_Left);
-								ImGui::EndDisabled();
+								gui::BeginDisabled();
+							    gui::ArrowButton("Back", ImGuiDir_Left);
+								gui::EndDisabled();
 							}
-							else if (ImGui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+							else if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
 						    static std::string previewPath;
-						    ImGui::SameLine();
-						    //ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy Path").x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-						    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-						    ImGui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
-						    ImGui::PopItemWidth();
-						    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) previewPath = assetsPath.string(); //
+						    gui::SameLine();
+						    //gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
+						    gui::PushItemWidth(gui::GetContentRegionAvail().x);
+						    gui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
+						    gui::PopItemWidth();
+						    if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string(); //
 						    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
 
-						    ImGui::Separator();
+						    gui::Separator();
 
-							float totalButtonWidth = 50 + ImGui::GetStyle().ItemSpacing.x;
-							int itemsPerRow = static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / totalButtonWidth);
+							float totalButtonWidth = 50 + gui::GetStyle().ItemSpacing.x;
+							int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
 
 							if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
 
@@ -1458,18 +1462,18 @@ namespace wc
 								for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
 								{
 									if (i > 0 && i % itemsPerRow != 0)
-										ImGui::SameLine();
+										gui::SameLine();
 
 									if (entry.is_directory())
 									{
-										ImGui::BeginGroup();
-										ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-										if (ImGui::ImageButton((entry.path().string() + "/").c_str(), std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder, { 50, 50 }))
+										gui::BeginGroup();
+										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+										if (gui::ImageButton((entry.path().string() + "/").c_str(), std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder, { 50, 50 }))
 											selectedFolderPath = entry.path();
 
-										ImGui::PopStyleColor();
-										ImGui::PopStyleVar();
+										gui::PopStyleColor();
+										gui::PopStyleVar();
 
 										std::string filename = entry.path().filename().string();
 										float wrapWidth = 50.0f; // Width for wrapping the text
@@ -1481,15 +1485,15 @@ namespace wc
 										// Display each line centered
 										std::string currentLine;
 										float currentLineWidth = 0.0f;
-										ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
+										gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
 										for (const auto& word : words)
 										{
-											ImVec2 wordSize = ImGui::CalcTextSize(word.c_str());
+											ImVec2 wordSize = gui::CalcTextSize(word.c_str());
 											if (currentLineWidth + wordSize.x > wrapWidth)
 											{
 												// Push the current line and start a new one
-												ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-												ImGui::TextUnformatted(currentLine.c_str());
+												gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+												gui::TextUnformatted(currentLine.c_str());
 												currentLine.clear();
 												currentLineWidth = 0.0f;
 											}
@@ -1497,7 +1501,7 @@ namespace wc
 											if (!currentLine.empty())
 											{
 												currentLine += " "; // Add a space before the next word
-												currentLineWidth += ImGui::CalcTextSize(" ").x;
+												currentLineWidth += gui::CalcTextSize(" ").x;
 											}
 											currentLine += word;
 											currentLineWidth += wordSize.x;
@@ -1506,20 +1510,20 @@ namespace wc
 										// Add the last line if there's any remaining text
 										if (!currentLine.empty())
 										{
-											ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-											ImGui::TextUnformatted(currentLine.c_str());
+											gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+											gui::TextUnformatted(currentLine.c_str());
 										}
-										ImGui::PopStyleVar(); // Restore item spacing for text
+										gui::PopStyleVar(); // Restore item spacing for text
 
-										ImGui::EndGroup();
+										gui::EndGroup();
 									}
 									else
 									{
-										ImGui::BeginGroup();
-										ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+										gui::BeginGroup();
+										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 
-										if (ImGui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
+										if (gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
 										{
                                                if (entry.path().extension() != ".scene")
                                                {
@@ -1527,29 +1531,29 @@ namespace wc
 											    	    openedFiles.push_back(entry.path());
                                                }
                                                else
-										        ImGui::OpenPopup("Confirm");
+										        gui::OpenPopup("Confirm");
 										}
 
-										ImGui::PopStyleVar();
-										ImGui::PopStyleColor();
-										ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 50);
-										ImGui::TextWrapped(entry.path().filename().string().c_str());
-										ImGui::PopTextWrapPos();
-										ImGui::EndGroup();
+										gui::PopStyleVar();
+										gui::PopStyleColor();
+										gui::PushTextWrapPos(gui::GetCursorPos().x + 50);
+										gui::TextWrapped(entry.path().filename().string().c_str());
+										gui::PopTextWrapPos();
+										gui::EndGroup();
 
-									    if (ImGui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+									    if (gui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
                                         {
-                                            ImGui::Text("Are you sure you want to load this scene?");
-                                            if (ImGui::Button("Yes") || ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                            gui::Text("Are you sure you want to load this scene?");
+                                            if (gui::Button("Yes") || gui::IsKeyPressed(ImGuiKey_Enter))
                                             {
                                                 m_Scene.Load(entry.path().string());
-                                                ImGui::CloseCurrentPopup();
+                                                gui::CloseCurrentPopup();
                                             }
 
-									     ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2 - 5);
-									     if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+									     gui::SameLine(gui::GetWindowWidth() - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x * 2 - 5);
+									     if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
-                                            ImGui::EndPopup();
+                                            gui::EndPopup();
                                         }
 
 									}
@@ -1557,29 +1561,29 @@ namespace wc
 								}
 							}
 						}
-						ImGui::EndChild();
+						gui::EndChild();
 
 
-						ImGui::EndTable();
+						gui::EndTable();
 					}
 				}
 				else
 				{
 					// Display directories without table
-					ImGui::BeginChild("FoldersChild##2", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+					gui::BeginChild("FoldersChild##2", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
 					displayDirectory(assetsPath);
-					ImGui::EndChild();
+					gui::EndChild();
 				}
 			}
-			ImGui::End();
+			gui::End();
 
 			// Handle opened files (tabs or whatever content needs to be displayed)
 			for (auto it = openedFiles.begin(); it != openedFiles.end();)
 			{
 				bool open = true;
-				if (ImGui::Begin(it->filename().string().c_str(), &open))
-					ImGui::Text("File: %s", it->string().c_str());
-				ImGui::End();
+				if (gui::Begin(it->filename().string().c_str(), &open))
+					gui::Text("File: %s", it->string().c_str());
+				gui::End();
 
 				if (!open)
 				{
@@ -1593,28 +1597,28 @@ namespace wc
 
         void UI_DebugStats()
 	    {
-	        if (ImGui::Begin("Debug Stats", &showDebugStats, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize))
+	        if (gui::Begin("Debug Stats", &showDebugStats, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize))
 	        {
 	            // Draw background if docked, if not, only tint
-	            ImGuiDockNode* dockNode = ImGui::GetWindowDockNode();
+	            ImGuiDockNode* dockNode = gui::GetWindowDockNode();
 	            if (dockNode == nullptr) // Window is floating
 	            {
-	                ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), {ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y}, IM_COL32(20, 20, 20, 60));
+	                gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y}, IM_COL32(20, 20, 20, 60));
 	            }
 	            else // Window is docked
 	            {
-	                ImVec4 bgColor = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
-	                ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(),
-                        {ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y},
-                        ImGui::ColorConvertFloat4ToU32(bgColor));
+	                ImVec4 bgColor = gui::GetStyleColorVec4(ImGuiCol_WindowBg);
+	                gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(),
+                        {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y},
+                        gui::ColorConvertFloat4ToU32(bgColor));
 	            }
 
 	            uint32_t fps = 1.f / Globals.deltaTime;
-	            UI::Text(std::format("Frame time: {:.4f}ms", Globals.deltaTime * 1000.f));
-	            UI::Text(std::format("FPS: {}", fps));
-	            UI::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
-	            UI::Text(std::format("Min FPS: {}", m_PrevMinFPS));
-	            UI::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
+	            ui::Text(std::format("Frame time: {:.4f}ms", Globals.deltaTime * 1000.f));
+	            ui::Text(std::format("FPS: {}", fps));
+	            ui::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
+	            ui::Text(std::format("Min FPS: {}", m_PrevMinFPS));
+	            ui::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
 
 	            m_DebugTimer += Globals.deltaTime;
 
@@ -1637,16 +1641,16 @@ namespace wc
 	                m_MaxFPS = m_MinFPS = fps;
 	            }
 	        }
-	        ImGui::End();
+	        gui::End();
 	    }
 
 		void UI_StyleEditor(ImGuiStyle* ref = nullptr)
 		{
-			if (ImGui::Begin("Style editor", &showStyleEditor))
+			if (gui::Begin("Style editor", &showStyleEditor))
 			{
 				// You can pass in a reference ImGuiStyle structure to compare to, revert to and save to
 				// (without a reference style pointer, we will use one compared locally as a reference)
-				ImGuiStyle& style = ImGui::GetStyle();
+				ImGuiStyle& style = gui::GetStyle();
 				static ImGuiStyle ref_saved_style;
 
 				// Default to using internal storage as reference
@@ -1657,10 +1661,10 @@ namespace wc
 				if (ref == NULL)
 					ref = &ref_saved_style;
 
-				ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.50f);
+				gui::PushItemWidth(gui::GetWindowWidth() * 0.50f);
 
 				// Save/Revert button
-				if (ImGui::Button("Save"))
+				if (gui::Button("Save"))
 				{
 					auto filepath = FileDialogs::SaveFile(Globals.window, "Image (*.style)\0*.style\0");
 
@@ -1670,15 +1674,15 @@ namespace wc
 
 						if (file.is_open())
 						{
-							ImGuiStyle finalStyle = ImGui::GetStyle();
+							ImGuiStyle finalStyle = gui::GetStyle();
 							//LastStyle = std::filesystem::relative(filepath).string();
 							file.write((const char*)&finalStyle, sizeof(finalStyle));
 							file.close();
 						}
 					}
 				}
-				ImGui::SameLine();
-				if (ImGui::Button("Load"))
+				gui::SameLine();
+				if (gui::Button("Load"))
 				{
 					auto filepath = FileDialogs::OpenFile(Globals.window, "Image (*.style)\0*.style\0");
 
@@ -1687,7 +1691,7 @@ namespace wc
 						std::ifstream file(filepath, std::ios::binary);
 						if (file.is_open())
 						{
-							ImGuiStyle& loadStyle = ImGui::GetStyle();
+							ImGuiStyle& loadStyle = gui::GetStyle();
 							//LastStyle = std::filesystem::relative(filepath).string();
 							file.read((char*)&loadStyle, sizeof(loadStyle));
 							file.close();
@@ -1696,237 +1700,241 @@ namespace wc
 				}
 
 				// Simplified Settings (expose floating-pointer border sizes as boolean representing 0.0f or 1.0f)
-				if (UI::Slider("Frame rounding", style.FrameRounding, 0.0f, 12.0f, "%.0f"))
+				if (ui::Slider("Frame rounding", style.FrameRounding, 0.0f, 12.0f, "%.0f"))
 					style.GrabRounding = style.FrameRounding; // Make GrabRounding always the same value as FrameRounding
-				{ bool border = (style.WindowBorderSize > 0.0f); if (UI::Checkbox("WindowBorder", border)) { style.WindowBorderSize = border ? 1.0f : 0.0f; } }
-				ImGui::SameLine();
-				{ bool border = (style.FrameBorderSize > 0.0f);  if (UI::Checkbox("FrameBorder", border)) { style.FrameBorderSize = border ? 1.0f : 0.0f; } }
-				ImGui::SameLine();
-				{ bool border = (style.PopupBorderSize > 0.0f);  if (UI::Checkbox("PopupBorder", border)) { style.PopupBorderSize = border ? 1.0f : 0.0f; } }
+				{ bool border = (style.WindowBorderSize > 0.0f); if (ui::Checkbox("WindowBorder", border)) { style.WindowBorderSize = border ? 1.0f : 0.0f; } }
+				gui::SameLine();
+				{ bool border = (style.FrameBorderSize > 0.0f);  if (ui::Checkbox("FrameBorder", border)) { style.FrameBorderSize = border ? 1.0f : 0.0f; } }
+				gui::SameLine();
+				{ bool border = (style.PopupBorderSize > 0.0f);  if (ui::Checkbox("PopupBorder", border)) { style.PopupBorderSize = border ? 1.0f : 0.0f; } }
 
 
-				UI::Separator();
+				ui::Separator();
 
-				if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None))
+				if (gui::BeginTabBar("##tabs", ImGuiTabBarFlags_None))
 				{
-					if (ImGui::BeginTabItem("Sizes"))
+					if (gui::BeginTabItem("Sizes"))
 					{
-						UI::Separator("Main");
-						UI::Slider2("WindowPadding", (float*)(&style.WindowPadding), 0.0f, 20.0f, "%.0f");
-						UI::Slider2("FramePadding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
-						UI::Slider2("ItemSpacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
-						UI::Slider2("ItemInnerSpacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
-						UI::Slider2("TouchExtraPadding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
-						UI::Slider("IndentSpacing", style.IndentSpacing, 0.0f, 30.0f, "%.0f");
-						UI::Slider("ScrollbarSize", style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
-						UI::Slider("GrabMinSize", style.GrabMinSize, 1.0f, 20.0f, "%.0f");
+						ui::Separator("Main");
+						ui::Slider2("WindowPadding", (float*)(&style.WindowPadding), 0.0f, 20.0f, "%.0f");
+						ui::Slider2("FramePadding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
+						ui::Slider2("ItemSpacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
+						ui::Slider2("ItemInnerSpacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
+						ui::Slider2("TouchExtraPadding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
+						ui::Slider("IndentSpacing", style.IndentSpacing, 0.0f, 30.0f, "%.0f");
+						ui::Slider("ScrollbarSize", style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
+						ui::Slider("GrabMinSize", style.GrabMinSize, 1.0f, 20.0f, "%.0f");
 
-						UI::Separator("Borders");
-						UI::Slider("WindowBorderSize", style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
-						UI::Slider("ChildBorderSize", style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
-						UI::Slider("PopupBorderSize", style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
-						UI::Slider("FrameBorderSize", style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
-						UI::Slider("TabBorderSize", style.TabBorderSize, 0.0f, 1.0f, "%.0f");
-						UI::Slider("TabBarBorderSize", style.TabBarBorderSize, 0.0f, 2.0f, "%.0f");
+						ui::Separator("Borders");
+						ui::Slider("WindowBorderSize", style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
+						ui::Slider("ChildBorderSize", style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
+						ui::Slider("PopupBorderSize", style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
+						ui::Slider("FrameBorderSize", style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
+						ui::Slider("TabBorderSize", style.TabBorderSize, 0.0f, 1.0f, "%.0f");
+						ui::Slider("TabBarBorderSize", style.TabBarBorderSize, 0.0f, 2.0f, "%.0f");
 
-						UI::Separator("Rounding");
-						UI::Slider("WindowRounding", style.WindowRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("ChildRounding", style.ChildRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("FrameRounding", style.FrameRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("PopupRounding", style.PopupRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("ScrollbarRounding", style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("GrabRounding", style.GrabRounding, 0.0f, 12.0f, "%.0f");
-						UI::Slider("TabRounding", style.TabRounding, 0.0f, 12.0f, "%.0f");
+						ui::Separator("Rounding");
+						ui::Slider("WindowRounding", style.WindowRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("ChildRounding", style.ChildRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("FrameRounding", style.FrameRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("PopupRounding", style.PopupRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("ScrollbarRounding", style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("GrabRounding", style.GrabRounding, 0.0f, 12.0f, "%.0f");
+						ui::Slider("TabRounding", style.TabRounding, 0.0f, 12.0f, "%.0f");
 
-						UI::Separator("Tables");
-						UI::Slider2("CellPadding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
-						ImGui::SliderAngle("TableAngledHeadersAngle", &style.TableAngledHeadersAngle, -50.0f, +50.0f);
+						ui::Separator("Tables");
+						ui::Slider2("CellPadding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
+						gui::SliderAngle("TableAngledHeadersAngle", &style.TableAngledHeadersAngle, -50.0f, +50.0f);
 
-						UI::Separator("Widgets");
-						UI::Slider2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
+						ui::Separator("Widgets");
+						ui::Slider2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
 						auto window_menu_button_position = style.WindowMenuButtonPosition + 1;
-						if (ImGui::Combo("WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
+						if (gui::Combo("WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
 							style.WindowMenuButtonPosition = (ImGuiDir)(window_menu_button_position - 1);
-						ImGui::Combo("ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
-						UI::Slider2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
-						ImGui::SameLine(); UI::HelpMarker("Alignment applies when a button is larger than its text content.");
-						UI::Slider2("SelectableTextAlign", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
-						ImGui::SameLine(); UI::HelpMarker("Alignment applies when a selectable is larger than its text content.");
-						UI::Slider("SeparatorTextBorderSize", style.SeparatorTextBorderSize, 0.0f, 10.0f, "%.0f");
-						UI::Slider2("SeparatorTextAlign", (float*)&style.SeparatorTextAlign, 0.0f, 1.0f, "%.2f");
-						UI::Slider2("SeparatorTextPadding", (float*)&style.SeparatorTextPadding, 0.0f, 40.0f, "%.0f");
-						UI::Slider("LogSliderDeadzone", style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
+						gui::Combo("ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
+						ui::Slider2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
+						gui::SameLine(); ui::HelpMarker("Alignment applies when a button is larger than its text content.");
+						ui::Slider2("SelectableTextAlign", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
+						gui::SameLine(); ui::HelpMarker("Alignment applies when a selectable is larger than its text content.");
+						ui::Slider("SeparatorTextBorderSize", style.SeparatorTextBorderSize, 0.0f, 10.0f, "%.0f");
+						ui::Slider2("SeparatorTextAlign", (float*)&style.SeparatorTextAlign, 0.0f, 1.0f, "%.2f");
+						ui::Slider2("SeparatorTextPadding", (float*)&style.SeparatorTextPadding, 0.0f, 40.0f, "%.0f");
+						ui::Slider("LogSliderDeadzone", style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
 
-						UI::Separator("Docking");
-						UI::Slider("DockingSplitterSize", style.DockingSeparatorSize, 0.0f, 12.0f, "%.0f");
+						ui::Separator("Docking");
+						ui::Slider("DockingSplitterSize", style.DockingSeparatorSize, 0.0f, 12.0f, "%.0f");
 
-						ImGui::SeparatorText("Tooltips");
+						gui::SeparatorText("Tooltips");
 						for (int n = 0; n < 2; n++)
-							if (ImGui::TreeNodeEx(n == 0 ? "HoverFlagsForTooltipMouse" : "HoverFlagsForTooltipNav"))
+							if (gui::TreeNodeEx(n == 0 ? "HoverFlagsForTooltipMouse" : "HoverFlagsForTooltipNav"))
 							{
 								ImGuiHoveredFlags* p = (n == 0) ? &style.HoverFlagsForTooltipMouse : &style.HoverFlagsForTooltipNav;
-								ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayNone", p, ImGuiHoveredFlags_DelayNone);
-								ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayShort", p, ImGuiHoveredFlags_DelayShort);
-								ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayNormal", p, ImGuiHoveredFlags_DelayNormal);
-								ImGui::CheckboxFlags("ImGuiHoveredFlags_Stationary", p, ImGuiHoveredFlags_Stationary);
-								ImGui::CheckboxFlags("ImGuiHoveredFlags_NoSharedDelay", p, ImGuiHoveredFlags_NoSharedDelay);
-								ImGui::TreePop();
+								gui::CheckboxFlags("ImGuiHoveredFlags_DelayNone", p, ImGuiHoveredFlags_DelayNone);
+								gui::CheckboxFlags("ImGuiHoveredFlags_DelayShort", p, ImGuiHoveredFlags_DelayShort);
+								gui::CheckboxFlags("ImGuiHoveredFlags_DelayNormal", p, ImGuiHoveredFlags_DelayNormal);
+								gui::CheckboxFlags("ImGuiHoveredFlags_Stationary", p, ImGuiHoveredFlags_Stationary);
+								gui::CheckboxFlags("ImGuiHoveredFlags_NoSharedDelay", p, ImGuiHoveredFlags_NoSharedDelay);
+								gui::TreePop();
 							}
 
-						ImGui::SeparatorText("Misc");
-						UI::Slider2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f"); ImGui::SameLine(); UI::HelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
+						gui::SeparatorText("Misc");
+						ui::Slider2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f"); gui::SameLine(); ui::HelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
 
-						ImGui::EndTabItem();
+						gui::EndTabItem();
 					}
 
-					if (ImGui::BeginTabItem("Colors"))
+					if (gui::BeginTabItem("Colors"))
 					{
 						static ImGuiTextFilter filter;
-						filter.Draw("Filter colors", ImGui::GetFontSize() * 16);
+						filter.Draw("Filter colors", gui::GetFontSize() * 16);
 
 						static ImGuiColorEditFlags alpha_flags = ImGuiColorEditFlags_AlphaPreviewHalf;
-						if (ImGui::RadioButton("Opaque", alpha_flags == ImGuiColorEditFlags_None)) { alpha_flags = ImGuiColorEditFlags_None; } ImGui::SameLine();
-						if (ImGui::RadioButton("Alpha", alpha_flags == ImGuiColorEditFlags_AlphaPreview)) { alpha_flags = ImGuiColorEditFlags_AlphaPreview; } ImGui::SameLine();
-						if (ImGui::RadioButton("Both", alpha_flags == ImGuiColorEditFlags_AlphaPreviewHalf)) { alpha_flags = ImGuiColorEditFlags_AlphaPreviewHalf; } ImGui::SameLine();
-						UI::HelpMarker(
+						if (gui::RadioButton("Opaque", alpha_flags == ImGuiColorEditFlags_None)) { alpha_flags = ImGuiColorEditFlags_None; } gui::SameLine();
+						if (gui::RadioButton("Alpha", alpha_flags == ImGuiColorEditFlags_AlphaPreview)) { alpha_flags = ImGuiColorEditFlags_AlphaPreview; } gui::SameLine();
+						if (gui::RadioButton("Both", alpha_flags == ImGuiColorEditFlags_AlphaPreviewHalf)) { alpha_flags = ImGuiColorEditFlags_AlphaPreviewHalf; } gui::SameLine();
+						ui::HelpMarker(
 							"In the color list:\n"
 							"Left-click on color square to open color picker,\n"
 							"Right-click to open edit options menu.");
 
-						ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 10), ImVec2(FLT_MAX, FLT_MAX));
-						ImGui::BeginChild("##colors", ImVec2(0, 0), ImGuiChildFlags_Border, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NavFlattened);
-						ImGui::PushItemWidth(ImGui::GetFontSize() * -12);
+						gui::SetNextWindowSizeConstraints(ImVec2(0.0f, gui::GetTextLineHeightWithSpacing() * 10), ImVec2(FLT_MAX, FLT_MAX));
+						gui::BeginChild("##colors", ImVec2(0, 0), ImGuiChildFlags_Border, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NavFlattened);
+						gui::PushItemWidth(gui::GetFontSize() * -12);
 						for (int i = 0; i < ImGuiCol_COUNT; i++)
 						{
-							const char* name = ImGui::GetStyleColorName(i);
+							const char* name = gui::GetStyleColorName(i);
 							if (!filter.PassFilter(name))
 								continue;
-							ImGui::PushID(i);
-							ImGui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | alpha_flags);
+							gui::PushID(i);
+							gui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | alpha_flags);
 							if (memcmp(&style.Colors[i], &ref->Colors[i], sizeof(ImVec4)) != 0)
 							{
 								// Tips: in a real user application, you may want to merge and use an icon font into the main font,
 								// so instead of "Save"/"Revert" you'd use icons!
 								// Read the FAQ and docs/FONTS.md about using icon fonts. It's really easy and super convenient!
-								ImGui::SameLine(0.0f, style.ItemInnerSpacing.x); if (ImGui::Button("Save")) { ref->Colors[i] = style.Colors[i]; }
-								ImGui::SameLine(0.0f, style.ItemInnerSpacing.x); if (ImGui::Button("Revert")) { style.Colors[i] = ref->Colors[i]; }
+								gui::SameLine(0.0f, style.ItemInnerSpacing.x); if (gui::Button("Save")) { ref->Colors[i] = style.Colors[i]; }
+								gui::SameLine(0.0f, style.ItemInnerSpacing.x); if (gui::Button("Revert")) { style.Colors[i] = ref->Colors[i]; }
 							}
-							ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-							ImGui::TextUnformatted(name);
-							ImGui::PopID();
+							gui::SameLine(0.0f, style.ItemInnerSpacing.x);
+							gui::TextUnformatted(name);
+							gui::PopID();
 						}
-						ImGui::PopItemWidth();
-						ImGui::EndChild();
+						gui::PopItemWidth();
+						gui::EndChild();
 
-						ImGui::EndTabItem();
+						gui::EndTabItem();
 					}
 
-					if (ImGui::BeginTabItem("Rendering"))
+					if (gui::BeginTabItem("Rendering"))
 					{
-						UI::Checkbox("Anti-aliased lines", style.AntiAliasedLines);
-						ImGui::SameLine();
-						UI::HelpMarker("When disabling anti-aliasing lines, you'll probably want to disable borders in your style as well.");
+						ui::Checkbox("Anti-aliased lines", style.AntiAliasedLines);
+						gui::SameLine();
+						ui::HelpMarker("When disabling anti-aliasing lines, you'll probably want to disable borders in your style as well.");
 
-						UI::Checkbox("Anti-aliased lines use texture", style.AntiAliasedLinesUseTex);
-						ImGui::SameLine();
-						UI::HelpMarker("Faster lines using texture data. Require backend to render with bilinear filtering (not point/nearest filtering).");
+						ui::Checkbox("Anti-aliased lines use texture", style.AntiAliasedLinesUseTex);
+						gui::SameLine();
+						ui::HelpMarker("Faster lines using texture data. Require backend to render with bilinear filtering (not point/nearest filtering).");
 
-						UI::Checkbox("Anti-aliased fill", style.AntiAliasedFill);
-						ImGui::PushItemWidth(ImGui::GetFontSize() * 8);
-						UI::Drag("Curve Tessellation Tolerance", style.CurveTessellationTol, 0.02f, 0.10f, 10.0f, "%.2f");
+						ui::Checkbox("Anti-aliased fill", style.AntiAliasedFill);
+						gui::PushItemWidth(gui::GetFontSize() * 8);
+						ui::Drag("Curve Tessellation Tolerance", style.CurveTessellationTol, 0.02f, 0.10f, 10.0f, "%.2f");
 						if (style.CurveTessellationTol < 0.10f) style.CurveTessellationTol = 0.10f;
 
 						// When editing the "Circle Segment Max Error" value, draw a preview of its effect on auto-tessellated circles.
-						UI::Drag("Circle Tessellation Max Error", style.CircleTessellationMaxError, 0.005f, 0.10f, 5.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-						const bool show_samples = ImGui::IsItemActive();
+						ui::Drag("Circle Tessellation Max Error", style.CircleTessellationMaxError, 0.005f, 0.10f, 5.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+						const bool show_samples = gui::IsItemActive();
 						if (show_samples)
-							ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
-						if (show_samples && ImGui::BeginTooltip())
+							gui::SetNextWindowPos(gui::GetCursorScreenPos());
+						if (show_samples && gui::BeginTooltip())
 						{
-							ImGui::TextUnformatted("(R = radius, N = number of segments)");
-							ImGui::Spacing();
-							ImDrawList* draw_list = ImGui::GetWindowDrawList();
-							const float min_widget_width = ImGui::CalcTextSize("N: MMM\nR: MMM").x;
+							gui::TextUnformatted("(R = radius, N = number of segments)");
+							gui::Spacing();
+							ImDrawList* draw_list = gui::GetWindowDrawList();
+							const float min_widget_width = gui::CalcTextSize("N: MMM\nR: MMM").x;
 							for (int n = 0; n < 8; n++)
 							{
 								const float RAD_MIN = 5.0f;
 								const float RAD_MAX = 70.0f;
 								const float rad = RAD_MIN + (RAD_MAX - RAD_MIN) * (float)n / (8.0f - 1.0f);
 
-								ImGui::BeginGroup();
+								gui::BeginGroup();
 
-								ImGui::Text("R: %.f\nN: %d", rad, draw_list->_CalcCircleAutoSegmentCount(rad));
+								gui::Text("R: %.f\nN: %d", rad, draw_list->_CalcCircleAutoSegmentCount(rad));
 
 								const float canvas_width = std::max(min_widget_width, rad * 2.0f);
 								const float offset_x = floorf(canvas_width * 0.5f);
 								const float offset_y = floorf(RAD_MAX);
 
-								const ImVec2 p1 = ImGui::GetCursorScreenPos();
-								draw_list->AddCircle(ImVec2(p1.x + offset_x, p1.y + offset_y), rad, ImGui::GetColorU32(ImGuiCol_Text));
-								ImGui::Dummy(ImVec2(canvas_width, RAD_MAX * 2));
+								const ImVec2 p1 = gui::GetCursorScreenPos();
+								draw_list->AddCircle(ImVec2(p1.x + offset_x, p1.y + offset_y), rad, gui::GetColorU32(ImGuiCol_Text));
+								gui::Dummy(ImVec2(canvas_width, RAD_MAX * 2));
 
 								/*
-								const ImVec2 p2 = ImGui::GetCursorScreenPos();
-								draw_list->AddCircleFilled(ImVec2(p2.x + offset_x, p2.y + offset_y), rad, ImGui::GetColorU32(ImGuiCol_Text));
-								ImGui::Dummy(ImVec2(canvas_width, RAD_MAX * 2));
+								const ImVec2 p2 = gui::GetCursorScreenPos();
+								draw_list->AddCircleFilled(ImVec2(p2.x + offset_x, p2.y + offset_y), rad, gui::GetColorU32(ImGuiCol_Text));
+								gui::Dummy(ImVec2(canvas_width, RAD_MAX * 2));
 								*/
 
-								ImGui::EndGroup();
-								ImGui::SameLine();
+								gui::EndGroup();
+								gui::SameLine();
 							}
-							ImGui::EndTooltip();
+							gui::EndTooltip();
 						}
-						ImGui::SameLine();
-						UI::HelpMarker("When drawing circle primitives with \"num_segments == 0\" tesselation will be calculated automatically.");
+						gui::SameLine();
+						ui::HelpMarker("When drawing circle primitives with \"num_segments == 0\" tesselation will be calculated automatically.");
 
-						UI::Drag("Global Alpha", style.Alpha, 0.005f, 0.20f, 1.0f, "%.2f"); // Not exposing zero here so user doesn't "lose" the UI (zero alpha clips all widgets). But application code could have a toggle to switch between zero and non-zero.
-						UI::Drag("Disabled Alpha", style.DisabledAlpha, 0.005f, 0.0f, 1.0f, "%.2f"); ImGui::SameLine(); UI::HelpMarker("Additional alpha multiplier for disabled items (multiply over current value of Alpha).");
-						ImGui::PopItemWidth();
+						ui::Drag("Global Alpha", style.Alpha, 0.005f, 0.20f, 1.0f, "%.2f"); // Not exposing zero here so user doesn't "lose" the UI (zero alpha clips all widgets). But application code could have a toggle to switch between zero and non-zero.
+						ui::Drag("Disabled Alpha", style.DisabledAlpha, 0.005f, 0.0f, 1.0f, "%.2f"); gui::SameLine(); ui::HelpMarker("Additional alpha multiplier for disabled items (multiply over current value of Alpha).");
+						gui::PopItemWidth();
 
-						ImGui::EndTabItem();
+						gui::EndTabItem();
 					}
 
-					ImGui::EndTabBar();
+					gui::EndTabBar();
 				}
 
-				ImGui::PopItemWidth();
+				gui::PopItemWidth();
 
-				ImGui::End();
+				gui::End();
 			}
 		}
 
 		void UI()
 		{
 	        static bool showPopup = false;
-		    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-			ImGui::SetNextWindowPos(viewport->WorkPos);
-			ImGui::SetNextWindowSize(viewport->WorkSize);
-			ImGui::SetNextWindowViewport(viewport->ID);
+		    const ImGuiViewport* viewport = gui::GetMainViewport();
+			gui::SetNextWindowPos(viewport->WorkPos);
+			gui::SetNextWindowSize(viewport->WorkSize);
+			gui::SetNextWindowViewport(viewport->ID);
 
-	        if (Project::Exists())
-	        {
-			    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-			    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	        }
+	        gui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+	        gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+	        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
-			if (ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
-				| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
-				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground))
+	        static bool enableMenuBar = true;
+	        static ImGuiWindowFlags windowFlags =
+	            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+	            | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+    	        | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+			if (gui::Begin("DockSpace", nullptr, windowFlags))
 			{
 			    if (!Project::Exists())
 			    {
+			        gui::PopStyleVar(3);
+			        windowFlags &= ~ImGuiWindowFlags_NoBackground;
+			        windowFlags &= ~ImGuiWindowFlags_MenuBar;
+
 			        static bool openProjNamePopup = false; // New persistent flag
 
-			        ImGui::PushFont(Globals.fontBig);
-			        if (ImGui::Button("New Project"))
+			        gui::PushFont(Globals.fontBig);
+			        if (gui::Button("New Project"))
 			        {
-			            ImGui::OpenPopup("New Project");
+			            gui::OpenPopup("New Project");
 			        }
-			        ImGui::PopFont();
+			        gui::PopFont();
 
 			        // File dialog logic
-			        std::string newProjectPath = UI::FileDialog("New Project", ".");
+			        std::string newProjectPath = ui::FileDialog("New Project", ".");
 			        static std::string newProjectSavePath;
 			        if (!newProjectPath.empty())
 			        {
@@ -1936,152 +1944,178 @@ namespace wc
 
 			        if (openProjNamePopup)
 			        {
-			            ImGui::OpenPopup("New Project - Name");
+			            gui::OpenPopup("New Project - Name");
 			            openProjNamePopup = false;
 			        }
 
-			        UI::CenterNextWindow();
-			        if (ImGui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			        ui::CenterNextWindow();
+			        if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 			        {
 			            static std::string projName = "Untitled";
-			            ImGui::InputText("Project Name", &projName);
+			            gui::InputText("Project Name", &projName);
 
-			            ImGui::BeginDisabled(projName.empty());
-			            if (ImGui::Button("OK"))
+			            gui::BeginDisabled(projName.empty());
+			            if (gui::Button("OK"))
 			            {
-			                if (Project::ExistListProj(projName))
+			                if (Project::ExistListProject(projName))
 			                {
-			                    ImGui::OpenPopup("Project Already Exists");
+			                    gui::OpenPopup("Project Already Exists");
 			                }
 			                else
 			                {
 			                    Project::Create(newProjectSavePath, projName);
 			                    newProjectSavePath.clear();
 			                    openProjNamePopup = false;
-			                    ImGui::CloseCurrentPopup();
+			                    gui::CloseCurrentPopup();
 			                }
 			            }
-			            ImGui::EndDisabled();
-			            if (projName.empty())ImGui::SetItemTooltip("Project name cannot be empty!");
+			            gui::EndDisabled();
+			            if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			            ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
-			            if (ImGui::Button("Cancel"))
+			            gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			            if (gui::Button("Cancel"))
 			            {
 			                projName = "Untitled";
 			                newProjectSavePath.clear();
 			                openProjNamePopup = false;
-			                ImGui::CloseCurrentPopup();
+			                gui::CloseCurrentPopup();
 			            }
 
-			            UI::CenterNextWindow();
-                        if (ImGui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			            ui::CenterNextWindow();
+                        if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
                         {
-                            ImGui::Text("Project with this name already exists!");
-                            if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
-                            ImGui::EndPopup();
+                            gui::Text("Project with this name already exists!");
+                            if (gui::Button("OK")) gui::CloseCurrentPopup();
+                            gui::EndPopup();
                         }
 
-			            ImGui::EndPopup();
+			            gui::EndPopup();
 			        }
 
-			        ImGui::SameLine();
+			        gui::SameLine();
 
-			        ImGui::PushFont(Globals.fontBig);
-			        if (ImGui::Button("Open Project"))
+			        gui::PushFont(Globals.fontBig);
+			        if (gui::Button("Open Project"))
 			        {
-			            ImGui::OpenPopup("Open Project");
+			            gui::OpenPopup("Open Project");
 			        }
-			        ImGui::PopFont();
-			        std::string openProjectPath = UI::FileDialog("Open Project", ".");
+			        gui::PopFont();
+			        std::string openProjectPath = ui::FileDialog("Open Project", ".");
 			        if (!openProjectPath.empty())
                     {
                         Project::Load(openProjectPath);
                     }
 
-			        ImGui::Separator();
+			        gui::Separator();
 
-			        if (ImGui::BeginChild("Project Display", ImVec2(0, 0)))
+			        if (gui::BeginChild("Project Display", ImVec2(0, 0)))
 			        {
-			            ImGui::PushFont(Globals.fontBig);
+			            gui::PushFont(Globals.fontBig);
 			            for (auto project : Project::savedProjectPaths)
                         {
 			                std::filesystem::path path = project;
 			                if (std::filesystem::exists(path))
 			                {
-			                    if (ImGui::Button((path.filename().string() + "##" + path.string()).c_str()))
+			                    if (gui::Button((path.filename().string() + "##" + path.string()).c_str()))
                                 {
                                     Project::Load(project);
                                 }
 
-			                    ImGui::SameLine(0, 100);
-			                    ImGui::Text("FullPath: %s", project.c_str());
-			                    ImGui::SameLine();
-			                    if (ImGui::Button(("Delete##" + path.string()).c_str()))
+			                    gui::SameLine(0, 100);
+			                    gui::Text("FullPath: %s", project.c_str());
+			                    gui::SameLine();
+			                    if (gui::Button(("Delete##" + path.string()).c_str()))
 			                    {
-			                        ImGui::OpenPopup("Delete Project");
+			                        gui::OpenPopup("Delete Project");
 			                    }
 			                }
 			                else WC_CORE_WARN("Project path does not exist: {0}", project);
 
-			                UI::CenterNextWindow();
-			                if (ImGui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			                ui::CenterNextWindow();
+			                if (gui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 			                {
-			                    ImGui::Text("Are you sure you want to delete this project?");
-			                    if (ImGui::Button("Yes##Delete"))
+			                    gui::Text("Are you sure you want to delete this project?");
+			                    if (gui::Button("Yes##Delete"))
 			                    {
 			                        Project::Delete(project);
-			                        ImGui::CloseCurrentPopup();
+			                        gui::CloseCurrentPopup();
 			                    }
 
-			                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("No").x - ImGui::GetStyle().FramePadding.x * 2);
-			                    if (ImGui::Button("No##Delete")) ImGui::CloseCurrentPopup();
+			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x * 2);
+			                    if (gui::Button("No##Delete")) gui::CloseCurrentPopup();
 
-			                    ImGui::EndPopup();
+			                    gui::EndPopup();
 			                }
                         }
-			            ImGui::PopFont();
+			            gui::PopFont();
 			        }
-			        ImGui::EndChild();
+			        gui::EndChild();
 
 			    }
 			    else
 			    {
-			        ImGui::PopStyleVar(3);
+			        gui::PopStyleVar(3);
+			        windowFlags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBackground;
 
-			        ImGuiIO& io = ImGui::GetIO();
+			        ImGuiIO& io = gui::GetIO();
 			        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 			        {
-			            ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-			            ImGui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
+			            ImGuiID dockspace_id = gui::GetID("MainDockSpace");
+			            gui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
 			        }
 
-			        if (ImGui::BeginMenuBar())
+			        if (gui::BeginMenuBar())
 			        {
 			            // TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
-			            if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
+			            if (gui::IsWindowHovered() && !gui::IsAnyItemHovered())
 			            {
 			                //WC_CORE_INFO("Empty space on main menu bar is hovered)"
 			            }
 
-			            //ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+			            if (gui::BeginMenu(("[" + Project::name + "]").c_str())){
+			                if (gui::MenuItem("Change", "CTRL + P")) Project::Clear();
 
-			            if (ImGui::BeginMenu("File"))
+			                // Delete - TODO: FIX IF NEEDED
+			                /*ImGui::Separator();
+			                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.f, 0.f, 0.f, 1.f));
+			                if (ui::MenuItemButton("Delete")) gui::OpenPopup("Delete Project");
+			                ImGui::PopStyleColor();
+
+			                if (gui::BeginPopupModal("Delete Project"))
+			                {
+                                gui::Text("Are you sure you want to delete this project?");
+			                    if (gui::Button("Yes"))
+                                {
+			                        const std::string path = Project::rootPath;
+
+
+                                    gui::CloseCurrentPopup();
+                                }
+			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			                    if (gui::Button("Cancel")) gui::CloseCurrentPopup();
+			                    gui::EndPopup();
+			                }*/
+
+			                gui::EndMenu();
+			            }
+
+			            gui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+
+			            if (gui::BeginMenu("File"))
 			            {
-                            ImGui::SeparatorText(("Project: [" + Project::name + "]").c_str());
-
-			                if (ImGui::MenuItem("Change", "CTRL + P"))
+			                if (gui::MenuItem("Change", "CTRL + P"))
                             {
                                 Project::Clear();
                             }
 
-			                ImGui::SeparatorText("Scene");
+			                gui::SeparatorText("Scene");
 
 			                static bool openSceneNamePopup = false; // New persistent flag
-			                if (UI::MenuItemButton("New", "CTRL + N", false))
+			                if (ui::MenuItemButton("New", "CTRL + N", false))
 			                {
-                                ImGui::OpenPopup("New Scene");
+                                gui::OpenPopup("New Scene");
 			                }
-			                std::string newScenePath = UI::FileDialog("New Scene", ".", Project::rootPath);
+			                std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
 			                static std::string newSceneSavePath;
 			                if (!newScenePath.empty())
                             {
@@ -2091,151 +2125,151 @@ namespace wc
 
 			                if (openSceneNamePopup)
 			                {
-			                    ImGui::OpenPopup("New Scene - Name");
+			                    gui::OpenPopup("New Scene - Name");
 			                    openSceneNamePopup = false;
 			                }
 
-			                UI::CenterNextWindow();
-			                if (ImGui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			                ui::CenterNextWindow();
+			                if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
 			                {
 			                    static std::string projName = "Untitled";
-			                    ImGui::InputText("Project Name", &projName);
+			                    gui::InputText("Project Name", &projName);
 
-			                    ImGui::BeginDisabled(projName.empty());
-			                    if (ImGui::Button("OK"))
+			                    gui::BeginDisabled(projName.empty());
+			                    if (gui::Button("OK"))
 			                    {
 			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
 			                        Project::Create(newSceneSavePath, projName);
 			                        projName = "Untitled";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
-			                        ImGui::CloseCurrentPopup();
+			                        gui::CloseCurrentPopup();
 			                    }
-			                    ImGui::EndDisabled();
-			                    if (projName.empty())ImGui::SetItemTooltip("Project name cannot be empty!");
+			                    gui::EndDisabled();
+			                    if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x);
-			                    if (ImGui::Button("Cancel"))
+			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			                    if (gui::Button("Cancel"))
 			                    {
 			                        projName = "Untitled";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
-			                        ImGui::CloseCurrentPopup();
+			                        gui::CloseCurrentPopup();
 			                    }
 
-			                    ImGui::EndPopup();
+			                    gui::EndPopup();
 			                }
 
-			                if (UI::MenuItemButton("Open", "CTRL + O", false))
+			                if (ui::MenuItemButton("Open", "CTRL + O", false))
 			                {
-			                    ImGui::OpenPopup("Open Scene");
+			                    gui::OpenPopup("Open Scene");
 			                }
-			                std::string sOpenPath = UI::FileDialog("Open Scene", ".scene", Project::rootPath);
+			                std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath);
 			                if (!sOpenPath.empty())
 			                {
 			                    m_Scene.Load(sOpenPath);
-			                    ImGui::CloseCurrentPopup();
+			                    gui::CloseCurrentPopup();
 			                }
 
-			                ImGui::SeparatorText("File");
+			                gui::SeparatorText("File");
 
-			                if (ImGui::MenuItem("Save", "CTRL + S"))
+			                if (gui::MenuItem("Save", "CTRL + S"))
 			                {
 			                    m_Scene.Save("testScene.scene");
 			                }
 
-			                if (ImGui::MenuItem("Undo", "CTRL + Z"))
+			                if (gui::MenuItem("Undo", "CTRL + Z"))
                             {
                                 WC_INFO("Undo");
                             }
 
-			                if (ImGui::MenuItem("Redo", "CTRL + Y"))
+			                if (gui::MenuItem("Redo", "CTRL + Y"))
                             {
                                 WC_INFO("Redo");
                             }
 
-			                ImGui::EndMenu();
+			                gui::EndMenu();
 			            }
 
-			            if (ImGui::BeginMenu("View"))
+			            if (gui::BeginMenu("View"))
 			            {
-			                ImGui::MenuItem("Editor", NULL, &showEditor);
-			                ImGui::MenuItem("Scene properties", NULL, &showSceneProperties);
-			                ImGui::MenuItem("Entities", NULL, &showEntities);
-			                ImGui::MenuItem("Properties", NULL, &showProperties);
-			                ImGui::MenuItem("Console", NULL, &showConsole);
-			                ImGui::MenuItem("File Explorer", NULL, &showFileExplorer);
-			                ImGui::MenuItem("Debug Statistics", NULL, &showDebugStats);
-			                ImGui::MenuItem("Style Editor", NULL, &showStyleEditor);
+			                gui::MenuItem("Editor", nullptr, &showEditor);
+			                gui::MenuItem("Scene properties", nullptr, &showSceneProperties);
+			                gui::MenuItem("Entities", nullptr, &showEntities);
+			                gui::MenuItem("Properties", nullptr, &showProperties);
+			                gui::MenuItem("Console", nullptr, &showConsole);
+			                gui::MenuItem("File Explorer", nullptr, &showFileExplorer);
+			                gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
+			                gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
 
-			                if (ImGui::BeginMenu("Theme"))
+			                if (gui::BeginMenu("Theme"))
 			                {
 			                    // TODO - Add more themes / custom themes / save themes
 			                    static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
 			                    static int currentTheme = 0; // Default to SoDark
 			                    static float hue = 0.0f;
 
-			                    if (ImGui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
+			                    if (gui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
 			                    {
 			                        switch (currentTheme)
 			                        {
 			                            case 0: // SoDark
-			                                ImGui::GetStyle() = UI::SoDark(hue);
+			                                gui::GetStyle() = ui::SoDark(hue);
 			                            break;
 			                            case 1: // Classic
-			                                ImGui::StyleColorsClassic();
+			                                gui::StyleColorsClassic();
 			                            break;
 			                            case 2: // Dark
-			                                ImGui::StyleColorsDark();
+			                                gui::StyleColorsDark();
 			                            break;
 			                            case 3: // Light
-			                                ImGui::StyleColorsLight();
+			                                gui::StyleColorsLight();
 			                            break;
 			                        }
 			                    }
 
-			                    if (currentTheme == 0 && ImGui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
+			                    if (currentTheme == 0 && gui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
 			                    {
-			                        ImGui::GetStyle() = UI::SoDark(hue);
+			                        gui::GetStyle() = ui::SoDark(hue);
 			                    }
 
-			                    ImGui::EndMenu();
+			                    gui::EndMenu();
 			                }
 
-			                ImGui::EndMenu();
+			                gui::EndMenu();
 			            }
 
 			            // Buttons
-			            /*ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-			            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-			            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-			            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			            /*gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+			            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+			            gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+			            gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 
-			            float buttonSize = ImGui::GetFrameHeightWithSpacing();
+			            float buttonSize = gui::GetFrameHeightWithSpacing();
 
-			            ImGui::SameLine(ImGui::GetContentRegionMax().x - 3 * (buttonSize + ImGui::GetStyle().ItemSpacing.x));
-			            if (ImGui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
+			            gui::SameLine(gui::GetContentRegionMax().x - 3 * (buttonSize + gui::GetStyle().ItemSpacing.x));
+			            if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
 			            {
 			                //Globals.window.Collapse();
 			            }
 
-			            ImGui::SameLine();
-			            if (ImGui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
+			            gui::SameLine();
+			            if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
 			            {
 			                //Globals.window.Maximize();
 			            }
 
-			            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
-			            ImGui::SameLine();
-			            if (ImGui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+			            gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
+			            gui::SameLine();
+			            if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
 			            {
 			                Globals.window.Close();
 			            }
 
-			            ImGui::PopStyleVar();
-			            ImGui::PopStyleColor(4);*/
+			            gui::PopStyleVar();
+			            gui::PopStyleColor(4);*/
 
-			            ImGui::EndMenuBar();
+			            gui::EndMenuBar();
 			        }
 
 			        if (showEditor) UI_Editor();
@@ -2248,7 +2282,7 @@ namespace wc
 			        if (showStyleEditor) UI_StyleEditor();
 			    }
 			}
-			ImGui::End();
+			gui::End();
 		}
 
 		void Resize(glm::vec2 size)
@@ -2269,6 +2303,9 @@ namespace wc
 			t_FolderEmpty.Destroy();
 	        t_Reorder.Destroy();
 	        t_Bond.Destroy();
+	        t_Play.Destroy();
+	        t_Simulate.Destroy();
+	        t_Stop.Destroy();
 
 	        assetManager.Free();
 			m_Renderer.Deinit();

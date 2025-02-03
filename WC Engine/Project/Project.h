@@ -29,7 +29,7 @@ namespace wc
             std::string filepath = std::filesystem::current_path().string() + "/SavedProjects.yaml";
             if (!std::filesystem::exists(filepath))
             {
-                WC_CORE_ERROR("{} does not exist.", filepath);
+                WC_CORE_ERROR("List Loading Failed -> Save file at does not exist: {}", filepath);
                 return;
             }
 
@@ -42,31 +42,31 @@ namespace wc
                 }
                 else
                 {
-                    WC_CORE_WARN("Project path does not exist: {0} ->> Deleting", each.as<std::string>());
+                    WC_CORE_WARN("List Loading Failed -> Project path does not exist: {0} ->> Deleting", each.as<std::string>());
                     std::erase(savedProjectPaths, each.as<std::string>());
                     SaveSavedProjects();
                 }
             }
         }
 
-        inline void SaveListProj()
+        inline void SaveListProject()
         {
             // add if doesnt exist
             if (std::find(savedProjectPaths.begin(), savedProjectPaths.end(), rootPath) == savedProjectPaths.end())
             {
-                savedProjectPaths.push_back(rootPath + "/" + name + ".blz");
+                savedProjectPaths.push_back(rootPath);
                 SaveSavedProjects();
             }
         }
 
-        inline void RemoveListProj()
+        inline void RemoveListProject()
         {
-            std::erase(savedProjectPaths, rootPath + "/" + name + ".blz");
+            std::erase(savedProjectPaths, rootPath);
             SaveSavedProjects();
         }
 
         //name without extension
-        inline bool ExistListProj(const std::string &pName)
+        inline bool ExistListProject(const std::string &pName)
         {
             for (auto& each : savedProjectPaths)
             {
@@ -80,21 +80,21 @@ namespace wc
 
         inline void Create(const std::string& filepath, const std::string& pName)
         {
-            if (ExistListProj(pName))
+            if (ExistListProject(pName))
             {
-                WC_CORE_WARN("Project with this name already exists: {0}", pName);
+                WC_CORE_WARN("Create Failed -> Project with this name already exists: {0}", pName);
                 return;
             }
 
             if (std::filesystem::path(filepath).extension().string() == ".blz")
             {
-                WC_CORE_WARN("Project path cannot have .blz extension: {0}", filepath);
+                WC_CORE_WARN("Create Failed -> Project path cannot have .blz extension: {0}", filepath);
                 return;
             }
 
             name = pName;
-            rootPath = filepath;
-            SaveListProj();
+            rootPath = filepath + "/" + pName + ".blz";
+            SaveListProject();
             std::filesystem::create_directory(filepath + "/" + pName + ".blz");
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Scenes");
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Assets");
@@ -105,24 +105,24 @@ namespace wc
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Assets/Shaders");
             std::filesystem::create_directory(filepath + "/" + pName + ".blz" + "/Assets/Entities");
 
-            WC_CORE_INFO("Created project: {0} at {1}", pName, filepath);
+            WC_CORE_INFO("Create Successful -> Created project: {0} at {1}", pName, filepath);
         }
 
         inline bool Load(const std::string& filepath)
         {
             if(!std::filesystem::exists(filepath))
             {
-                WC_CORE_ERROR("{} does not exist.", filepath);
+                WC_CORE_ERROR("Load Failed -> {} does not exist.", filepath);
                 return false;
             }
             else if(!std::filesystem::is_directory(filepath))
             {
-                WC_CORE_ERROR("{} is not a directory.", filepath);
+                WC_CORE_ERROR("Load Failed -> {} is not a directory.", filepath);
                 return false;
             }
             else if (filepath.find(".blz") == std::string::npos)
             {
-                WC_CORE_ERROR("{} is not a .BLproj file.", filepath);
+                WC_CORE_ERROR("Load Failed -> {} is not a .blz file.", filepath);
                 return false;
             }
             else
@@ -130,26 +130,12 @@ namespace wc
                 //Everything is fine - open project
                 name = std::filesystem::path(filepath).stem().string();
                 rootPath = filepath;
-                SaveListProj();
-                WC_CORE_INFO("Opened project: {0} at {1}", name, filepath);
+                SaveListProject();
+                WC_CORE_INFO("Load Successful -> Opened project: {0} at {1}", name, filepath);
             }
 
 
             return true;
-        }
-
-        inline void Delete(const std::string& filepath)
-        {
-            if (std::filesystem::exists(filepath))
-            {
-                std::filesystem::remove_all(filepath);
-                std::erase(savedProjectPaths, filepath);
-                WC_CORE_INFO("Deleted project: {0}", filepath);
-            }
-            else
-            {
-                WC_CORE_WARN("Project path does not exist: {0}", filepath);
-            }
         }
 
         inline void Clear()
@@ -157,6 +143,26 @@ namespace wc
             name = "";
             rootPath = "";
             firstScene = "";
+        }
+
+        inline void Delete(const std::string& filepath)
+        {
+            if (std::filesystem::exists(filepath))
+            {
+                WC_CORE_INFO(std::filesystem::path(filepath).extension().string());
+                if (std::filesystem::path(filepath).extension().string() == ".blz")
+                {
+                    std::filesystem::remove_all(filepath);
+                    RemoveListProject();
+                    Clear();
+                    WC_CORE_INFO("Delete Successful -> Deleted project: {0}", filepath);
+                }
+                else WC_CORE_WARN("Delete Failed -> Directory is not a .blz project: {0}", filepath);
+            }
+            else
+            {
+                WC_CORE_WARN("Delete Failed -> Project path does not exist: {0}", filepath);
+            }
         }
 
         inline bool Exists()

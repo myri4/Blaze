@@ -19,19 +19,10 @@ namespace wc
 		Clock deltaTimer;
 		float deltaTime = 0.f;
 
-		void HandleWindowState()
-		{
-			window.SetMaximized(!isWindowMaximized);
-			isWindowMaximized = !isWindowMaximized;
-		}
-
 		void UpdateTime()
 		{
 			deltaTime = deltaTimer.restart();
 		}
-
-	private:
-		bool isWindowMaximized = window.IsMaximized();
 	};
 
 	inline GlobalVariables Globals;

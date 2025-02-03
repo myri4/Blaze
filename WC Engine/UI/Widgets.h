@@ -7,7 +7,7 @@
 
 namespace wc
 {
-	namespace UI
+	namespace ui
 	{
 	    //Center Window
         inline void CenterNextWindow(bool once = false)
