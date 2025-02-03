@@ -1,1 +1,1 @@
-# WC-Engine
+# Blaze - 2D Game Engine
