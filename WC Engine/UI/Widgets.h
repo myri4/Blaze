@@ -10,9 +10,10 @@ namespace wc
 	namespace ui
 	{
 	    //Center Window
+	    //if left on false, no need for ImGuiWindowFlags_NoMove
         inline void CenterNextWindow(bool once = false)
         {
-	        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), once ? ImGuiCond_Once : ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), once ? ImGuiCond_Once : ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         }
 
 	    const std::unordered_map<std::string, std::string> fileTypeExt =

@@ -86,7 +86,7 @@ namespace wc
                 return;
             }
 
-            if (std::filesystem::path(filepath).extension().string() == ".blz")
+            if (filepath.find(".blz") != std::string::npos)
             {
                 WC_CORE_WARN("Create Failed -> Project path cannot have .blz extension: {0}", filepath);
                 return;
@@ -115,17 +115,16 @@ namespace wc
                 WC_CORE_ERROR("Load Failed -> {} does not exist.", filepath);
                 return false;
             }
-            else if(!std::filesystem::is_directory(filepath))
+            if(!std::filesystem::is_directory(filepath))
             {
                 WC_CORE_ERROR("Load Failed -> {} is not a directory.", filepath);
                 return false;
             }
-            else if (filepath.find(".blz") == std::string::npos)
+            if (std::filesystem::path(filepath).extension().string() != ".blz")
             {
                 WC_CORE_ERROR("Load Failed -> {} is not a .blz file.", filepath);
                 return false;
             }
-            else
             {
                 //Everything is fine - open project
                 name = std::filesystem::path(filepath).stem().string();

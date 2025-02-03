@@ -9,3 +9,4 @@ cmake-build-relwithdebinfo-visual-studio
 .idea
 build/
 WC Engine/workdir/SavedProjects.yaml
+WC Engine/workdir/assets/imgui.ini

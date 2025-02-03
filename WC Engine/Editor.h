@@ -427,11 +427,11 @@ namespace wc
 				bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
 				bool isPaused = (m_SceneState == SceneState::Edit);
 
-			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 0));
 				if (isPlayingOrSimulating) gui::BeginDisabled();
-				if (gui::ImageButton("play", t_Play, {20, 20}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine();
+				if (gui::ImageButton("play", t_Play, {20, 20}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 
-			    if (gui::ImageButton("simulate", t_Simulate, {20, 20}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine();
+			    if (gui::ImageButton("simulate", t_Simulate, {20, 20}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 				if (isPlayingOrSimulating) gui::EndDisabled();
 
 				if (isPaused) gui::BeginDisabled();
@@ -831,8 +831,8 @@ namespace wc
 			        showPopup = false;
                 }
 
-			    gui::SetNextWindowPos(gui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			    ui::CenterNextWindow();
+				if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 				{
 					ImVec2 center = gui::GetMainViewport()->GetCenter();
 					ImVec2 windowSize = gui::GetWindowSize();
@@ -841,48 +841,35 @@ namespace wc
 
 					static std::string name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
 				    gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
-                    float size = gui::CalcItemWidth();
+				    const float widgetSize = gui::GetItemRectSize().x;
 
+                    gui::BeginDisabled(name.empty());
 					if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 					{
-						if (!name.empty())
-						{
-						    if (m_Scene.GetWorld().lookup(name.c_str()) == flecs::entity::null())
-						    {
-						        m_SelectedEntity = m_Scene.AddEntity(name);
-						        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-						        gui::CloseCurrentPopup();
-						    }
-						    else
-						        gui::OpenPopup("WarnNameExists");
-						}
-						else
-						{
-							gui::SetNextWindowPos(gui::GetMousePos());
-							gui::OpenPopup("WarnEmptyName");
-						}
+					    if (m_Scene.GetWorld().lookup(name.c_str()) == flecs::entity::null())
+					    {
+					        m_SelectedEntity = m_Scene.AddEntity(name);
+					        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
+					        gui::CloseCurrentPopup();
+					    }
+					    else gui::OpenPopup("WarnNameExists");
 					}
+				    gui::EndDisabled();
+				    if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
 
 				    gui::SameLine();
-				    gui::SetCursorPosX(size);
+				    gui::SetCursorPosX(widgetSize);
 				    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 				    {
 				        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
 				        gui::CloseCurrentPopup();
 				    }
 
-					if (gui::BeginPopupModal("WarnEmptyName", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |	ImGuiWindowFlags_NoMove))
-					{
-						gui::Text("Name cannot be empty!");
-
-					    if (gui::Button("Close")) gui::CloseCurrentPopup();
-
-						gui::EndPopup();
-					}
-
-				    if (gui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    ui::CenterNextWindow();
+				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
 				    {
 				        gui::Text("Name already exists!");
+
 				        if (gui::Button("Close")) gui::CloseCurrentPopup();
 				        gui::EndPopup();
 				    }
@@ -943,7 +930,8 @@ namespace wc
 				        }
 				    }
 
-				    if (gui::BeginPopupModal("WarnNameExists", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    ui::CenterNextWindow();
+				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
 				    {
 				        gui::Text("Name already exists!");
 				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
@@ -999,15 +987,14 @@ namespace wc
                                     gui::OpenPopup("Create Material##popup");
 				                gui::PopStyleColor();
 
-				                // TODO - add a popup for a new Material and save/load them
-				                gui::SetNextWindowPos(gui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+				                ui::CenterNextWindow();
+				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
 				                {
 				                    PhysicsMaterial newMaterial;
 
 				                    static std::string name;
 				                    gui::InputText("Name", &name);
-				                    float size = gui::CalcItemWidth();
+				                    const float widgetSize = gui::GetItemRectSize().x;
 
 				                    if (gui::Button("Create"))
 				                    {
@@ -1016,9 +1003,8 @@ namespace wc
 				                        gui::CloseCurrentPopup();
 				                    }
 				                    gui::SameLine();
-				                    gui::SetCursorPosX(size);
-				                    if (gui::Button("Cancel"))
-                                        gui::CloseCurrentPopup();
+				                    gui::SetCursorPosX(widgetSize);
+				                    if (gui::Button("Cancel")) gui::CloseCurrentPopup();
 
 				                    gui::EndPopup();
 				                }
@@ -1287,14 +1273,24 @@ namespace wc
 
 		void UI_Assets()
 		{
-			static const std::filesystem::path assetsPath = Project::rootPath;
-
+	        auto assetsPath = std::filesystem::path(Project::rootPath);
 			static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
 			static std::filesystem::path selectedFolderPath = assetsPath;
 			static std::vector<std::filesystem::path> openedFiles;
 			static std::unordered_set<std::string> openedFileNames;
 	        static bool showIcons = true;
 	        static bool previewAsset = true;
+
+	        // reset variables every time root changes
+	        static std::filesystem::path prevRootPath;
+	        if (assetsPath != prevRootPath)
+	        {
+	            selectedFolderPath = assetsPath;
+	            folderStates.clear();
+	            openedFiles.clear();
+	            openedFileNames.clear();
+	            prevRootPath = assetsPath;
+	        }
 
 			// Expand all helper func
 			std::function<void(const std::filesystem::path&, bool)> setFolderStatesRecursively =
@@ -1393,7 +1389,8 @@ namespace wc
 									}
 								}
 
-							    if (gui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollbar))
+							    ui::CenterNextWindow();
+							    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							    {
 							        gui::Text("Are you sure you want to load this scene?");
 							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
@@ -1401,7 +1398,7 @@ namespace wc
 							            m_Scene.Load(entry.path().string());
 							            gui::CloseCurrentPopup();
 							        }
-							        gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+							        gui::SameLine(gui::CalcTextSize("Are you sure you want to load this scene?").x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 							        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
 							            gui::CloseCurrentPopup();
 
@@ -1446,7 +1443,7 @@ namespace wc
 						    gui::PushItemWidth(gui::GetContentRegionAvail().x);
 						    gui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
 						    gui::PopItemWidth();
-						    if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string(); //
+						    if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
 						    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
 
 						    gui::Separator();
@@ -1541,7 +1538,8 @@ namespace wc
 										gui::PopTextWrapPos();
 										gui::EndGroup();
 
-									    if (gui::BeginPopupModal("Confirm", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
+									    ui::CenterNextWindow();
+									    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
                                         {
                                             gui::Text("Are you sure you want to load this scene?");
                                             if (gui::Button("Yes") || gui::IsKeyPressed(ImGuiKey_Enter))
@@ -1550,10 +1548,10 @@ namespace wc
                                                 gui::CloseCurrentPopup();
                                             }
 
-									     gui::SameLine(gui::GetWindowWidth() - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x * 2 - 5);
-									     if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+									        gui::SameLine(gui::CalcTextSize("Are you sure you want to load this scene?").x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x * 2 - 5);
+									        if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
-                                            gui::EndPopup();
+									        gui::EndPopup();
                                         }
 
 									}
@@ -1949,10 +1947,11 @@ namespace wc
 			        }
 
 			        ui::CenterNextWindow();
-			        if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			        if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			        {
 			            static std::string projName = "Untitled";
 			            gui::InputText("Project Name", &projName);
+			            const float widgetSize = gui::GetItemRectSize().x;
 
 			            gui::BeginDisabled(projName.empty());
 			            if (gui::Button("OK"))
@@ -1972,7 +1971,7 @@ namespace wc
 			            gui::EndDisabled();
 			            if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			            gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			            gui::SameLine(widgetSize - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			            if (gui::Button("Cancel"))
 			            {
 			                projName = "Untitled";
@@ -1982,7 +1981,7 @@ namespace wc
 			            }
 
 			            ui::CenterNextWindow();
-                        if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+                        if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
                         {
                             gui::Text("Project with this name already exists!");
                             if (gui::Button("OK")) gui::CloseCurrentPopup();
@@ -2032,7 +2031,7 @@ namespace wc
 			                else WC_CORE_WARN("Project path does not exist: {0}", project);
 
 			                ui::CenterNextWindow();
-			                if (gui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			                if (gui::BeginPopupModal("Delete Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
 			                    gui::Text("Are you sure you want to delete this project?");
 			                    if (gui::Button("Yes##Delete"))
@@ -2041,7 +2040,7 @@ namespace wc
 			                        gui::CloseCurrentPopup();
 			                    }
 
-			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x * 2);
+			                    gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("No##Delete")) gui::CloseCurrentPopup();
 
 			                    gui::EndPopup();
@@ -2103,11 +2102,6 @@ namespace wc
 
 			            if (gui::BeginMenu("File"))
 			            {
-			                if (gui::MenuItem("Change", "CTRL + P"))
-                            {
-                                Project::Clear();
-                            }
-
 			                gui::SeparatorText("Scene");
 
 			                static bool openSceneNamePopup = false; // New persistent flag
@@ -2128,30 +2122,36 @@ namespace wc
 			                    gui::OpenPopup("New Scene - Name");
 			                    openSceneNamePopup = false;
 			                }
+			                if (openSceneNamePopup)
+			                {
+			                    gui::OpenPopup("New Scene - Name");
+			                    openSceneNamePopup = false;
+			                }
 
 			                ui::CenterNextWindow();
-			                if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar))
+			                if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
-			                    static std::string projName = "Untitled";
-			                    gui::InputText("Project Name", &projName);
+			                    static std::string sceneName = "Untitled";
+			                    gui::InputText("Scene Name", &sceneName);
+			                    const float widgetWidth = gui::GetItemRectSize().x;
 
-			                    gui::BeginDisabled(projName.empty());
+			                    gui::BeginDisabled(sceneName.empty());
 			                    if (gui::Button("OK"))
 			                    {
 			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
-			                        Project::Create(newSceneSavePath, projName);
-			                        projName = "Untitled";
+			                        Project::Create(newSceneSavePath, sceneName);
+			                        sceneName = "Untitled";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
 			                    }
 			                    gui::EndDisabled();
-			                    if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
+			                    if (sceneName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("Cancel"))
 			                    {
-			                        projName = "Untitled";
+			                        sceneName = "Untitled";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
@@ -2272,14 +2272,18 @@ namespace wc
 			            gui::EndMenuBar();
 			        }
 
-			        if (showEditor) UI_Editor();
-			        if (showSceneProperties) UI_SceneProperties();
-			        if (showEntities) UI_Entities();
-			        if (showProperties) UI_Properties();
-			        if (showConsole) UI_Console();
-			        if (showFileExplorer) UI_Assets();
-			        if (showDebugStats) UI_DebugStats();
-			        if (showStyleEditor) UI_StyleEditor();
+			        // check again because we can change state with menu bar (inside this else-case)
+			        if (Project::Exists())
+			        {
+			            if (showEditor) UI_Editor();
+			            if (showSceneProperties) UI_SceneProperties();
+			            if (showEntities) UI_Entities();
+			            if (showProperties) UI_Properties();
+			            if (showConsole) UI_Console();
+			            if (showFileExplorer) UI_Assets();
+			            if (showDebugStats) UI_DebugStats();
+			            if (showStyleEditor) UI_StyleEditor();
+			        }
 			    }
 			}
 			gui::End();
