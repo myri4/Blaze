@@ -171,7 +171,7 @@ namespace wc
 
 			m_World.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
-					pc.Translation = glm::mix(p.prevPos, p.body.GetPosition(), alpha);
+					pc.Translation = {glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z};
 					pc.Rotation = glm::mix(p.previousRotation, p.body.GetAngle(), alpha);
 				});
 		}
@@ -367,7 +367,7 @@ namespace wc
 			if (transformComponent)
 			{
 				deserializedEntity.set<TransformComponent>({
-					transformComponent["Translation"].as<glm::vec2>(),
+					transformComponent["Translation"].as<glm::vec3>(),
 					transformComponent["Scale"].as<glm::vec2>(),
 					glm::radians(transformComponent["Rotation"].as<float>())
 					});

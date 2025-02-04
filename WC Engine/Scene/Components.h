@@ -17,13 +17,13 @@ namespace wc
 
 	struct TransformComponent
 	{
-		glm::vec2 Translation = glm::vec2(0.f);
+		glm::vec3 Translation = glm::vec3(0.f);
 		glm::vec2 Scale = glm::vec2(1.f);
 		float Rotation = 0.f;
 
 		glm::mat4 GetTransform() const
 		{
-			return glm::translate(glm::mat4(1.f), glm::vec3(Translation, 0.f)) * glm::rotate(glm::mat4(1.f), Rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.0f), glm::vec3(Scale, 1.f));
+			return glm::translate(glm::mat4(1.f), Translation) * glm::rotate(glm::mat4(1.f), Rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.0f), glm::vec3(Scale, 1.f));
 		}
 	};
 

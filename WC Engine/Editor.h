@@ -500,7 +500,7 @@ namespace wc
 
 						// Update the entity's local transform
 						m_SelectedEntity.set<TransformComponent>({
-							glm::vec2(translation),
+							glm::vec3(translation),
 							glm::vec2(scale),
 							rotation.z
 							});
@@ -657,7 +657,7 @@ namespace wc
 				if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
 				{
 					if (entity.has<TransformComponent>())
-						camera.Position = glm::vec3(entity.get<TransformComponent>()->Translation, 0.f);
+						camera.Position = entity.get<TransformComponent>()->Translation;
 				}
 
 				if(dragMode)
@@ -870,7 +870,7 @@ namespace wc
 				    {
 				        gui::Text("Name already exists!");
 
-				        if (gui::Button("Close")) gui::CloseCurrentPopup();
+				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 				        gui::EndPopup();
 				    }
 
@@ -948,7 +948,10 @@ namespace wc
 						auto& realRotation = const_cast<float&>(component.Rotation);
 						auto rotation = glm::degrees(realRotation);
 
-						ui::DragButton2("Position", component.Translation);
+						//ui::DragButton2("Position", component.Translation);
+					    //gui::DragFloat3("Position", glm::value_ptr(component.Translation));
+					    gui::Button("awd", {gui::CalcItemWidth(), 0});
+					    ui::DragButton3("Position", component.Translation);
 						ui::DragButton2("Scale", component.Scale);
 						ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
 						realRotation = glm::radians(rotation);
@@ -996,7 +999,7 @@ namespace wc
 				                    gui::InputText("Name", &name);
 				                    const float widgetSize = gui::GetItemRectSize().x;
 
-				                    if (gui::Button("Create"))
+				                    if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 				                    {
 				                        m_Scene.Materials[name] = newMaterial;
 				                        name = "";
@@ -1004,7 +1007,7 @@ namespace wc
 				                    }
 				                    gui::SameLine();
 				                    gui::SetCursorPosX(widgetSize);
-				                    if (gui::Button("Cancel")) gui::CloseCurrentPopup();
+				                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
 				                    gui::EndPopup();
 				                }
@@ -1956,7 +1959,7 @@ namespace wc
 			            const float widgetWidth = gui::GetItemRectSize().x;
 
 			            gui::BeginDisabled(projName.empty());
-			            if (gui::Button("OK"))
+			            if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
 			            {
 			                if (Project::ExistListProject(projName))
 			                {
@@ -1974,7 +1977,7 @@ namespace wc
 			            if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
 			            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-			            if (gui::Button("Cancel"))
+			            if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 			            {
 			                projName = "Untitled";
 			                newProjectSavePath.clear();
@@ -1986,7 +1989,7 @@ namespace wc
                         if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
                         {
                             gui::Text("Project with this name already exists!");
-                            if (gui::Button("OK")) gui::CloseCurrentPopup();
+                            if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
                             gui::EndPopup();
                         }
 
@@ -2037,14 +2040,14 @@ namespace wc
 			                if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
 			                    gui::Text("Are you sure you want to delete this project?");
-			                    if (gui::Button("Yes##Delete"))
+			                    if (gui::Button("Yes##Delete") || gui::IsKeyPressed(ImGuiKey_Enter))
 			                    {
 			                        Project::Delete(project);
 			                        gui::CloseCurrentPopup();
 			                    }
 
 			                    gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
-			                    if (gui::Button("No##Delete")) gui::CloseCurrentPopup();
+			                    if (gui::Button("No##Delete") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
 			                    gui::EndPopup();
 			                }
@@ -2138,7 +2141,7 @@ namespace wc
 			                    const float widgetWidth = gui::GetItemRectSize().x;
 
 			                    gui::BeginDisabled(sceneName.empty());
-			                    if (gui::Button("OK"))
+			                    if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
 			                    {
 			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
 			                        Project::Create(newSceneSavePath, sceneName);
@@ -2151,7 +2154,7 @@ namespace wc
 			                    if (sceneName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
 			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-			                    if (gui::Button("Cancel"))
+			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 			                    {
 			                        sceneName = "Untitled";
 			                        newSceneSavePath.clear();

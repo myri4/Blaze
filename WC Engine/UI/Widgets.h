@@ -5,6 +5,8 @@
 //#include <imgui/imgui_widgets.cpp>
 //#include <Windows.h> // Needed for file attributes
 
+namespace gui = ImGui;
+
 namespace wc
 {
 	namespace ui
@@ -522,7 +524,7 @@ namespace wc
 			const float buttonWidth = 20.0f;
 
 			// Calculate the available width for the input fields
-			float inputWidth = (ImGui::GetContentRegionAvail().x - 2 - ImGui::GetStyle().ItemSpacing.x - buttonWidth * 2) * 0.65f / 2;
+            float inputWidth = (gui::CalcItemWidth() - buttonWidth * 2 - ImGui::GetStyle().ItemSpacing.x) / 2;
 
 			// Draw colored button for "X"
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
@@ -563,6 +565,71 @@ namespace wc
 
 			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
 		}
+
+	    bool DragButton3(const char* txt, glm::vec3& v) // Changed to bool return type
+        {
+            // Define a fixed width for the buttons
+            const float buttonWidth = 20.0f;
+
+            // Calculate the available width for the input fields
+            float inputWidth = (gui::CalcItemWidth() - buttonWidth * 3 - ImGui::GetStyle().ItemSpacing.x * 2) / 3;
+
+            // Draw colored button for "X"
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.6f)); // Red color
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 0.75f)); // Red color
+            if (ImGui::Button((std::string("X##X") + txt).c_str(), ImVec2(buttonWidth, 0)))
+            {
+                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.x -= 1.0f; }
+                else { v.x += 1.0f; }
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine(0, 0);
+
+            ImGui::SetNextItemWidth(inputWidth);
+            ImGui::DragFloat((std::string("##X") + txt).c_str(), &v.x, 0.1f);
+
+            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+
+            // Draw colored button for "Y"
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 0.5f)); // Green color
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 1.0f, 0.0f, 0.6f)); // Green color
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.0f, 0.75f)); // Green color
+            if (ImGui::Button((std::string("Y##Y") + txt).c_str(), ImVec2(buttonWidth, 0)))
+            {
+                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.y -= 1.0f; }
+                else { v.y += 1.0f; }
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine(0, 0);
+
+            ImGui::SetNextItemWidth(inputWidth);
+            ImGui::DragFloat((std::string("##Y") + txt).c_str(), &v.y, 0.1f);
+
+            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+
+            // Draw colored button for "Z"
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 1.0f, 0.5f)); // Blue color
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 1.0f, 0.6f)); // Blue color
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 1.0f, 0.75f)); // Blue color
+            if (ImGui::Button((std::string("Z##Z") + txt).c_str(), ImVec2(buttonWidth, 0)))
+            {
+                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.z -= 1.0f; }
+                else { v.z += 1.0f; }
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine(0, 0);
+
+            ImGui::SetNextItemWidth(inputWidth);
+            ImGui::DragFloat((std::string("##Z") + txt).c_str(), &v.z, 0.1f);
+
+            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text(txt);
+
+            // Return true if any of the values were modified
+            return ImGui::IsItemEdited();
+        }
 
 		void Separator()
 		{
