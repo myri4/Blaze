@@ -100,6 +100,7 @@ glm::glm
 box2d::box2d
 freetype
 freetype-interface
+msdfgen
 msdf-atlas-gen::msdf-atlas-gen
 flecs::flecs_static
 Luau.VM

@@ -177,6 +177,7 @@ namespace wc
 		enum class SceneState { Edit, Simulate, Play };
 		SceneState m_SceneState = SceneState::Edit;
 
+		std::string m_ScenePath;
 		Scene m_Scene;
 		Scene m_TempScene;
 
@@ -372,7 +373,9 @@ namespace wc
 					Resize(ViewPortSize);
 				}
 
-				if (Mouse::GetMouse(Mouse::LEFT) && !ImGuizmo::IsOver() && allowInput)
+				bool allowedSelect = !ImGuizmo::IsOver() && !ImGuizmo::IsUsing();
+				//if (m_SelectedEntity == flecs::entity::null()) allowedSelect = true;
+				if (Mouse::GetMouse(Mouse::LEFT) && allowedSelect && allowInput)
 				{
 					auto mousePos = (glm::ivec2)(Mouse::GetCursorPosition() - (glm::uvec2)WindowPos);
 
@@ -950,7 +953,6 @@ namespace wc
 
 						//ui::DragButton2("Position", component.Translation);
 					    //gui::DragFloat3("Position", glm::value_ptr(component.Translation));
-					    gui::Button("awd", {gui::CalcItemWidth(), 0});
 					    ui::DragButton3("Position", component.Translation);
 						ui::DragButton2("Scale", component.Scale);
 						ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
@@ -1399,7 +1401,8 @@ namespace wc
 							        const float widgetWidth = gui::GetItemRectSize().x;
 							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 							        {
-							            m_Scene.Load(entry.path().string());
+										m_ScenePath = entry.path().string();
+							            m_Scene.Load(m_ScenePath);
 							            gui::CloseCurrentPopup();
 							        }
 							        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
@@ -2107,14 +2110,13 @@ namespace wc
 
 			            if (gui::BeginMenu("File"))
 			            {
-			                gui::SeparatorText("Scene");
+			                ui::Separator("Scene");
 
 			                static bool openSceneNamePopup = false; // New persistent flag
 			                if (ui::MenuItemButton("New", "CTRL + N", false))
-			                {
                                 gui::OpenPopup("New Scene");
-			                }
-			                std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
+			                
+							std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
 			                static std::string newSceneSavePath;
 			                if (!newScenePath.empty())
                             {
@@ -2122,11 +2124,6 @@ namespace wc
                                 openSceneNamePopup = true;
                             }
 
-			                if (openSceneNamePopup)
-			                {
-			                    gui::OpenPopup("New Scene - Name");
-			                    openSceneNamePopup = false;
-			                }
 			                if (openSceneNamePopup)
 			                {
 			                    gui::OpenPopup("New Scene - Name");
@@ -2151,7 +2148,7 @@ namespace wc
 			                        gui::CloseCurrentPopup();
 			                    }
 			                    gui::EndDisabled();
-			                    if (sceneName.empty())gui::SetItemTooltip("Project name cannot be empty!");
+			                    if (sceneName.empty()) gui::SetItemTooltip("Project name cannot be empty!");
 
 			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
@@ -2169,10 +2166,12 @@ namespace wc
 			                {
 			                    gui::OpenPopup("Open Scene");
 			                }
+
 			                std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath);
 			                if (!sOpenPath.empty())
 			                {
-			                    m_Scene.Load(sOpenPath);
+								m_ScenePath = sOpenPath;
+			                    m_Scene.Load(m_ScenePath);
 			                    gui::CloseCurrentPopup();
 			                }
 
@@ -2180,8 +2179,13 @@ namespace wc
 
 			                if (gui::MenuItem("Save", "CTRL + S"))
 			                {
-			                    m_Scene.Save("testScene.scene");
+			                    m_Scene.Save(m_ScenePath);
 			                }
+
+							if (gui::MenuItem("Save As", "CTRL + A + S"))
+							{
+								m_Scene.Save(m_ScenePath);
+							}
 
 			                if (gui::MenuItem("Undo", "CTRL + Z"))
                             {

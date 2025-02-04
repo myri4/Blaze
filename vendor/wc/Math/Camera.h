@@ -42,17 +42,13 @@ namespace wc
 		}
 	};
 
-	class OrthographicCamera
+	struct OrthographicCamera
 	{
-	private:
-		glm::mat4 m_ProjectionMatrix;
+		glm::mat4 ProjectionMatrix;
 
-	public:
 		glm::vec3 Position;
 		float Rotation = 0.f;
 		float Zoom = 1.f;
-
-	public:
 
 		void Shake(float shake, float maxOffset = 0.3f, float maxRotation = 10.f)
 		{
@@ -70,12 +66,12 @@ namespace wc
 
 		void SetProjection(float left, float right, float bottom, float top, float Near = -1.f, float Far = 1.f) 
 		{
-			m_ProjectionMatrix = glm::ortho(left, right, bottom, top, Near, Far);
+			ProjectionMatrix = glm::ortho(left, right, bottom, top, Near, Far);
 		}
 
 		void Update(glm::vec2 halfSize) { SetProjection(-halfSize.x, halfSize.x, halfSize.y, -halfSize.y); }
 
-		const glm::mat4& GetProjectionMatrix() const { return m_ProjectionMatrix; }
+		const glm::mat4& GetProjectionMatrix() const { return ProjectionMatrix; }
 		
 		glm::mat4 GetViewMatrix() const 
 		{
@@ -84,7 +80,7 @@ namespace wc
 			return glm::inverse(transform);
 		}
 
-		glm::mat4 GetViewProjectionMatrix() const { return m_ProjectionMatrix * GetViewMatrix(); }	
+		glm::mat4 GetViewProjectionMatrix() const { return ProjectionMatrix * GetViewMatrix(); }	
 	};
 
 	bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale) 

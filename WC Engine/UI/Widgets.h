@@ -2,6 +2,7 @@
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <string>
 //#include <imgui/imgui_widgets.cpp>
 //#include <Windows.h> // Needed for file attributes
 
@@ -20,20 +21,21 @@ namespace wc
 
 	    const std::unordered_map<std::string, std::string> fileTypeExt =
 	    {
-	        {".*", "(All)"},
-            {".", "(Folder)"},
-            {".png", "(Image)"},
-            {".wav", "(Audio)"},
-            {".scene", "(Scene)"},
-            {".script", "(Script)"},
-            {".shader", "(Shader)"},
-            {".font", "(Font)"}
+	        {".*", "All"},
+            {".", "Folder"},
+            {".png", "Image"},
+            {".wav", "WAVE"},
+            {".mp3", "mp3"},
+            {".scene", "Scene"},
+            {".script", "Script"},
+            {".shader", "Shader"},
+            {".font", "Font"}
 	    };
 
         // FileDialog - A simple file dialog for opening files or selecting directories
 	    // filters: [.* - All] [. - Folder] [.png - Image] [.wav - Audio] [.scene - Scene] [.script - Script] [.shader - Shader] [.font - Font]
 	    // Only way to return a Directory(Folder) is to use the "." filter
-        std::string FileDialog(const char* name, const std::string &filter = ".*", const std::string startPath = "")
+        std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
         {
             //bool showPopup = true; for close button X on the window
             static std::filesystem::path currentPath;

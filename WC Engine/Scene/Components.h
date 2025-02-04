@@ -28,14 +28,14 @@ namespace wc
 	};
 
 	// Graphics
-	struct TextRendererComponent
+	enum class CameraType { Orthographic, Perspective };
+	struct CameraComponent
 	{
-		std::string Text;
-		uint32_t FontID = 0;
-		glm::vec4 Color = glm::vec4(1.f);
-		float Kerning = 0.f;
-		float LineSpacing = 0.f;
-	};
+		bool FixedAspectRatio = false;
+		CameraType type = CameraType::Orthographic;
+		// uint32_t target
+		// Effects UI...
+	};	
 
 	struct SpriteRendererComponent
 	{
@@ -48,6 +48,15 @@ namespace wc
 		glm::vec4 Color = glm::vec4(1.f);
 		float Thickness = 1.f;
 		float Fade = 0.005f;
+	};
+
+	struct TextRendererComponent
+	{
+		std::string Text;
+		uint32_t FontID = 0;
+		glm::vec4 Color = glm::vec4(1.f);
+		float Kerning = 0.f;
+		float LineSpacing = 0.f;
 	};
 
 	// Physics
@@ -88,7 +97,7 @@ namespace wc
 
 			return bodyDef;
 		}
-	};
+	};	
 
 	struct PhysicsMaterial
 	{

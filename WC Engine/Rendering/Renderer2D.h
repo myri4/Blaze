@@ -157,7 +157,7 @@ namespace wc
 				GenerateDescriptor(m_Buffers[2].imageViews[currentMip], m_Buffers[0].imageViews[0]);
 		}
 
-		void Execute(CommandEncoder& cmd, float Threshold = 1.2f, float Knee = 0.6f)
+		void Execute(CommandEncoder& cmd, float Threshold = 0.8f, float Knee = 0.6f)
 		{
 			cmd.BindShader(m_Shader);
 			uint32_t counter = 0;
@@ -347,8 +347,6 @@ namespace wc
 		CompositePass composite;
 		CRTPass crt;
 
-		float time = 0.f;
-
 		vk::Image m_FinalImage[2];
 		vk::ImageView m_FinalImageView[2];
 		vk::Sampler m_ScreenSampler;
@@ -525,8 +523,6 @@ namespace wc
 		{
 			m_RenderSize = size;
 
-			camera->Update(GetHalfSize());
-
 			{
 				vk::ImageSpecification imageInfo;
 				imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -668,8 +664,6 @@ namespace wc
 		{
 			//if (!m_IndexCount && !m_LineVertexCount) return;
 
-			time += Globals.deltaTime;
-
 			{
 				VkCommandBuffer& cmd = m_Cmd[CURRENT_FRAME];
 				vkResetCommandBuffer(cmd, 0);
@@ -755,7 +749,7 @@ namespace wc
 				CommandEncoder cmd;
 				bloom.Execute(cmd);
 				composite.Execute(cmd, m_RenderSize);
-				crt.Execute(cmd, m_RenderSize, time);
+				crt.Execute(cmd, m_RenderSize, 0.f);
 
 				cmd.ExecuteCompute(m_ComputeCmd[CURRENT_FRAME]);
 			}
