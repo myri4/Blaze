@@ -427,15 +427,15 @@ namespace wc
 				bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
 				bool isPaused = (m_SceneState == SceneState::Edit);
 
-			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 0));
+			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
 				if (isPlayingOrSimulating) gui::BeginDisabled();
-				if (gui::ImageButton("play", t_Play, {20, 20}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+				if (gui::ImageButton("play", t_Play, {10, 10}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 
-			    if (gui::ImageButton("simulate", t_Simulate, {20, 20}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+			    if (gui::ImageButton("simulate", t_Simulate, {10, 10}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 				if (isPlayingOrSimulating) gui::EndDisabled();
 
 				if (isPaused) gui::BeginDisabled();
-				if (gui::ImageButton("stop", t_Stop, {20, 20})) ChangeSceneState(SceneState::Edit);
+				if (gui::ImageButton("stop", t_Stop, {10, 10})) ChangeSceneState(SceneState::Edit);
 				if (isPaused) gui::EndDisabled();
 			    ImGui::PopStyleVar();
 
@@ -811,11 +811,12 @@ namespace wc
             static bool showPopup = false;
 			if (gui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
-                static char filter[1024];
+                std::string filterBuf;
                 if (gui::BeginMenuBar())
                 {
+                    //TODO - Implement search
                     gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Add Entity").x - 20 - gui::GetStyle().ItemSpacing.x * 3);
-                    gui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
+                    gui::InputText("##Search", &filterBuf, ImGuiInputTextFlags_AutoSelectAll);
 
                     if (gui::Button("Add Entity"))
                         showPopup = true;
@@ -904,7 +905,7 @@ namespace wc
 					std::string nameBuffer = m_SelectedEntity.name().c_str(); // Buffer to hold the entity's name
 
 				    // Input name
-				    if (gui::InputText("Name", &nameBuffer))
+				    if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 				    {
 				        if (!nameBuffer.empty())
 				        {
@@ -929,6 +930,7 @@ namespace wc
 				            }
 				        }
 				    }
+				    ui::HelpMarker("Press ENTER or Deselect to confirm");
 
 				    ui::CenterNextWindow();
 				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
@@ -1233,7 +1235,9 @@ namespace wc
 			        gui::SetClipboardText(logData.c_str());
 			    }
 
+			    // TODO - make work
 				gui::SameLine();
+			    gui::PushItemWidth(ImGui::GetContentRegionAvail().x - gui::CalcTextSize("Filter").x - gui::GetStyle().ItemSpacing.x);
 				gui::InputText("Input", const_cast<char*>(""), 0);
 
 				gui::Separator();
@@ -1914,7 +1918,6 @@ namespace wc
 	        gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 	        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
-	        static bool enableMenuBar = true;
 	        static ImGuiWindowFlags windowFlags =
 	            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
 	            | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
@@ -2136,16 +2139,15 @@ namespace wc
 			                ui::CenterNextWindow();
 			                if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
-			                    static std::string sceneName = "Untitled";
+			                    static std::string sceneName = "newScene";
 			                    gui::InputText("Scene Name", &sceneName);
 			                    const float widgetWidth = gui::GetItemRectSize().x;
 
 			                    gui::BeginDisabled(sceneName.empty());
 			                    if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
 			                    {
-			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
-			                        Project::Create(newSceneSavePath, sceneName);
-			                        sceneName = "Untitled";
+			                        WC_CORE_INFO("Implement new scene creation");
+			                        sceneName = "newScene";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
@@ -2156,7 +2158,7 @@ namespace wc
 			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 			                    {
-			                        sceneName = "Untitled";
+			                        sceneName = "newScene";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
@@ -2177,11 +2179,6 @@ namespace wc
 			                }
 
 			                gui::SeparatorText("File");
-
-			                if (gui::MenuItem("Save", "CTRL + S"))
-			                {
-			                    m_Scene.Save("testScene.scene");
-			                }
 
 			                if (gui::MenuItem("Undo", "CTRL + Z"))
                             {
