@@ -71,8 +71,6 @@ namespace wc
 
 		void Update(glm::vec2 halfSize) { SetProjection(-halfSize.x, halfSize.x, halfSize.y, -halfSize.y); }
 
-		const glm::mat4& GetProjectionMatrix() const { return ProjectionMatrix; }
-		
 		glm::mat4 GetViewMatrix() const 
 		{
 			glm::mat4 transform = glm::translate(glm::mat4(1.f), Position) * glm::rotate(glm::mat4(1.f), glm::radians(Rotation), glm::vec3(0.f, 0.f, 1.f));

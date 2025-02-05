@@ -64,7 +64,7 @@ namespace wc
 
 		VkDescriptorBindingFlags* bindingFlags = nullptr;
 		uint32_t bindingFlagCount = 0;
-		uint32_t dynamicDescriptorCount = 0;
+		bool dynamicDescriptorCount = false;
 
 		VkDynamicState* dynamicState = nullptr;
 		uint32_t dynamicStateCount = 0;
@@ -80,7 +80,7 @@ namespace wc
 
 		VkDescriptorBindingFlags* bindingFlags = nullptr;
 		uint32_t bindingFlagCount = 0;
-		uint32_t dynamicDescriptorCount = 0;
+		bool dynamicDescriptorCount = false;
 	};
 
 	struct Shader
@@ -149,11 +149,11 @@ namespace wc
 						auto& baseType = compiler.get_type(resource.base_type_id);
 						uint32_t bufferSize = (uint32_t)compiler.get_declared_struct_size(baseType);
 
-						uint32_t offset = 0;
-						if (ranges.size())
-							offset = ranges.back().offset + ranges.back().size;
+						//uint32_t offset = 0;
+						//if (ranges.size())
+						//	offset = ranges.back().offset + ranges.back().size;
 
-						auto& pushConstantRange = ranges.emplace_back() = {
+						ranges.emplace_back() = {
 							.stageFlags = shaderStage,
 							.offset = 0,
 							.size = bufferSize
@@ -181,12 +181,11 @@ namespace wc
 							uint32_t descriptorCount = 1;
 							if (type.array[0] > 0) descriptorCount = type.array[0];
 
-							auto& layoutBinding = layoutBindings.emplace_back() = {
+							layoutBindings.emplace_back() = {
 								.binding = binding,
 								.descriptorType = descriptorType,
 								.descriptorCount = descriptorCount,
 								.stageFlags = shaderStage,
-								.pImmutableSamplers = nullptr,
 							};
 						}
 					}
@@ -212,12 +211,11 @@ namespace wc
 							// @TODO: report this as an issue with the new spirv-cross reflection as this is probably a nullptr and gives random garbage which is not supposed to happen
 							//if (type.array[0] > 0) descriptorCount = type.array[0]; 
 
-							auto& layoutBinding = layoutBindings.emplace_back() = {
+							layoutBindings.emplace_back() = {
 								.binding = binding,
 								.descriptorType = descriptorType,
 								.descriptorCount = descriptorCount,
 								.stageFlags = shaderStage,
-								.pImmutableSamplers = nullptr,
 							};
 						}
 					}
@@ -231,12 +229,11 @@ namespace wc
 							uint32_t descriptorCount = 1;
 							//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-							auto& layoutBinding = layoutBindings.emplace_back() = {
+							layoutBindings.emplace_back() = {
 								.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 								.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 								.descriptorCount = descriptorCount,
 								.stageFlags = shaderStage,
-								.pImmutableSamplers = nullptr,
 							};
 						}
 
@@ -247,12 +244,11 @@ namespace wc
 							uint32_t descriptorCount = 1;
 							//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-							auto& layoutBinding = layoutBindings.emplace_back() = {
+							layoutBindings.emplace_back() = {
 								.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 								.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 								.descriptorCount = descriptorCount,
 								.stageFlags = shaderStage,
-								.pImmutableSamplers = nullptr,
 							};
 						}
 					}
@@ -266,7 +262,13 @@ namespace wc
 				}
 
 				if (createInfo.dynamicDescriptorCount)
-					layoutBindings[layoutBindings.size() - 1].descriptorCount = createInfo.dynamicDescriptorCount;
+				{
+					auto& binding = layoutBindings[layoutBindings.size() - 1];
+					auto limits = VulkanContext::GetPhysicalDevice().GetLimits();
+					if (binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) binding.descriptorCount = glm::min(limits.maxDescriptorSetSampledImages, limits.maxPerStageDescriptorSamplers);
+					if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER) binding.descriptorCount = limits.maxPerStageDescriptorSamplers;
+					//@TODO: add more stuff here
+				}
 
 				VkDescriptorSetLayoutCreateInfo layoutInfo = { 
 					.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -429,7 +431,7 @@ namespace wc
 					uint32_t descriptorCount = 1;
 					//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-					auto& layoutBinding = layoutBindings.emplace_back() = {
+					layoutBindings.emplace_back() = {
 						.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 						.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 						.descriptorCount = descriptorCount,
@@ -445,7 +447,7 @@ namespace wc
 					uint32_t descriptorCount = 1;
 					//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-					auto& layoutBinding = layoutBindings.emplace_back() = {
+					layoutBindings.emplace_back() = {
 						.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 						.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 						.descriptorCount = descriptorCount,
@@ -462,7 +464,7 @@ namespace wc
 					uint32_t descriptorCount = 1;
 					//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-					auto& layoutBinding = layoutBindings.emplace_back() = {
+					layoutBindings.emplace_back() = {
 						.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 						.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 						.descriptorCount = descriptorCount,
@@ -478,7 +480,7 @@ namespace wc
 					uint32_t descriptorCount = 1;
 					//if (type.array[0] > 0) descriptorCount = type.array[0];
 
-					auto& layoutBinding = layoutBindings.emplace_back() = {
+					layoutBindings.emplace_back() = {
 						.binding = compiler.get_decoration(resource.id, spv::DecorationBinding),
 						.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 						.descriptorCount = descriptorCount,
@@ -488,7 +490,13 @@ namespace wc
 				}
 
 				if (createInfo.dynamicDescriptorCount)
-					layoutBindings[layoutBindings.size() - 1].descriptorCount = createInfo.dynamicDescriptorCount;
+				{
+					auto& binding = layoutBindings[layoutBindings.size() - 1];
+					auto limits = VulkanContext::GetPhysicalDevice().GetLimits();
+					if (binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) binding.descriptorCount = glm::min(limits.maxDescriptorSetSampledImages, limits.maxPerStageDescriptorSamplers);
+					if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER) binding.descriptorCount = limits.maxPerStageDescriptorSamplers;
+					//@TODO: add more stuff here
+				}
 
 				VkDescriptorSetLayoutCreateInfo layoutInfo = { 
 					.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,

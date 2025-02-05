@@ -20,10 +20,6 @@ void         ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuf
 bool         ImGui_ImplVulkan_CreateFontsTexture();
 void         ImGui_ImplVulkan_DestroyFontsTexture();
 
-// Vulkan data
-struct ImGui_ImplVulkan_Data;
-static ImGui_ImplVulkan_Data* ImGui_ImplVulkan_GetBackendData();
-
 VkDescriptorSet MakeImGuiDescriptor(VkDescriptorSet dSet, const VkDescriptorImageInfo& imageInfo);
 
 #endif // #ifndef IMGUI_DISABLE

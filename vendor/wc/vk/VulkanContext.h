@@ -138,6 +138,7 @@ namespace vk
 			vkGetPhysicalDeviceProperties2(m_Handle, &properties2);
 		}
 
+		auto GetLimits() const { return properties.limits; }
 		auto GetFeatures() const { return features; }
 
 		auto GetProperties() const { return properties; }
@@ -188,8 +189,6 @@ namespace VulkanContext
 	inline auto& GetLogicalDevice() { return logicalDevice; }
 	inline auto& GetMemoryAllocator() { return MemoryAllocator; }
 	inline VkAllocationCallbacks* GetAllocator() { return nullptr; }
-	inline auto GetProperties() { return physicalDevice.GetProperties(); }
-	inline auto GetSupportedFeatures() { return physicalDevice.GetFeatures(); }
 
 #if WC_GRAPHICS_VALIDATION
 	inline bool bValidationLayers = false;

@@ -30,9 +30,9 @@ namespace wc
                 charset.add(c);
         }
 
-        double fontScale = 1.f;
+        //double fontScale = 1.f;
         FontGeometry = msdf_atlas::FontGeometry(&m_Glyphs);
-        int glyphsLoaded = FontGeometry.loadCharset(font, fontScale, charset);
+        //int glyphsLoaded = FontGeometry.loadCharset(font, fontScale, charset);
 
 
         double emSize = 40.0;

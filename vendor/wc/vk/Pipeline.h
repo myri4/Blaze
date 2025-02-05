@@ -44,9 +44,9 @@ namespace vk
 			auto& header = *(VkPipelineCacheHeaderVersionOne*)data;
 			if (header.headerSize <= 0) return false;
 			if (header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE) return false;
-			if (header.vendorID != VulkanContext::GetProperties().vendorID)   return false;
-			if (header.deviceID != VulkanContext::GetProperties().deviceID)   return false;
-			if (memcmp(header.pipelineCacheUUID, VulkanContext::GetProperties().pipelineCacheUUID, sizeof(header.pipelineCacheUUID)) != 0) return false;
+			if (header.vendorID != VulkanContext::GetPhysicalDevice().GetProperties().vendorID)   return false;
+			if (header.deviceID != VulkanContext::GetPhysicalDevice().GetProperties().deviceID)   return false;
+			if (memcmp(header.pipelineCacheUUID, VulkanContext::GetPhysicalDevice().GetProperties().pipelineCacheUUID, sizeof(header.pipelineCacheUUID)) != 0) return false;
 			return true;
 		}
 	};

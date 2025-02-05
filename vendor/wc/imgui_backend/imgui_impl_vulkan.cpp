@@ -337,7 +337,6 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
     uint8_t* pixels;
     int width, height;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-    size_t upload_size = width * height * 4 * sizeof(char);
 
     // Create the Image:
     wc::TextureSpecification texSpec = 
@@ -385,7 +384,7 @@ static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
 
 	// Create surface
 	ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-    VkResult err = (VkResult)platform_io.Platform_CreateVkSurface(viewport, (ImU64)VulkanContext::GetInstance(), (const void*)VulkanContext::GetAllocator(), (ImU64*)&wd->Swapchain.surface);
+    platform_io.Platform_CreateVkSurface(viewport, (ImU64)VulkanContext::GetInstance(), (const void*)VulkanContext::GetAllocator(), (ImU64*)&wd->Swapchain.surface);
 
     // Create SwapChain, RenderPass, Framebuffer, etc.
     wd->ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;

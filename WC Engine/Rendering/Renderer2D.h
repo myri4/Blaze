@@ -337,6 +337,7 @@ namespace wc
 
 		Shader m_Shader;
 		VkDescriptorSet m_DescriptorSet;
+		uint32_t TextureCapacity = 0;
 
 		Shader m_LineShader;
 
@@ -357,8 +358,8 @@ namespace wc
 
 		OrthographicCamera* camera = nullptr;
 
-		auto GetHalfSize() const { return (m_RenderSize / 128.f) * camera->Zoom; }
 		auto GetHalfSize(glm::vec2 size) const { return size * camera->Zoom; }
+		auto GetHalfSize() const { return GetHalfSize(m_RenderSize / 128.f); }
 
 		auto ScreenToWorld(glm::vec2 coords) const
 		{
@@ -377,7 +378,7 @@ namespace wc
 			return glm::vec2(screenX, screenY);
 		}
 
-		void Init(const AssetManager& assetManager)
+		void Init()
 		{
 			bloom.Init();
 			composite.Init();
@@ -460,29 +461,22 @@ namespace wc
 				vkCreateRenderPass(VulkanContext::GetLogicalDevice(), &renderPassInfo, VulkanContext::GetAllocator(), &m_RenderPass);
 			}
 
-			VkDynamicState dynamicStates[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+			VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 			{
 				ShaderCreateInfo createInfo;
 				ReadBinary("assets/shaders/Renderer2D.vert", createInfo.binaries[0]);
 				ReadBinary("assets/shaders/Renderer2D.frag", createInfo.binaries[1]);
-				createInfo.renderSize = m_RenderSize;
 				createInfo.renderPass = m_RenderPass;
 
 				VkDescriptorBindingFlags flags[1];
 				memset(flags, 0, sizeof(VkDescriptorBindingFlags) * (std::size(flags) - 1));
 				flags[std::size(flags) - 1] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
-				uint32_t count = 100;// (uint32_t)assetManager.GetTextures().size();
-
-				VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO };
-				set_counts.descriptorSetCount = 1;
-				set_counts.pDescriptorCounts = &count;
-
 				createInfo.bindingFlags = flags;
 				createInfo.bindingFlagCount = (uint32_t)std::size(flags);
 
-				createInfo.dynamicDescriptorCount = count;
+				createInfo.dynamicDescriptorCount = true;
 
 				createInfo.dynamicStateCount = std::size(dynamicStates);
 				createInfo.dynamicState = dynamicStates;
@@ -490,17 +484,6 @@ namespace wc
 				createInfo.blendAttachments.push_back(CreateBlendAttachment(false));
 
 				m_Shader.Create(createInfo);
-
-				vk::descriptorAllocator.Allocate(m_DescriptorSet, m_Shader.GetDescriptorLayout(), &set_counts, set_counts.descriptorSetCount);
-
-				vk::DescriptorWriter writer(m_DescriptorSet);
-
-
-				std::vector<VkDescriptorImageInfo> infos;
-				for (auto& image : assetManager.GetTextures())
-					infos.push_back({ image.GetSampler(), image.GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-
-				writer.BindImages(0, infos, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			}
 
 			{
@@ -517,6 +500,32 @@ namespace wc
 
 				m_LineShader.Create(createInfo);
 			}
+		}
+
+		void AllocateNewDescriptor(uint32_t count)
+		{
+			TextureCapacity = count;
+
+			if (m_DescriptorSet) 
+				vk::descriptorAllocator.Free(m_DescriptorSet);
+
+			VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = {
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+				.descriptorSetCount = 1,
+				.pDescriptorCounts = &count,
+			};
+			vk::descriptorAllocator.Allocate(m_DescriptorSet, m_Shader.GetDescriptorLayout(), &set_counts, set_counts.descriptorSetCount);
+		}
+
+		void UpdateTextures(const AssetManager& assetManager)
+		{
+			vk::DescriptorWriter writer(m_DescriptorSet);
+
+			std::vector<VkDescriptorImageInfo> infos;
+			for (auto& image : assetManager.Textures)
+				infos.push_back({ image.GetSampler(), image.GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+
+			writer.BindImages(0, infos, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		}
 
 		void CreateScreen(glm::vec2 size)

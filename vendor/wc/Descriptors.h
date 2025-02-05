@@ -10,8 +10,8 @@ namespace vk
 	{
 		void Create() 
 		{
-			m_CurrentPool = GrabPool();
-			m_UsedPools.push_back(m_CurrentPool);
+			CurrentPool = GrabPool();
+			m_UsedPools.push_back(CurrentPool);
 		}
 
 		void ResetPools() 
@@ -21,24 +21,26 @@ namespace vk
 
 			m_FreePools = m_UsedPools;
 			m_UsedPools.clear();
-			m_CurrentPool = VK_NULL_HANDLE;
+			CurrentPool = VK_NULL_HANDLE;
 		}
 
 		bool Allocate(VkDescriptorSet& set, const VkDescriptorSetLayout& layout) { return Allocate(set, layout, nullptr, 1); }
 
 		bool Allocate(VkDescriptorSet& set, const VkDescriptorSetLayout& layout, const void* pNext, uint32_t descriptorCount) 
 		{
-			if (m_CurrentPool == VK_NULL_HANDLE)
+			if (CurrentPool == VK_NULL_HANDLE)
 			{
-				m_CurrentPool = GrabPool();
-				m_UsedPools.push_back(m_CurrentPool);
+				CurrentPool = GrabPool();
+				m_UsedPools.push_back(CurrentPool);
 			}
 
-			VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-			allocInfo.descriptorPool = m_CurrentPool;
-			allocInfo.descriptorSetCount = descriptorCount;
-			allocInfo.pSetLayouts = &layout;
-			allocInfo.pNext = pNext;
+			VkDescriptorSetAllocateInfo allocInfo = { 
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.pNext = pNext,
+				.descriptorPool = CurrentPool,
+				.descriptorSetCount = descriptorCount,
+				.pSetLayouts = &layout,
+			};
 
 			switch (vkAllocateDescriptorSets(VulkanContext::GetLogicalDevice(), &allocInfo, &set))
 			{
@@ -46,14 +48,19 @@ namespace vk
 			case VK_ERROR_FRAGMENTED_POOL:
 			case VK_ERROR_OUT_OF_POOL_MEMORY:
 				//allocate a new pool and retry
-				m_CurrentPool = GrabPool();
-				m_UsedPools.push_back(m_CurrentPool);
+				CurrentPool = GrabPool();
+				m_UsedPools.push_back(CurrentPool);
 				
 				//if it still fails then we have big issues
 				if (vkAllocateDescriptorSets(VulkanContext::GetLogicalDevice(), &allocInfo, &set) == VK_SUCCESS) return true;
 			}
 
 			return false;
+		}
+
+		void Free(VkDescriptorSet descriptorSet)
+		{
+			vkFreeDescriptorSets(VulkanContext::GetLogicalDevice(), CurrentPool, 1, &descriptorSet); // @NOTE: This is very possible to produce errors in the future
 		}
 
 		void Destroy() 
@@ -65,9 +72,6 @@ namespace vk
 				vkDestroyDescriptorPool(VulkanContext::GetLogicalDevice(), p, VulkanContext::GetAllocator());
 		}
 
-		auto GetCurrentPool() { return m_CurrentPool; }
-
-	private:
 		VkDescriptorPool GrabPool() 
 		{
 			if (m_FreePools.size() > 0)
@@ -94,11 +98,13 @@ namespace vk
 			for (int i = 0; i < std::size(dSizes); i++)
 				sizes[i] = { dSizes[i].first, uint32_t(dSizes[i].second * count) };
 
-			VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-			pool_info.flags = 0;
-			pool_info.maxSets = count;
-			pool_info.poolSizeCount = (uint32_t)sizes.size();
-			pool_info.pPoolSizes = sizes.data();
+			VkDescriptorPoolCreateInfo pool_info = { 
+				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+				.flags = 0,
+				.maxSets = count,
+				.poolSizeCount = (uint32_t)sizes.size(),
+				.pPoolSizes = sizes.data(),
+			};
 
 			VkDescriptorPool descriptorPool;
 			vkCreateDescriptorPool(VulkanContext::GetLogicalDevice(), &pool_info, VulkanContext::GetAllocator(), &descriptorPool);
@@ -106,7 +112,7 @@ namespace vk
 			return descriptorPool;
 		}
 
-		VkDescriptorPool m_CurrentPool;
+		VkDescriptorPool CurrentPool;
 		std::vector<VkDescriptorPool> m_UsedPools;
 		std::vector<VkDescriptorPool> m_FreePools;
 	}inline descriptorAllocator;
@@ -126,13 +132,15 @@ namespace vk
 
 		DescriptorWriter& BindBuffer(uint32_t binding, const VkDescriptorBufferInfo& bufferInfo, VkDescriptorType type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) 
 		{
-			VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			VkWriteDescriptorSet write = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 
-			write.dstSet = dstSet;
-			write.dstBinding = binding;
-			write.descriptorCount = 1;
-			write.descriptorType = type;
-			write.pBufferInfo = &m_BufferInfos.emplace_back(bufferInfo);
+				.dstSet = dstSet,
+				.dstBinding = binding,
+				.descriptorCount = 1,
+				.descriptorType = type,
+				.pBufferInfo = &m_BufferInfos.emplace_back(bufferInfo),
+			};
 
 			writes.push_back(write);
 			return *this;
@@ -142,13 +150,15 @@ namespace vk
 
 		DescriptorWriter& BindImage(uint32_t binding, const VkDescriptorImageInfo& imageInfo, VkDescriptorType type) 
 		{
-			VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			VkWriteDescriptorSet write = { 
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 
-			write.dstSet = dstSet;
-			write.dstBinding = binding;
-			write.descriptorCount = 1;
-			write.descriptorType = type;
-			write.pImageInfo = &m_ImageInfos.emplace_back(imageInfo);
+				.dstSet = dstSet,
+				.dstBinding = binding,
+				.descriptorType = type,
+				.descriptorCount = 1,
+				.pImageInfo = &m_ImageInfos.emplace_back(imageInfo),
+			};
 
 			writes.push_back(write);
 			return *this;
@@ -158,13 +168,15 @@ namespace vk
 
 		DescriptorWriter& BindImages(uint32_t binding, const std::vector<VkDescriptorImageInfo>& imageInfo, VkDescriptorType type)
 		{
-			VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+			VkWriteDescriptorSet write = { 
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 
-			write.dstSet = dstSet;
-			write.dstBinding = binding;
-			write.descriptorCount = (uint32_t)imageInfo.size();
-			write.descriptorType = type;
-			write.pImageInfo = imageInfo.data();
+				.dstSet = dstSet,
+				.dstBinding = binding,
+				.descriptorType = type,
+				.descriptorCount = (uint32_t)imageInfo.size(),
+				.pImageInfo = imageInfo.data(),
+			};
 
 			writes.push_back(write);
 			return *this;

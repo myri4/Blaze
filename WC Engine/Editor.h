@@ -196,7 +196,7 @@ namespace wc
 	            m_RenderData[i].Allocate();
 
 	        m_Renderer.camera = &camera;
-	        m_Renderer.Init(assetManager);
+	        m_Renderer.Init();
 
 	        // Load Textures
 	        t_Close.Load("assets/textures/menu/close.png");
@@ -308,6 +308,15 @@ namespace wc
 		{
 		    auto& renderData = m_RenderData[CURRENT_FRAME];
 
+			if (m_Renderer.TextureCapacity < assetManager.Textures.size())
+				m_Renderer.AllocateNewDescriptor(assetManager.Textures.capacity());
+
+			if (assetManager.TexturesUpdated)
+			{
+				assetManager.TexturesUpdated = false;
+				m_Renderer.UpdateTextures(assetManager);
+			}
+
 		    m_Scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
                 if (entt.parent() != 0) return;
 
@@ -338,7 +347,6 @@ namespace wc
 		{
 			std::string selectedEntityName;
 			if (m_SelectedEntity != flecs::entity::null()) selectedEntityName = m_SelectedEntity.name().c_str();
-			//WC_INFO("Changing scene state. Selected Entity: {0}", selectedEntityName);
 
 			m_SceneState = newState;
 
@@ -354,7 +362,6 @@ namespace wc
 			}
 
 			if(m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.GetWorld().lookup(selectedEntityName.c_str());
-			//WC_INFO("Scene state changed. Selected Entity: {0}", m_SelectedEntity.name().c_str());
 		}
 
 		void UI_Editor()
@@ -385,7 +392,7 @@ namespace wc
 					if (mousePos.x > 0 && mousePos.y > 0 && mousePos.x < width && mousePos.y < height)
 					{
 						VulkanContext::GetLogicalDevice().WaitIdle();
-
+						// @TODO: Optimize this to download only 1 pixel
 						vk::StagingBuffer stagingBuffer;
 						stagingBuffer.Allocate(sizeof(uint64_t) * width * height, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 						vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
@@ -442,7 +449,7 @@ namespace wc
 				if (isPaused) gui::EndDisabled();
 			    ImGui::PopStyleVar();
 
-				glm::mat4 projection = camera.GetProjectionMatrix();
+				glm::mat4 projection = camera.ProjectionMatrix;
 				projection[1][1] *= -1;
 
 				ImGuizmo::SetOrthographic(true);

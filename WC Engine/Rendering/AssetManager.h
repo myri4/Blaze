@@ -11,45 +11,48 @@ namespace wc
 {
     struct AssetManager
     {
-    private:
-        std::unordered_map<std::string, uint32_t> m_TextureCache;
+        std::unordered_map<std::string, uint32_t> TextureCache;
 
-        std::vector<Texture> m_Textures;
-    public:
-
-        auto& GetTextures() { return m_Textures; }
-        const auto& GetTextures() const { return m_Textures; }
+        std::vector<Texture> Textures;
+        bool TexturesUpdated = false; // This is set to true when a new texture is loaded. It's used to signal when we need to resize the descriptor set
 
         void Init()
         {
 			Texture texture;
 			uint32_t white = 0xFFFFFFFF;
 			texture.Load(&white, 1, 1);
-			m_Textures.push_back(texture);
+            PushTexture(texture);
         }
 
         void Free()
         {
-			for (auto& texture : m_Textures)
+			for (auto& texture : Textures)
                 texture.Destroy();
         }
 
+		uint32_t PushTexture(const Texture& texture)
+		{
+			Textures.push_back(texture);
+            TexturesUpdated = true;
+
+			return uint32_t(Textures.size() - 1);
+		}
 
         uint32_t PushTexture(const Texture& texture, const std::string& name)
         {
-            if (m_TextureCache.find(name) != m_TextureCache.end())
-                return m_TextureCache[name];
+            if (TextureCache.find(name) != TextureCache.end())
+                return TextureCache[name];
 
-            m_Textures.push_back(texture);
+            auto texID = PushTexture(texture);
 
-            m_TextureCache[name] = uint32_t(m_Textures.size() - 1);
-            return uint32_t(m_Textures.size() - 1);
+            TextureCache[name] = texID;
+            return texID;
         }
 
         uint32_t LoadTexture(const std::string& file)
         {
-            if (m_TextureCache.find(file) != m_TextureCache.end())
-                return m_TextureCache[file];
+            if (TextureCache.find(file) != TextureCache.end())
+                return TextureCache[file];
 
             if (std::filesystem::exists(file))
             {
@@ -59,15 +62,15 @@ namespace wc
                 return PushTexture(texture, file);
             }
 
-            m_TextureCache[file] = 0;
+            TextureCache[file] = 0;
             WC_CORE_ERROR("Cannot find file at location: {}", file);
             return 0;
         }
 
         uint32_t LoadTextureFromMemory(const Image& image, const std::string& name)
         {
-            if (m_TextureCache.find(name) != m_TextureCache.end())
-                return m_TextureCache[name];
+            if (TextureCache.find(name) != TextureCache.end())
+                return TextureCache[name];
 
             Texture texture;
             texture.Load(image.Data, image.Width, image.Height);
@@ -79,9 +82,8 @@ namespace wc
 		{
 			Texture texture;
 			texture.Allocate(specification);
-			m_Textures.push_back(texture);
 
-			return uint32_t(m_Textures.size() - 1);
+			return PushTexture(texture);
 		}
     };
 }

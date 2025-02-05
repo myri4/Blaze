@@ -57,17 +57,16 @@ namespace wc
                 .addressModeV = specification.addressModeV,
                 .addressModeW = specification.addressModeW,
 			    .maxLod = (float)image.mipLevels,
+			    .magFilter = specification.magFilter,
+			    .minFilter = specification.minFilter,
+			    .mipmapMode = specification.mipmapMode,
             };
 
-			if (specification.mipMapping && VulkanContext::GetSupportedFeatures().samplerAnisotropy)
+			if (specification.mipMapping && VulkanContext::GetPhysicalDevice().GetFeatures().samplerAnisotropy)
 			{
 				samplerSpec.anisotropyEnable = true;
-				samplerSpec.maxAnisotropy = VulkanContext::GetProperties().limits.maxSamplerAnisotropy;
+				samplerSpec.maxAnisotropy = VulkanContext::GetPhysicalDevice().GetLimits().maxSamplerAnisotropy;
 			}
-            			
-			samplerSpec.magFilter = specification.magFilter;
-			samplerSpec.minFilter = specification.minFilter;
-			samplerSpec.mipmapMode = specification.mipmapMode;
 
 			sampler.Create(samplerSpec);
 			imageID = MakeImGuiDescriptor(imageID, { .sampler = sampler, .imageView = view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
@@ -80,7 +79,6 @@ namespace wc
                 .height = height,
                 .mipMapping = mipMapping,
             };
-
             
             if (width <= 128 || height <= 128) 
             {
@@ -127,32 +125,29 @@ namespace wc
             stagingBuffer.Allocate(imageSize);
             stagingBuffer.SetData(data, imageSize);
 
-            VkImageSubresourceRange subresourceRange = {};
-            subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            subresourceRange.levelCount = 1;
-            subresourceRange.layerCount = 1;
+            VkImageSubresourceRange subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .levelCount = 1,
+                .layerCount = 1,
+            };
 
             vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
                 image.SetLayout(cmd, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-                VkBufferImageCopy copyRegion = {};
-                copyRegion.bufferOffset = 0;
-                copyRegion.bufferRowLength = 0;
-                copyRegion.bufferImageHeight = 0;
-
-                copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                copyRegion.imageSubresource.mipLevel = 0;
-                copyRegion.imageSubresource.baseArrayLayer = 0;
-                copyRegion.imageSubresource.layerCount = 1;
-                copyRegion.imageExtent = {
-                .width = width,
-                .height = height,
-                .depth = 1 };
-                copyRegion.imageOffset =
-                {
-                    .x = (int32_t)offsetX,
-                    .y = (int32_t)offsetY,
-                    .z = 0,
+                VkBufferImageCopy copyRegion = {
+                    .imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .imageSubresource.layerCount = 1,
+                    .imageExtent = {
+                        .width = width,
+                        .height = height,
+                        .depth = 1
+                    },
+                    .imageOffset =
+                    {
+                        .x = (int32_t)offsetX,
+                        .y = (int32_t)offsetY,
+                        .z = 0,
+                    },
                 };
 
                 vkCmdCopyBufferToImage(cmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
