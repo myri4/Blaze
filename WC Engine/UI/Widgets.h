@@ -9,8 +9,32 @@ namespace gui = ImGui;
 
 namespace wc
 {
+    namespace conv
+    {
+        glm::vec2 ImVec2ToGlm(const ImVec2& v)
+        {
+            return glm::vec2(v.x, v.y);
+        }
+
+        ImVec2 GlmToImVec2(const glm::vec2& v)
+        {
+            return ImVec2(v.x, v.y);
+        }
+
+        glm::vec4 ImVec4ToGlm(const ImVec4& v)
+        {
+            return glm::vec4(v.x, v.y, v.z, v.w);
+        }
+
+        ImVec4 GlmToImVec4(const glm::vec4& v)
+        {
+            return ImVec4(v.x, v.y, v.z, v.w);
+        }
+    }
+
 	namespace ui
 	{
+
 	    //Center Window
 	    //if left on false, no need for ImGuiWindowFlags_NoMove
         inline void CenterNextWindow(bool once = false)
@@ -515,6 +539,64 @@ namespace wc
                 ImGui::PopItemFlag();
 
             return pressed;
+        }
+
+	    inline bool MatchPayloadType(const char* type)
+        {
+            if (type == nullptr) return ImGui::IsDragDropActive();
+            return ImGui::IsDragDropActive() && strcmp(ImGui::GetDragDropPayload()->DataType, type) == 0;
+        }
+
+        inline void DrawBgRows(float itemSpacing = -1.f)
+        {
+            if (itemSpacing > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacing);
+
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            if (window->SkipItems)
+                return;
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImGuiStyle& style = ImGui::GetStyle();
+
+            const float scroll_y = ImGui::GetScrollY();
+            const float window_height = ImGui::GetWindowHeight();
+
+            const float row_height = style.ItemSpacing.y + ImGui::GetTextLineHeight();
+
+            const int row_start = static_cast<int>(scroll_y / row_height);
+            const int row_count = static_cast<int>((scroll_y + window_height) / row_height) - row_start + 1;
+
+            const float collOffset = 1.3f;
+            const ImU32 color_even = ImGui::GetColorU32(style.Colors[ImGuiCol_WindowBg]);
+            const ImU32 color_odd = ImGui::GetColorU32({style.Colors[ImGuiCol_WindowBg].x * collOffset, style.Colors[ImGuiCol_WindowBg].y * collOffset, style.Colors[ImGuiCol_WindowBg].z * collOffset, style.Colors[ImGuiCol_WindowBg].w});
+
+            // Get starting position of the window's content area
+            const ImVec2 win_pos = ImVec2(window->Pos.x, window->Pos.y - style.ItemSpacing.y * 0.5f);
+            const ImVec2 clip_rect_min = {win_pos.x, win_pos.y};
+            const ImVec2 clip_rect_max = {win_pos.x + window->Size.x, win_pos.y + window_height};
+
+            // Clip drawing to the visible area
+            draw_list->PushClipRect(clip_rect_min, clip_rect_max, true);
+
+            for (int row = row_start; row < row_start + row_count; row++)
+            {
+                // Alternate colors
+                const ImU32 col = (row % 2 == 0) ? color_even : color_odd;
+
+                // Calculate row position
+                const float y1 = win_pos.y + (row * row_height) - scroll_y;
+                const float y2 = y1 + row_height;
+
+                // Draw the row background
+                draw_list->AddRectFilled(
+                    ImVec2(win_pos.x, y1),
+                    ImVec2(win_pos.x + window->Size.x, y2),
+                    col
+                );
+            }
+
+            draw_list->PopClipRect();
+            gui::PopStyleVar();
         }
 
 		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
