@@ -969,182 +969,9 @@ namespace wc
 				        }
 				    }
 				    ui::HelpMarker("Press ENTER or Deselect to confirm");
-
-				    ui::CenterNextWindow();
-				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
-				    {
-				        gui::Text("Name already exists!");
-				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-				        gui::EndPopup();
-				    }
-
-					// Display the entity's ID
-					//gui::Text("ID: %u", selected_entity.id());
-
-					//NOTE: for every new component, a new if statement is needed
-					gui::SeparatorText("Components");
-
-					EditComponent<TransformComponent>("Transform", [](auto& component){
-						auto& realRotation = const_cast<float&>(component.Rotation);
-						auto rotation = glm::degrees(realRotation);
-
-						//ui::DragButton2("Position", component.Translation);
-					    //gui::DragFloat3("Position", glm::value_ptr(component.Translation));
-					    ui::DragButton3("Position", component.Translation);
-						ui::DragButton2("Scale", component.Scale);
-						ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
-						realRotation = glm::radians(rotation);
-					});
-
-					EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
-						gui::ColorEdit4("color", glm::value_ptr(component.Color));
-						gui::Button("Texture");
-					});
-
-					EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
-						ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
-						ui::Slider("Fade", component.Fade, 0.0f, 1.0f);
-						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
-						});
-
-					EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
-						//auto& font = const_cast<std::string&>(t.Font);
-						gui::InputText("Text", &component.Text);
-						//gui::InputText("Font", &font);
-						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
-					});
-
-					auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
-						{
-				            ui::Separator("Material");
-				            static int currentMaterialIndex = 0;  // Track the selected material
-
-				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
-				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
-
-				            if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
-				            {
-				                gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-                                if (gui::Button("New Material", {gui::GetContentRegionAvail().x, 0}))
-                                    gui::OpenPopup("Create Material##popup");
-				                gui::PopStyleColor();
-
-				                ui::CenterNextWindow();
-				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
-				                {
-				                    PhysicsMaterial newMaterial;
-
-				                    static std::string name;
-				                    gui::InputText("Name", &name);
-				                    const float widgetSize = gui::GetItemRectSize().x;
-
-				                    if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
-				                    {
-				                        m_Scene.Materials[name] = newMaterial;
-				                        name = "";
-				                        gui::CloseCurrentPopup();
-				                    }
-				                    gui::SameLine();
-				                    gui::SetCursorPosX(widgetSize);
-				                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-
-				                    gui::EndPopup();
-				                }
-				                gui::Separator();
-
-				                int index = 0;
-				                for (const auto& [name, mat] : m_Scene.Materials)
-								{
-				                    bool isSelected = (currentMaterialIndex == index);
-				                    gui::PushStyleColor(ImGuiCol_Header, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-				                    if (gui::Selectable(name.c_str(), isSelected))
-				                        currentMaterialIndex = index;
-
-                                    gui::PopStyleColor();
-				                    if (isSelected)
-				                        gui::SetItemDefaultFocus();
-
-				                    ++index;
-				                }
-				                gui::EndCombo();
-				            }
-
-                            // Get the selected material
-				            auto& curMaterial = m_Scene.Materials[currentMaterialName];
-
-				            gui::BeginDisabled(currentMaterialName == "Default");
-				            gui::BeginGroup();
-				            ui::Drag("Density", curMaterial.Density);
-							ui::Drag("Friction", curMaterial.Friction);
-							ui::Drag("Restitution", curMaterial.Restitution);
-							ui::Drag("Rolling Resistance", curMaterial.RollingResistance);
-
-							ui::Separator();
-							gui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
-
-							ui::Separator();
-							ui::Checkbox("Sensor", curMaterial.Sensor);
-							ui::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
-							ui::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
-							ui::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
-							ui::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
-							ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
-				            gui::EndGroup();
-				            gui::EndDisabled();
-				            if (currentMaterialName == "Default")
-								gui::SetItemTooltip("Cannot edit Default material values");
-
-				            material = curMaterial;
-
-						};
-
-					EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
-
-						const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
-						const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
-
-						if (gui::BeginCombo("Body Type", currentBodyTypeString))
-						{
-							for (int i = 0; i < 3; i++)
-							{
-								bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
-								if (gui::Selectable(bodyTypeStrings[i], &isSelected))
-								{
-									currentBodyTypeString = bodyTypeStrings[i];
-									component.Type = BodyType(i);
-								}
-
-								if (isSelected)
-									gui::SetItemDefaultFocus();
-							}
-							gui::EndCombo();
-						}
-
-						ui::Drag("Gravity Scale", component.GravityScale);
-						ui::Drag("Linear Damping", component.LinearDamping);
-						ui::Drag("Angular Damping", component.AngularDamping);
-						ui::Checkbox("Fixed Rotation", component.FixedRotation);
-						ui::Checkbox("Bullet", component.Bullet);
-						ui::Checkbox("Fast Rotation", component.FastRotation);
-					});
-
-					EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
-						ui::DragButton2("Offset", component.Offset);
-						ui::DragButton2("Size", component.Size);
-
-						UI_PhysicsMaterial(component.Material);
-					});
-
-					EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
-						ui::DragButton2("Offset", component.Offset);
-						ui::Drag("Radius", component.Radius);
-
-						UI_PhysicsMaterial(component.Material);
-					});
-
-					static bool showAddComponent = false;
+				    static bool showAddComponent = false;
 					static enum { None, Transform, Render, Rigid } menu = None;
-					if (gui::Button("Add Component"))
+					if (gui::Button("Add Component", { gui::CalcItemWidth(), 0 }))
 					{
 						showAddComponent = true;
 						menu = None;
@@ -1244,6 +1071,182 @@ namespace wc
 						}
 						gui::End();
 					}
+
+				    ui::CenterNextWindow();
+				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				    {
+				        gui::Text("Name already exists!");
+				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+				        gui::EndPopup();
+				    }
+
+					// Display the entity's ID
+					//gui::Text("ID: %u", selected_entity.id());
+
+					//NOTE: for every new component, a new if statement is needed
+					gui::SeparatorText("Components");
+
+				    if (gui::BeginChild("components"))
+				    {
+				        EditComponent<TransformComponent>("Transform", [](auto& component){
+                            auto& realRotation = const_cast<float&>(component.Rotation);
+                            auto rotation = glm::degrees(realRotation);
+
+                            //ui::DragButton2("Position", component.Translation);
+                            //gui::DragFloat3("Position", glm::value_ptr(component.Translation));
+                            ui::DragButton3("Position", component.Translation);
+                            ui::DragButton2("Scale", component.Scale);
+                            ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+                            realRotation = glm::radians(rotation);
+                        });
+
+				        EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
+                            gui::ColorEdit4("color", glm::value_ptr(component.Color));
+                            gui::Button("Texture");
+                        });
+
+				        EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
+                            ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
+                            ui::Slider("Fade", component.Fade, 0.0f, 1.0f);
+                            gui::ColorEdit4("Color", glm::value_ptr(component.Color));
+                            });
+
+				        EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
+                            //auto& font = const_cast<std::string&>(t.Font);
+                            gui::InputText("Text", &component.Text);
+                            //gui::InputText("Font", &font);
+                            gui::ColorEdit4("Color", glm::value_ptr(component.Color));
+                        });
+
+				        auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
+				        {
+				            ui::Separator("Material");
+				            static int currentMaterialIndex = 0;  // Track the selected material
+
+				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
+				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
+
+				            if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
+				            {
+				                gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+				                if (gui::Button("New Material", {gui::GetContentRegionAvail().x, 0}))
+				                    gui::OpenPopup("Create Material##popup");
+				                gui::PopStyleColor();
+
+				                ui::CenterNextWindow();
+				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
+				                {
+				                    PhysicsMaterial newMaterial;
+
+				                    static std::string name;
+				                    gui::InputText("Name", &name);
+				                    const float widgetSize = gui::GetItemRectSize().x;
+
+				                    if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
+				                    {
+				                        m_Scene.Materials[name] = newMaterial;
+				                        name = "";
+				                        gui::CloseCurrentPopup();
+				                    }
+				                    gui::SameLine();
+				                    gui::SetCursorPosX(widgetSize);
+				                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+
+				                    gui::EndPopup();
+				                }
+				                gui::Separator();
+
+				                int index = 0;
+				                for (const auto& [name, mat] : m_Scene.Materials)
+				                {
+				                    bool isSelected = (currentMaterialIndex == index);
+				                    gui::PushStyleColor(ImGuiCol_Header, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+				                    if (gui::Selectable(name.c_str(), isSelected))
+				                        currentMaterialIndex = index;
+
+				                    gui::PopStyleColor();
+				                    if (isSelected)
+				                        gui::SetItemDefaultFocus();
+
+				                    ++index;
+				                }
+				                gui::EndCombo();
+				            }
+
+				            // Get the selected material
+				            auto& curMaterial = m_Scene.Materials[currentMaterialName];
+
+				            gui::BeginDisabled(currentMaterialName == "Default");
+				            gui::BeginGroup();
+				            ui::Drag("Density", curMaterial.Density);
+				            ui::Drag("Friction", curMaterial.Friction);
+				            ui::Drag("Restitution", curMaterial.Restitution);
+				            ui::Drag("Rolling Resistance", curMaterial.RollingResistance);
+
+				            ui::Separator();
+				            gui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
+
+				            ui::Separator();
+				            ui::Checkbox("Sensor", curMaterial.Sensor);
+				            ui::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
+				            ui::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
+				            ui::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
+				            ui::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
+				            ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
+				            gui::EndGroup();
+				            gui::EndDisabled();
+				            if (currentMaterialName == "Default")
+				                gui::SetItemTooltip("Cannot edit Default material values");
+
+				            material = curMaterial;
+
+				        };
+
+				        EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
+
+                            const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
+                            const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
+
+                            if (gui::BeginCombo("Body Type", currentBodyTypeString))
+                            {
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
+                                    if (gui::Selectable(bodyTypeStrings[i], &isSelected))
+                                    {
+                                        currentBodyTypeString = bodyTypeStrings[i];
+                                        component.Type = BodyType(i);
+                                    }
+
+                                    if (isSelected)
+                                        gui::SetItemDefaultFocus();
+                                }
+                                gui::EndCombo();
+                            }
+
+                            ui::Drag("Gravity Scale", component.GravityScale);
+                            ui::Drag("Linear Damping", component.LinearDamping);
+                            ui::Drag("Angular Damping", component.AngularDamping);
+                            ui::Checkbox("Fixed Rotation", component.FixedRotation);
+                            ui::Checkbox("Bullet", component.Bullet);
+                            ui::Checkbox("Fast Rotation", component.FastRotation);
+                        });
+
+				        EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
+                            ui::DragButton2("Offset", component.Offset);
+                            ui::DragButton2("Size", component.Size);
+
+                            UI_PhysicsMaterial(component.Material);
+                        });
+
+				        EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
+                            ui::DragButton2("Offset", component.Offset);
+                            ui::Drag("Radius", component.Radius);
+
+                            UI_PhysicsMaterial(component.Material);
+                        });
+				    }
+				    gui::EndChild();
 				}
 			}
 			gui::End();
