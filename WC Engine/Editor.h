@@ -347,6 +347,7 @@ namespace wc
 		{
 			std::string selectedEntityName;
 			if (m_SelectedEntity != flecs::entity::null()) selectedEntityName = m_SelectedEntity.name().c_str();
+			//WC_INFO("Changing scene state. Selected Entity: {0}", selectedEntityName);
 
 			m_SceneState = newState;
 
@@ -362,6 +363,7 @@ namespace wc
 			}
 
 			if(m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.GetWorld().lookup(selectedEntityName.c_str());
+			//WC_INFO("Scene state changed. Selected Entity: {0}", m_SelectedEntity.name().c_str());
 		}
 
 		void UI_Editor()
@@ -437,15 +439,15 @@ namespace wc
 				bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
 				bool isPaused = (m_SceneState == SceneState::Edit);
 
-			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 0));
+			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
 				if (isPlayingOrSimulating) gui::BeginDisabled();
-				if (gui::ImageButton("play", t_Play, {20, 20}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+				if (gui::ImageButton("play", t_Play, {10, 10}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 
-			    if (gui::ImageButton("simulate", t_Simulate, {20, 20}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+			    if (gui::ImageButton("simulate", t_Simulate, {10, 10}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 				if (isPlayingOrSimulating) gui::EndDisabled();
 
 				if (isPaused) gui::BeginDisabled();
-				if (gui::ImageButton("stop", t_Stop, {20, 20})) ChangeSceneState(SceneState::Edit);
+				if (gui::ImageButton("stop", t_Stop, {10, 10})) ChangeSceneState(SceneState::Edit);
 				if (isPaused) gui::EndDisabled();
 			    ImGui::PopStyleVar();
 
@@ -536,7 +538,7 @@ namespace wc
 		{
 			if (gui::Begin("Scene Properties", &showSceneProperties))
 			{
-				if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+			    if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					auto& worldData = m_Scene.GetPhysicsWorldData();
 					ui::DragButton2("Gravity", worldData.Gravity);
@@ -589,231 +591,238 @@ namespace wc
 
 		void ShowEntities()
 		{
-	        static bool dragMode = false;
-	        if (gui::BeginMenuBar())
-	        {
-	            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-	            if (gui::ImageButton("mode", dragMode ? t_Bond : t_Reorder, ImVec2(20, 20)) || gui::IsWindowFocused() && gui::IsKeyPressed(ImGuiKey_LeftCtrl, ImGuiInputFlags_LockThisFrame))
-	            {
-	                dragMode = !dragMode;
-	                WC_INFO(dragMode ? "Changed Mode to : Bond" : "Changed Mode to : Reorder");
-	            }
-	            gui::SetItemTooltip("Press CTRL or press to change mode");
-	            gui::PopStyleVar();
-	            gui::PopStyleColor();
-	            gui::EndMenuBar();
-	        }
-
 			if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
 
-			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
+	        if (gui::BeginChild("##ShowEntities", {0, 0}, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 	        {
-				const bool is_selected = (m_SelectedEntity == entity);
+	            // Reorder
+	            auto separator = [&](flecs::entity entity) -> void
+                {
+                    if (ui::MatchPayloadType("ENTITY"))
+			            {
+			                gui::PushStyleColor(ImGuiCol_Separator, {0.5f, 0.5f, 0.5f, 0.f});
+			                gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
+			                gui::PopStyleColor();
 
-				std::vector<flecs::entity> children;
-				if (entity.has<ChildNamesComponent>())
-				{
-					auto& childNames = entity.get<ChildNamesComponent>()->childNames;
-					for (const auto& childName : childNames)
-					{
-						std::string fullChildName = std::string(entity.name()) + "::" + childName;
+			                if (gui::BeginDragDropTarget())
+			                {
+			                    if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+			                    {
+			                        IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+			                        flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
 
-						flecs::entity childEntity = entity;
-						while (childEntity.parent() != flecs::entity::null())
-						{
-							childEntity = childEntity.parent();
-							fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
-						}
+			                        // Only allow reordering if both entities share the same parent.
+			                        if (droppedEntity.parent() == entity.parent())
+			                        {
+			                            // Get the list of names from the proper container.
+			                            // For top-level entities, use the scene's parent names;
+			                            // for children, use the parent's ChildNamesComponent.
+			                            std::vector<std::string>* entityNames = nullptr;
+			                            if (entity.parent() == flecs::entity::null())
+			                            {
+			                                entityNames = &m_Scene.GetParentEntityNames();
+			                            }
+			                            else if (entity.parent().has<ChildNamesComponent>())
+			                            {
+			                                entityNames = &entity.parent().get_ref<ChildNamesComponent>()->childNames;
+			                            }
 
-						auto childEntityResolved = m_Scene.GetWorld().lookup(fullChildName.c_str());
-						if (childEntityResolved)
-							children.push_back(childEntityResolved);
-					}
-				}
+			                            if (entityNames)
+			                            {
+			                                // Find the positions of the target (the entity associated with the separator)
+			                                // and the dropped entity.
+			                                auto targetIt = std::find(entityNames->begin(), entityNames->end(), std::string(entity.name()));
+			                                auto droppedIt = std::find(entityNames->begin(), entityNames->end(), std::string(droppedEntity.name()));
 
-				ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
-				if (is_selected)
-					node_flags |= ImGuiTreeNodeFlags_Selected;
+			                                if (targetIt != entityNames->end() && droppedIt != entityNames->end() && targetIt != droppedIt)
+			                                {
+			                                    // Remove the dropped entity from its current position.
+			                                    std::string droppedName = *droppedIt;
+			                                    entityNames->erase(droppedIt);
 
-				if (children.empty())
-					node_flags |= ImGuiTreeNodeFlags_Leaf;
+			                                    // Recalculate the target's index (in case removal shifted it).
+			                                    int newTargetIndex = std::distance(entityNames->begin(),
+                                                    std::find(entityNames->begin(), entityNames->end(), std::string(entity.name())));
 
-				if (m_SelectedEntity != flecs::entity::null())
-				{
-					auto parent = m_SelectedEntity.parent();
-					while (parent != flecs::entity::null())
-					{
-						if (parent == entity)
-						{
-							gui::SetNextItemOpen(true);
-							break;
-						}
-						parent = parent.parent();
-					}
-				}
+			                                    // Insert the dropped entity immediately after the target.
+			                                    int insertIndex = newTargetIndex + 1;
+			                                    if (insertIndex > static_cast<int>(entityNames->size()))
+			                                        insertIndex = static_cast<int>(entityNames->size());
+			                                    entityNames->insert(entityNames->begin() + insertIndex, droppedName);
+			                                }
+			                            }
+			                        }
+			                    }
+			                    gui::EndDragDropTarget();
+			                }
+			            }
+                };
 
-				// Push a flag to allow duplicate IDs in the same window
-				gui::PushItemFlag(ImGuiItemFlags_AllowDuplicateId, true);
-
-				// Render the entity
-				bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
-
-				gui::PopItemFlag();
-
-				// Handle selection on click
-				if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
-
-				if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
-				{
-					if (entity.has<TransformComponent>())
-						camera.Position = entity.get<TransformComponent>()->Translation;
-				}
-
-				if(dragMode)
-				{
-					if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
-					{
-						gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
-						gui::Text("Dragging %s", entity.name().c_str());
-						gui::EndDragDropSource();
-					}
-
-					if (gui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-						{
-							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-							flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
-
-							// Check if the drop target is empty space
-							 if (droppedEntity != entity.parent())
-								m_Scene.SetChild(entity, droppedEntity);
-						}
-						gui::EndDragDropTarget();
-					}
-				}
-				else if(gui::IsItemActive() && !gui::IsItemHovered())
-				{
-					auto& entitiyNames = entity.parent() == flecs::entity::null() ? m_Scene.GetParentEntityNames() : entity.parent().get_ref<ChildNamesComponent>()->childNames;
-					auto it = std::find(entitiyNames.begin(), entitiyNames.end(), std::string(entity.name()));
-
-					if (it != entitiyNames.end())
-					{
-						int index = std::distance(entitiyNames.begin(), it);
-
-						float drag_delta_y = gui::GetMouseDragDelta(0).y;
-
-						if (std::abs(drag_delta_y) > 5.0f)
-						{
-							int n_next = index + (drag_delta_y < 0.f ? -1 : 1);
-
-							if (n_next >= 0 && n_next < entitiyNames.size() && n_next != index)
-							{
-								std::swap(entitiyNames[index], entitiyNames[n_next]);
-
-								gui::ResetMouseDragDelta();
-							}
-						}
-					}
-				}
-
-				if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
-				{
-					if (gui::IsItemHovered())
-						gui::OpenPopup(std::to_string(entity.id()).c_str());
-					// TODO - ask if this is needed and fix it
-				    /*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
-                    {
-                        WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
-                        gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
-                    }*/
-				}
-
-				// Display the popup menu
-				if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
-				{
-					gui::Text("%s", entity.name().c_str());
-					gui::Separator();
-
-					if (gui::MenuItem("Clone"))
-					{
-						WC_CORE_INFO("Implement Clone");
-						gui::CloseCurrentPopup();
-					}
-
-					if (gui::MenuItem("Export"))
-					{
-						WC_CORE_INFO("Implement Export");
-						gui::CloseCurrentPopup();
-					}
-
-					if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-					{
-						//auto parent = entity.parent();
-						m_Scene.RemoveChild(entity);
-					}
-
-					if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
-					{
-						if (gui::MenuItem("Set Child of Selected"))
-							m_Scene.SetChild(m_SelectedEntity, entity);
-					}
-
-					gui::Separator();
-
-					gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-					if (gui::MenuItem("Delete"))
-					{
-						m_Scene.KillEntity(entity);
-						m_SelectedEntity = flecs::entity::null();
-						gui::CloseCurrentPopup();
-					}
-					gui::PopStyleColor();
-
-					gui::EndPopup();
-				}
-
-				// If the node is open, recursively display children
-				if (is_open)
-				{
-					for (const auto& child : children)
-						displayEntityRef(child, displayEntityRef);
-
-					gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
-				}
-	        };
-
-			for (const auto& name : m_Scene.GetParentEntityNames())
-			{
-				auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
-				if (rootEntity)
-					displayEntity(rootEntity, displayEntity);
-			}
-
-	        // "Empty space" drop target for clearing bonds
-	        if (dragMode && m_SelectedEntity && m_SelectedEntity.parent() != flecs::entity::null())
-	        {
-                gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-	            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-                if (gui::IsMouseDragging(0))gui::Button("*Remove Parent*", gui::GetContentRegionAvail());
-	            else gui::InvisibleButton("EmptySpace", gui::GetContentRegionAvail());
-	            gui::PopStyleColor(3);
-
-                if (gui::BeginDragDropTarget())
+			    auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 	            {
-	                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-	                {
-	                    IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-	                    flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+			        if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+			        {
+			            if (gui::IsItemHovered())
+			            {
+			                WC_INFO("Hovered {}", entity.name().c_str());
+			                gui::OpenPopup(std::to_string(entity.id()).c_str());
+			            }
+			            // TODO - ask if this is needed and fix it
+			            /*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+                        {
+                            WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
+                            gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+                        }*/
+			        }
 
-	                    if (droppedEntity.parent() != flecs::entity::null())
-	                        m_Scene.RemoveChild(droppedEntity);
-	                }
-	                gui::EndDragDropTarget();
-	            }
+			    	const bool is_selected = (m_SelectedEntity == entity);
+
+			    	std::vector<flecs::entity> children;
+			    	if (entity.has<ChildNamesComponent>())
+			    	{
+			    		auto& childNames = entity.get<ChildNamesComponent>()->childNames;
+			    		for (const auto& childName : childNames)
+			    		{
+			    			std::string fullChildName = std::string(entity.name()) + "::" + childName;
+
+			    			flecs::entity childEntity = entity;
+			    			while (childEntity.parent() != flecs::entity::null())
+			    			{
+			    				childEntity = childEntity.parent();
+			    				fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
+			    			}
+
+                            if (auto childEntityResolved = m_Scene.GetWorld().lookup(fullChildName.c_str()))
+			    				children.push_back(childEntityResolved);
+			    		}
+			    	}
+
+			    	ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+			    	if (is_selected)
+			    		node_flags |= ImGuiTreeNodeFlags_Selected;
+
+			    	if (children.empty())
+			    		node_flags |= ImGuiTreeNodeFlags_Leaf;
+
+			    	if (m_SelectedEntity != flecs::entity::null())
+			    	{
+			    		auto parent = m_SelectedEntity.parent();
+			    		while (parent != flecs::entity::null())
+			    		{
+			    			if (parent == entity)
+			    			{
+			    				gui::SetNextItemOpen(true);
+			    				break;
+			    			}
+			    			parent = parent.parent();
+			    		}
+			    	}
+
+			    	// Render the entity
+			    	bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
+
+			    	// Handle selection on click
+			    	if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
+
+			    	if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
+			    	{
+			    		if (entity.has<TransformComponent>())
+			    			camera.Position = entity.get<TransformComponent>()->Translation;
+			    	}
+
+			    	if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
+			    	{
+			    		gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
+			    		gui::Text("Dragging %s", entity.name().c_str());
+			    		gui::EndDragDropSource();
+			    	}
+
+			        // Bond
+			    	if (gui::BeginDragDropTarget())
+			    	{
+			    		if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+			    		{
+			    			IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+			    			flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+
+			    			// Check if the drop target is empty space
+			    			 if (droppedEntity != entity.parent())
+			    				m_Scene.SetChild(entity, droppedEntity);
+			    		}
+			    		gui::EndDragDropTarget();
+			    	}
+
+			    	// Display the popup menu
+			    	if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
+			    	{
+			    		gui::Text("%s", entity.name().c_str());
+			    		gui::Separator();
+
+			    		if (gui::MenuItem("Clone"))
+			    		{
+			    			WC_CORE_INFO("Implement Clone");
+			    			gui::CloseCurrentPopup();
+			    		}
+
+			    		if (gui::MenuItem("Export"))
+			    		{
+			    			WC_CORE_INFO("Implement Export");
+			    			gui::CloseCurrentPopup();
+			    		}
+
+			    		if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
+			    		{
+			    			//auto parent = entity.parent();
+			    			m_Scene.RemoveChild(entity);
+			    		}
+
+			    		if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
+			    		{
+			    			if (gui::MenuItem("Set Child of Selected"))
+			    				m_Scene.SetChild(m_SelectedEntity, entity);
+			    		}
+
+			    		gui::Separator();
+
+			    		gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+			    		if (gui::MenuItem("Delete"))
+			    		{
+			    			m_Scene.KillEntity(entity);
+			    			m_SelectedEntity = flecs::entity::null();
+			    			gui::CloseCurrentPopup();
+			    		}
+			    		gui::PopStyleColor();
+
+			    		gui::EndPopup();
+			    	}
+
+
+			    	// If the node is open, recursively display children
+			    	if (is_open)
+			    	{
+			    	    gui::TreePop(); // Pop before separator
+
+			            separator(entity);
+
+			    	    gui::TreePush(entity.name().c_str());
+			    		for (const auto& child : children)
+			    			displayEntityRef(child, displayEntityRef);
+			            gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
+			    	}
+			        else separator(entity);
+
+	            };
+
+	            ui::DrawBgRows(10);
+	            gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
+			    for (const auto& name : m_Scene.GetParentEntityNames())
+			    {
+			    	auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
+			    	if (rootEntity) displayEntity(rootEntity, displayEntity);
+			    }
+	            gui::PopStyleVar();
 	        }
+	        gui::EndChild();
 		}
 
 		void UI_Entities()
@@ -821,14 +830,34 @@ namespace wc
             static bool showPopup = false;
 			if (gui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
-                static char filter[1024];
+			    std::string entityFilter;
                 if (gui::BeginMenuBar())
                 {
-                    gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Add Entity").x - 20 - gui::GetStyle().ItemSpacing.x * 3);
-                    gui::InputTextEx("##filer", "Filter names", filter, IM_ARRAYSIZE(filter), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, nullptr, nullptr);
+                    //TODO - Implement search
+                    char filterBuff[256];
+                    //TODO - fix, imgui is DnD active crashes flecs for some reason
+                    bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
+                    //WC_INFO("1: {}", gui::IsDragDropActive());
+                    gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
+                    gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
+                    if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)){ entityFilter = filterBuff; }
 
-                    if (gui::Button("Add Entity"))
-                        showPopup = true;
+                    gui::BeginDisabled(buttonDnD);
+                    if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
+                    gui::EndDisabled();
+
+                    if (buttonDnD && gui::BeginDragDropTarget())
+                    {
+                        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+                        {
+                            IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+                            flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+
+                            if (droppedEntity.parent() != flecs::entity::null())
+                                m_Scene.RemoveChild(droppedEntity);
+                        }
+                        gui::EndDragDropTarget();
+                    }
 
                     gui::EndMenuBar();
                 }
@@ -914,7 +943,7 @@ namespace wc
 					std::string nameBuffer = m_SelectedEntity.name().c_str(); // Buffer to hold the entity's name
 
 				    // Input name
-				    if (gui::InputText("Name", &nameBuffer))
+				    if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 				    {
 				        if (!nameBuffer.empty())
 				        {
@@ -939,6 +968,7 @@ namespace wc
 				            }
 				        }
 				    }
+				    ui::HelpMarker("Press ENTER or Deselect to confirm");
 
 				    ui::CenterNextWindow();
 				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
@@ -1242,7 +1272,9 @@ namespace wc
 			        gui::SetClipboardText(logData.c_str());
 			    }
 
+			    // TODO - make work
 				gui::SameLine();
+			    gui::PushItemWidth(ImGui::GetContentRegionAvail().x - gui::CalcTextSize("Filter").x - gui::GetStyle().ItemSpacing.x);
 				gui::InputText("Input", const_cast<char*>(""), 0);
 
 				gui::Separator();
@@ -1355,51 +1387,53 @@ namespace wc
 						{
 							const auto& filenameStr = entry.path().filename().string();
 							const auto& fullPathStr = entry.path().string();
-							if (entry.is_directory())
-							{
-								auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
-								bool& isOpen = it->second;
+						    if (std::filesystem::exists(entry.path()))
+						    {
+						        if (entry.is_directory())
+						        {
+						            auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
+						            bool& isOpen = it->second;
 
-								gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-								gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-								if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
-									isOpen = !isOpen;
+						            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+						            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+						            if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+						                isOpen = !isOpen;
 
-								gui::PopStyleColor();
-								gui::PopStyleVar();
-								gui::SameLine();
+						            gui::PopStyleColor();
+						            gui::PopStyleVar();
+						            gui::SameLine();
 
-								if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
-									selectedFolderPath = entry.path();
+						            if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+						                selectedFolderPath = entry.path();
 
-								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-									isOpen = !isOpen;
+						            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
+						                isOpen = !isOpen;
 
-								if (isOpen)
-									displayDirectory(entry.path());
-							}
-							else
-							{
-								ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-								gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
-								if (gui::IsItemHovered())
-								{
-									if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
+						            if (isOpen)
+						                displayDirectory(entry.path());
+						        }
+						        else
+						        {
+						            ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+						            gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
+						            if (gui::IsItemHovered())
+						            {
+						                if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-									if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-									    if (entry.path().extension() != ".scene")
-									    {
-										    if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
-									    }
-									    else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
+						                if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+						                    if (entry.path().extension() != ".scene")
+						                    {
+						                        if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
+						                    }
+						                    else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
 
-								    gui::SetNextWindowPos({gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y});
-									if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
-									{
-										gui::Text("Preview: %s", filenameStr.c_str());
-										gui::EndPopup();
-									}
-								}
+						                gui::SetNextWindowPos({gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y});
+						                if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
+						                {
+						                    gui::Text("Preview: %s", filenameStr.c_str());
+						                    gui::EndPopup();
+						                }
+						            }
 
 							    ui::CenterNextWindow();
 							    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
@@ -1409,16 +1443,16 @@ namespace wc
 							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 							        {
 										m_ScenePath = entry.path().string();
-							            m_Scene.Load(m_ScenePath);
 							            gui::CloseCurrentPopup();
 							        }
 							        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 							        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
 							            gui::CloseCurrentPopup();
 
-							        gui::EndPopup();
-							    }
-							}
+						                gui::EndPopup();
+						            }
+						        }
+						    }
 						}
 
 						if (path != assetsPath) gui::Unindent(20);
@@ -1449,7 +1483,30 @@ namespace wc
 							    gui::ArrowButton("Back", ImGuiDir_Left);
 								gui::EndDisabled();
 							}
-							else if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+							else
+							{
+							    if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+
+							    // Drop target for directories
+							    if (gui::BeginDragDropTarget())
+							    {
+							        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+							        {
+							            const char* payloadPath = static_cast<const char*>(payload->Data);
+							            std::filesystem::path sourcePath(payloadPath);
+
+							            try
+							            {
+							                std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
+							            }
+							            catch (const std::exception& e)
+                                        {
+                                            WC_ERROR("Failed to move directory: {}", e.what());
+                                        }
+							        }
+							        gui::EndDragDropTarget();
+							    }
+							}
 
 						    static std::string previewPath;
 						    gui::SameLine();
@@ -1462,7 +1519,8 @@ namespace wc
 
 						    gui::Separator();
 
-							float totalButtonWidth = 50 + gui::GetStyle().ItemSpacing.x;
+						    constexpr float buttonSize = 70;
+							float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
 							int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
 
 							if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
@@ -1475,107 +1533,143 @@ namespace wc
 									if (i > 0 && i % itemsPerRow != 0)
 										gui::SameLine();
 
-									if (entry.is_directory())
-									{
-										gui::BeginGroup();
-										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-										if (gui::ImageButton((entry.path().string() + "/").c_str(), std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder, { 50, 50 }))
-											selectedFolderPath = entry.path();
+								    if (std::filesystem::exists(entry.path()))
+								    {
+								        if (entry.is_directory())
+								        {
+								            gui::BeginGroup();
+								            gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+								            gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								            // TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
+								            gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
+								            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
 
-										gui::PopStyleColor();
-										gui::PopStyleVar();
+								            // Drag source for directories
+								            if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+								            {
+								                std::string path = entry.path().string();
+								                gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+								                gui::Text("Moving %s", entry.path().filename().string().c_str());
+								                gui::EndDragDropSource();
+								            }
 
-										std::string filename = entry.path().filename().string();
-										float wrapWidth = 50.0f; // Width for wrapping the text
+								            // Drop target for directories
+								            if (gui::BeginDragDropTarget())
+								            {
+								                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+								                {
+								                    const char* payloadPath = static_cast<const char*>(payload->Data);
+								                    std::filesystem::path sourcePath(payloadPath);
+								                    std::filesystem::path targetPath = entry.path() / sourcePath.filename();
 
-										// Split the text into words
-										std::istringstream stream(filename);
-										std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
+								                    std::filesystem::rename(sourcePath, targetPath);
+								                }
+								                gui::EndDragDropTarget();
+								            }
 
-										// Display each line centered
-										std::string currentLine;
-										float currentLineWidth = 0.0f;
-										gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
-										for (const auto& word : words)
-										{
-											ImVec2 wordSize = gui::CalcTextSize(word.c_str());
-											if (currentLineWidth + wordSize.x > wrapWidth)
-											{
-												// Push the current line and start a new one
-												gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-												gui::TextUnformatted(currentLine.c_str());
-												currentLine.clear();
-												currentLineWidth = 0.0f;
-											}
+								            gui::PopStyleColor();
+								            gui::PopStyleVar();
 
-											if (!currentLine.empty())
-											{
-												currentLine += " "; // Add a space before the next word
-												currentLineWidth += gui::CalcTextSize(" ").x;
-											}
-											currentLine += word;
-											currentLineWidth += wordSize.x;
-										}
+								            std::string filename = entry.path().filename().string();
+								            float wrapWidth = buttonSize; // Width for wrapping the text
 
-										// Add the last line if there's any remaining text
-										if (!currentLine.empty())
-										{
-											gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-											gui::TextUnformatted(currentLine.c_str());
-										}
-										gui::PopStyleVar(); // Restore item spacing for text
+								            // Split the text into words
+								            std::istringstream stream(filename);
+								            std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
 
-										gui::EndGroup();
-									}
-									else
-									{
-										gui::BeginGroup();
-										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								            // Display each line centered
+								            std::string currentLine;
+								            float currentLineWidth = 0.0f;
+								            gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
+								            for (const auto& word : words)
+								            {
+								                ImVec2 wordSize = gui::CalcTextSize(word.c_str());
+								                if (currentLineWidth + wordSize.x > wrapWidth)
+								                {
+								                    // Push the current line and start a new one
+								                    gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+								                    gui::TextUnformatted(currentLine.c_str());
+								                    currentLine.clear();
+								                    currentLineWidth = 0.0f;
+								                }
 
-										if (gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { 50, 50 }))
-										{
-                                               if (entry.path().extension() != ".scene")
-                                               {
-										            if (openedFileNames.insert(entry.path().string()).second)
-											    	    openedFiles.push_back(entry.path());
-                                               }
-                                               else
-										        gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
-										}
+								                if (!currentLine.empty())
+								                {
+								                    currentLine += " "; // Add a space before the next word
+								                    currentLineWidth += gui::CalcTextSize(" ").x;
+								                }
+								                currentLine += word;
+								                currentLineWidth += wordSize.x;
+								            }
 
-										gui::PopStyleVar();
-										gui::PopStyleColor();
-										gui::PushTextWrapPos(gui::GetCursorPos().x + 50);
-										gui::TextWrapped(entry.path().filename().string().c_str());
-										gui::PopTextWrapPos();
-										gui::EndGroup();
+								            // Add the last line if there's any remaining text
+								            if (!currentLine.empty())
+								            {
+								                gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+								                gui::TextUnformatted(currentLine.c_str());
+								            }
+								            gui::PopStyleVar(); // Restore item spacing for text
 
-									    ui::CenterNextWindow();
-									    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
-                                        {
-                                            gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-									        const float widgetWidth = gui::GetItemRectSize().x;
+								            gui::EndGroup();
+								        }
+								        else
+								        {
+								            gui::BeginGroup();
+								            gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+								            gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								            gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
+								            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
+								            {
+								                if (entry.path().extension() != ".scene")
+								                {
+								                    if (openedFileNames.insert(entry.path().string()).second)
+								                        openedFiles.push_back(entry.path());
+								                }
+								                else
+								                    gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
+								            }
 
-                                            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-                                            {
-                                                m_Scene.Load(entry.path().string());
-                                                gui::CloseCurrentPopup();
-                                            }
+								            // Drag source for files
+								            if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+								            {
+								                std::string path = entry.path().string();
+								                gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+								                gui::Text("Moving %s", entry.path().filename().string().c_str());
+								                gui::EndDragDropSource();
+								            }
 
-									        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-									        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+								            gui::PopStyleVar();
+								            gui::PopStyleColor();
 
-									        gui::EndPopup();
-                                        }
-									}
+								            gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
+								            gui::TextWrapped(entry.path().filename().string().c_str());
+								            gui::PopTextWrapPos();
+								            gui::EndGroup();
+
+								            ui::CenterNextWindow();
+								            if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+								            {
+								                gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+								                const float widgetWidth = gui::GetItemRectSize().x;
+
+								                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+								                {
+								                    m_Scene.Load(entry.path().string());
+								                    gui::CloseCurrentPopup();
+								                }
+
+								                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+								                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+
+								                gui::EndPopup();
+								            }
+								        }
+								    }
 									i++;
 								}
 							}
 						}
-						gui::EndChild();
-
+					    gui::EndChild();
 
 						gui::EndTable();
 					}
@@ -1924,7 +2018,6 @@ namespace wc
 	        gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 	        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
-	        static bool enableMenuBar = true;
 	        static ImGuiWindowFlags windowFlags =
 	            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
 	            | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
@@ -2117,12 +2210,12 @@ namespace wc
 
 			            if (gui::BeginMenu("File"))
 			            {
-			                ui::Separator("Scene");
+			                ui::Separator();
 
 			                static bool openSceneNamePopup = false; // New persistent flag
 			                if (ui::MenuItemButton("New", "CTRL + N", false))
                                 gui::OpenPopup("New Scene");
-			                
+
 							std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
 			                static std::string newSceneSavePath;
 			                if (!newScenePath.empty())
@@ -2140,16 +2233,15 @@ namespace wc
 			                ui::CenterNextWindow();
 			                if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			                {
-			                    static std::string sceneName = "Untitled";
+			                    static std::string sceneName = "newScene";
 			                    gui::InputText("Scene Name", &sceneName);
 			                    const float widgetWidth = gui::GetItemRectSize().x;
 
 			                    gui::BeginDisabled(sceneName.empty());
 			                    if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
 			                    {
-			                        //WC_CORE_INFO("Creating project: {0} at {1}", projName, savePath);
-			                        Project::Create(newSceneSavePath, sceneName);
-			                        sceneName = "Untitled";
+			                        WC_CORE_INFO("Implement new scene creation");
+			                        sceneName = "newScene";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
@@ -2160,7 +2252,7 @@ namespace wc
 			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 			                    {
-			                        sceneName = "Untitled";
+			                        sceneName = "newScene";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();

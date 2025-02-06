@@ -10,3 +10,5 @@ cmake-build-relwithdebinfo-visual-studio
 build/
 WC Engine/workdir/SavedProjects.yaml
 WC Engine/workdir/assets/imgui.ini
+cmake-build-relwithdebinfo-clang
+WC Engine/workdir/SavedProjects.yaml
