@@ -20,7 +20,7 @@ namespace wc
 		b2World m_PhysicsWorld;
 		PhysicsWorldData m_PhysicsWorldData;
 
-		std::vector<std::string> m_ParentEntityNames; // only parents
+		std::vector<std::string> m_EntityOrder; // only parents
 
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
@@ -30,86 +30,72 @@ namespace wc
 		auto GetWorld()	{ return m_World; }
 		auto GetPhysicsWorld() { return m_PhysicsWorld; }
 		auto& GetPhysicsWorldData() { return m_PhysicsWorldData; }
-		auto& GetParentEntityNames() { return m_ParentEntityNames; }
+		auto& GetParentEntityOrder() { return m_EntityOrder; }
 
 		auto AddEntity() {	return m_World.entity().add<EntityTag>();	}
 
-		auto AddEntity(const std::string& name) { m_ParentEntityNames.push_back(name); return m_World.entity(name.c_str()).add<EntityTag>(); }
+		auto AddEntity(const std::string& name) { m_EntityOrder.push_back(name); return m_World.entity(name.c_str()).add<EntityTag>(); }
 		
 		void RemoveChild(flecs::entity& child)
 		{
-		    if (child.parent() == flecs::entity::null()) return;
+		    if (child.parent() == flecs::entity::null()) 
+				return;
 
 		    auto parent = child.parent();
 			child.remove(flecs::ChildOf, parent);
 
-			auto names = parent.get_ref<ChildNamesComponent>();
+			auto orderData = parent.get_ref<EntityOrderComponent>();
 
-			if (names)
+			if (orderData)
 			{
-				auto& childNames = names->childNames;
-				auto it = std::remove(childNames.begin(), childNames.end(), child.name().c_str());
-				if (it != childNames.end())
+				auto& order = orderData->EntityOrder;
+				auto it = std::remove(order.begin(), order.end(), child.name().c_str());
+				if (it != order.end())
 				{
-					childNames.erase(it, childNames.end());
+					order.erase(it, order.end());
 
-					// If it was the last child, remove the ChildNamesComponent from the parent
-					if (childNames.empty())
-					{
-						parent.remove<ChildNamesComponent>();
-					}
+					if (order.empty())
+						parent.remove<EntityOrderComponent>();
 				}
 			}
 
-			// Add the child's name back to m_EntityNames
-			m_ParentEntityNames.push_back(child.name().c_str());
+			m_EntityOrder.push_back(child.name().c_str());
 		}
 
 		void SetChild(flecs::entity& parent, flecs::entity& child)
 		{
-			// Check if the child already has a parent
 			if (child.parent() != flecs::entity::null())
-			{
-				// Remove the child from the current parent
 				RemoveChild(child);
-			}
 
-			parent.add<ChildNamesComponent>();
-			parent.get_ref<ChildNamesComponent>()->childNames.push_back(child.name().c_str());
+			parent.add<EntityOrderComponent>();
+			parent.get_ref<EntityOrderComponent>()->EntityOrder.push_back(child.name().c_str());
 			child.add(flecs::ChildOf, parent);
 
-			// Remove the child's name from m_ParentEntityNames
-			m_ParentEntityNames.erase(std::remove(m_ParentEntityNames.begin(), m_ParentEntityNames.end(), child.name().c_str()), m_ParentEntityNames.end());
+			m_EntityOrder.erase(std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), child.name().c_str()), m_EntityOrder.end());
 		}
 
 		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(m_World, ent2, ent, true); }
 
 		void KillEntity(flecs::entity& ent)
 		{
-			// Remove the entity's name from m_EntityNames
-			auto it = std::remove(m_ParentEntityNames.begin(), m_ParentEntityNames.end(), ent.name().c_str());
-			if (it != m_ParentEntityNames.end()) {
-				m_ParentEntityNames.erase(it, m_ParentEntityNames.end());
-			}
-
-			// Check if the entity has a parent
+			auto it = std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), ent.name().c_str());
+			if (it != m_EntityOrder.end())
+				m_EntityOrder.erase(it, m_EntityOrder.end());
+			
 			auto parent = ent.parent();
-			if (parent != flecs::entity::null() && parent.has<ChildNamesComponent>())
+			if (parent != flecs::entity::null() && parent.has<EntityOrderComponent>())
 			{
-				// Remove the child's name from the parent's ChildNamesComponent
-				auto& childNames = parent.get_ref<ChildNamesComponent>()->childNames;
-				auto childIt = std::remove(childNames.begin(), childNames.end(), ent.name().c_str());
-				if (childIt != childNames.end()) 
+				auto& order = parent.get_ref<EntityOrderComponent>()->EntityOrder;
+				auto childIt = std::remove(order.begin(), order.end(), ent.name().c_str());
+				if (childIt != order.end())
 				{
-					childNames.erase(childIt, childNames.end());
+					order.erase(childIt, order.end());
 
-					// If it was the last child, remove the ChildNamesComponent from the parent
-					if (childNames.empty()) 
-						parent.remove<ChildNamesComponent>();					
+					if (order.empty())
+						parent.remove<EntityOrderComponent>();
 				}
 			}
 
-			// Destruct the entity
 			ent.destruct();
 		}
 
@@ -141,7 +127,7 @@ namespace wc
 				}
 				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
 				p.previousRotation = pos.Rotation;
-				});
+			});
 		}
 
 		void DestroyPhysicsWorld()
@@ -172,7 +158,12 @@ namespace wc
 			m_World.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
 					pc.Translation = {glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z};
-					pc.Rotation = glm::mix(p.previousRotation, p.body.GetAngle(), alpha);
+
+					float start = p.previousRotation;
+					float end = p.body.GetAngle();
+					auto diff = end - start;
+
+					pc.Rotation = glm::mix(start, end, alpha);
 				});
 		}
 
@@ -488,7 +479,7 @@ namespace wc
 		    m_World.each([](flecs::entity entity, EntityTag) {
                 entity.destruct();
                 });
-		    m_ParentEntityNames.clear();
+			m_EntityOrder.clear();
 		}
 
 		bool Load(const std::string& filepath, const bool clear = true)

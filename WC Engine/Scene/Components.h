@@ -10,9 +10,9 @@ namespace wc
 {
 	struct EntityTag {};
 
-	struct ChildNamesComponent
+	struct EntityOrderComponent
 	{
-		std::vector<std::string> childNames;
+		std::vector<std::string> EntityOrder;
 	};
 
 	struct TransformComponent
@@ -40,7 +40,7 @@ namespace wc
 	struct SpriteRendererComponent
 	{
 		glm::vec4 Color = glm::vec4(1.f);
-		uint32_t Texture = 1;
+		uint32_t Texture = 0;
 	};
 
 	struct CircleRendererComponent

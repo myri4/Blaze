@@ -1,14 +1,24 @@
 #pragma shader_stage(compute)
 
-vec3 Tonemap_ACES(vec3 x) 
+vec3 Tonemap_PBRNeutral(vec3 color)
 {
-    // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return (x * (a * x + b)) / (x * (c * x + d) + e);
+  const float startCompression = 0.8 - 0.04;
+  const float desaturation = 0.15;
+
+  float x = min(color.r, min(color.g, color.b));
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+
+  float peak = max(color.r, max(color.g, color.b));
+  if (peak < startCompression) 
+    return color;
+
+  const float d = 1. - startCompression;
+  float newPeak = 1. - d * d / (peak + d - startCompression);
+  color *= newPeak / peak;
+
+  float g = 1. - 1. / (desaturation * (peak - newPeak) + 1.);
+  return mix(color, newPeak * vec3(1, 1, 1), g);
 }
 
 layout (push_constant) uniform Uniforms
@@ -34,12 +44,12 @@ void main()
 
     if (Bloom) 
         result += texture(bloomTexture, texCoords).rgb;
-
-    // HDR tonemapping  
-    result = Tonemap_ACES(result);  
     
     // Gamma correct
     result = pow(result, vec3(1.f / 2.2f));
+
+    // HDR tonemapping  
+    result = Tonemap_PBRNeutral(result);  
     
     imageStore(o_Image, invocID, vec4(result, 1.f));
 }

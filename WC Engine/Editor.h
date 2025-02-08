@@ -615,39 +615,35 @@ namespace wc
 			                        {
 			                            // Get the list of names from the proper container.
 			                            // For top-level entities, use the scene's parent names;
-			                            // for children, use the parent's ChildNamesComponent.
-			                            std::vector<std::string>* entityNames = nullptr;
+			                            // for children, use the parent's EntityOrderComponent.
+			                            std::vector<std::string>* entityOrder = nullptr;
 			                            if (entity.parent() == flecs::entity::null())
-			                            {
-			                                entityNames = &m_Scene.GetParentEntityNames();
-			                            }
-			                            else if (entity.parent().has<ChildNamesComponent>())
-			                            {
-			                                entityNames = &entity.parent().get_ref<ChildNamesComponent>()->childNames;
-			                            }
+											entityOrder = &m_Scene.GetParentEntityOrder();
+			                            else if (entity.parent().has<EntityOrderComponent>())
+											entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 
-			                            if (entityNames)
+										if (entityOrder)
 			                            {
 			                                // Find the positions of the target (the entity associated with the separator)
 			                                // and the dropped entity.
-			                                auto targetIt = std::find(entityNames->begin(), entityNames->end(), std::string(entity.name()));
-			                                auto droppedIt = std::find(entityNames->begin(), entityNames->end(), std::string(droppedEntity.name()));
+			                                auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
+			                                auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
 
-			                                if (targetIt != entityNames->end() && droppedIt != entityNames->end() && targetIt != droppedIt)
+			                                if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
 			                                {
 			                                    // Remove the dropped entity from its current position.
 			                                    std::string droppedName = *droppedIt;
-			                                    entityNames->erase(droppedIt);
+												entityOrder->erase(droppedIt);
 
 			                                    // Recalculate the target's index (in case removal shifted it).
-			                                    int newTargetIndex = std::distance(entityNames->begin(),
-                                                    std::find(entityNames->begin(), entityNames->end(), std::string(entity.name())));
+			                                    int newTargetIndex = std::distance(entityOrder->begin(),
+                                                    std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
 
 			                                    // Insert the dropped entity immediately after the target.
 			                                    int insertIndex = newTargetIndex + 1;
-			                                    if (insertIndex > static_cast<int>(entityNames->size()))
-			                                        insertIndex = static_cast<int>(entityNames->size());
-			                                    entityNames->insert(entityNames->begin() + insertIndex, droppedName);
+			                                    if (insertIndex > static_cast<int>(entityOrder->size()))
+			                                        insertIndex = static_cast<int>(entityOrder->size());
+												entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
 			                                }
 			                            }
 			                        }
@@ -677,10 +673,10 @@ namespace wc
 			    	const bool is_selected = (m_SelectedEntity == entity);
 
 			    	std::vector<flecs::entity> children;
-			    	if (entity.has<ChildNamesComponent>())
+			    	if (entity.has<EntityOrderComponent>())
 			    	{
-			    		auto& childNames = entity.get<ChildNamesComponent>()->childNames;
-			    		for (const auto& childName : childNames)
+			    		auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
+			    		for (const auto& childName : entityOrder)
 			    		{
 			    			std::string fullChildName = std::string(entity.name()) + "::" + childName;
 
@@ -814,7 +810,7 @@ namespace wc
 
 	            ui::DrawBgRows(10);
 	            gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
-			    for (const auto& name : m_Scene.GetParentEntityNames())
+			    for (const auto& name : m_Scene.GetParentEntityOrder())
 			    {
 			    	auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
 			    	if (rootEntity) displayEntity(rootEntity, displayEntity);
@@ -952,13 +948,13 @@ namespace wc
 				            {
 				                if (m_SelectedEntity.parent() == flecs::entity::null())
 				                {
-				                    auto& parentNames = m_Scene.GetParentEntityNames();
+				                    auto& parentNames = m_Scene.GetParentEntityOrder();
 				                    for (auto& name : parentNames)
 				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
 				                }
 				                else
 				                {
-				                    auto& childrenNames = m_SelectedEntity.parent().get_ref<ChildNamesComponent>()->childNames;
+				                    auto& childrenNames = m_SelectedEntity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 				                    for (auto& name : childrenNames)
 				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
 				                }
@@ -1445,6 +1441,7 @@ namespace wc
 							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 							        {
 										m_ScenePath = entry.path().string();
+										WC_INFO(m_ScenePath);
 							            gui::CloseCurrentPopup();
 							        }
 							        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
@@ -1656,7 +1653,8 @@ namespace wc
 
 								                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 								                {
-								                    m_Scene.Load(entry.path().string());
+													m_ScenePath = entry.path().string();
+								                    m_Scene.Load(m_ScenePath);
 								                    gui::CloseCurrentPopup();
 								                }
 
