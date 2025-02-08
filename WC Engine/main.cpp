@@ -46,16 +46,12 @@ namespace wc
 	Editor editor;
 
 	vk::Swapchain swapchain;
-	bool SwapChainOk = true;
 
 	void Resize()
 	{
 		auto size = Globals.window.GetFramebufferSize();
-		while (size.x == 0 || size.y == 0)
-		{
-			size = Globals.window.GetFramebufferSize();
-			glfwWaitEvents();
-		}
+		if (size.x == 0 || size.y == 0)
+			return;
 
 		VulkanContext::GetLogicalDevice().WaitIdle();
 		swapchain.Destroy();
@@ -64,7 +60,6 @@ namespace wc
 		// Resize renderers
 		editor.Resize(Globals.window.GetSize());
 		Globals.window.resized = false;
-		SwapChainOk = true;
 	}
 
 	//----------------------------------------------------------------------------------------------------------------------
@@ -83,7 +78,8 @@ namespace wc
 		Globals.window.Create(windowInfo);
 		Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h)
 			{
-				Resize();
+				reinterpret_cast<wc::Window*>(window)->resized = true;
+				Resize(); // @TODO: Probably should remove this in the future
 			});
 		swapchain.Create(Globals.window);
 
@@ -116,49 +112,53 @@ namespace wc
 
 	void OnUpdate()
 	{
-		vk::SyncContext::GetRenderFence().Wait();
+		auto r = vk::SyncContext::GetRenderFence().Wait();
+
+		//WC_CORE_INFO("Acquire result: {}, {}", magic_enum::enum_name(r), (int)r);
 
 		Globals.UpdateTime();
+		editor.Update();
 
-		uint32_t swapchainImageIndex = 0;
-		if (SwapChainOk)
+		auto extent = Globals.window.GetExtent();
+
+		if (extent.width > 0 && extent.height > 0)
 		{
+			uint32_t swapchainImageIndex = 0;
+
 			VkResult result = swapchain.AcquireNextImage(swapchainImageIndex, vk::SyncContext::GetImageAvaibleSemaphore());
 
 			if (result == VK_ERROR_OUT_OF_DATE_KHR)
 			{
 				Resize();
-				SwapChainOk = false;
+				return;
+			}
+			else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+			{
+				WC_CORE_ERROR("Acquire result: {}, {}", magic_enum::enum_name(result), (int)result);
 			}
 			vk::SyncContext::GetRenderFence().Reset(); // deadlock fix
-		}
-
-		if (!SwapChainOk)
-			return;
 
 
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-		ImGuizmo::BeginFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+			ImGuizmo::BeginFrame();
 
-		editor.UI();
+			editor.UI();
 
-		ImGui::Render();
+			ImGui::Render();
 
-		auto& cmd = vk::SyncContext::GetMainCommandBuffer();
-		vkResetCommandBuffer(cmd, 0);
-		editor.Update();
-		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault();
-		}
+			auto& cmd = vk::SyncContext::GetMainCommandBuffer();
+			vkResetCommandBuffer(cmd, 0);
+
+			editor.Render();
+
+			if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+			{
+				ImGui::UpdatePlatformWindows();
+				ImGui::RenderPlatformWindowsDefault();
+			}
 
 
-		auto extent = Globals.window.GetExtent();
-
-		if (extent.width != 0 && extent.height != 0)
-		{
 			VkClearValue clearValue = {
 				.color = { 0.f, 0.f, 0.f, 0.f },
 			};
@@ -201,18 +201,30 @@ namespace wc
 
 			vk::SyncContext::GetGraphicsQueue().Submit(submit, vk::SyncContext::GetRenderFence());
 
-			VkResult presentationResult = swapchain.Present(swapchainImageIndex, vk::SyncContext::GetPresentSemaphore());
+			VkPresentInfoKHR presentInfo = {
+				.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+				.waitSemaphoreCount = 1,
+				.pWaitSemaphores = &vk::SyncContext::GetPresentSemaphore(),
 
-			if (presentationResult == VK_ERROR_OUT_OF_DATE_KHR)
-				SwapChainOk = false;
+				.swapchainCount = 1,
+				.pSwapchains = &swapchain,
 
-			//if (presentationResult == VK_ERROR_OUT_OF_DATE_KHR || presentationResult == VK_SUBOPTIMAL_KHR || Globals.window.resized)
-			//{
-			//	Resize();
-			//}
+				.pImageIndices = &swapchainImageIndex,
+			};
+
+			VkResult presentationResult = vkQueuePresentKHR(vk::SyncContext::GetPresentQueue(), &presentInfo);
+
+			if (presentationResult == VK_ERROR_OUT_OF_DATE_KHR || presentationResult == VK_SUBOPTIMAL_KHR || Globals.window.resized)
+			{
+				Resize();
+			}
+			else if (presentationResult != VK_SUCCESS)
+			{
+				WC_CORE_ERROR("Presentation result: {}", magic_enum::enum_name(presentationResult));
+			}
+
+			vk::SyncContext::UpdateFrame();
 		}
-
-		vk::SyncContext::UpdateFrame();
 	}
 
 	//----------------------------------------------------------------------------------------------------------------------

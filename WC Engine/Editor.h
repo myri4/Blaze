@@ -306,6 +306,7 @@ namespace wc
 
 	    void Render()
 		{
+			if (!Project::Exists()) return;
 		    auto& renderData = m_RenderData[CURRENT_FRAME];
 
 			if (m_Renderer.TextureCapacity < assetManager.Textures.size())
@@ -339,8 +340,6 @@ namespace wc
 		{
 			if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
 			    m_Scene.Update();
-
-	        if (Project::Exists()) Render();
 		}
 
 		void ChangeSceneState(SceneState newState)
