@@ -240,7 +240,7 @@ namespace vk
 			return true;
 		}
 
-		VkResult AcquireNextImage(uint32_t& imageIndex, VkSemaphore semaphore = nullptr, VkFence fence = nullptr, uint64_t timeout = UINT64_MAX)
+		VkResult AcquireNextImage(uint32_t& imageIndex, VkSemaphore semaphore = VK_NULL_HANDLE, VkFence fence = VK_NULL_HANDLE, uint64_t timeout = UINT64_MAX)
 		{
 			uint32_t realImageIndex = 0;
 			auto result = vkAcquireNextImageKHR(VulkanContext::GetLogicalDevice(), m_Handle, timeout, semaphore, fence, &realImageIndex);

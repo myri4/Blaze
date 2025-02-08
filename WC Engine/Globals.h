@@ -11,7 +11,7 @@ namespace wc
 		Window window; // @TODO: maybe rename to main window
 
 	    // Change size if needed
-	    ImFont* fontDeffault = nullptr;
+	    ImFont* fontDefault = nullptr;
 	    ImFont* fontBig = nullptr;
 	    //ImFont* fontSmall = nullptr;
 	    //ImFont* fontBold = nullptr;

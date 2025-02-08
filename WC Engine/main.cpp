@@ -97,9 +97,9 @@ namespace wc
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.IniFilename = "assets/imgui.ini"; // TODO - remove and find alternative
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-	    Globals.fontDeffault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
+	    Globals.fontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
 	    Globals.fontBig = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 30.f);
-		io.FontDefault = Globals.fontDeffault;
+		io.FontDefault = Globals.fontDefault;
 
 		ImGui_ImplGlfw_Init(Globals.window, false);
 
@@ -140,13 +140,13 @@ namespace wc
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
+
 		editor.UI();
-		//ImGui::ShowDemoWindow();
-		ImGui::EndFrame();
-		//ImGuizmo::EndFrame();
+
 		ImGui::Render();
 
-		vkResetCommandBuffer(vk::SyncContext::GetMainCommandBuffer(), 0);
+		auto& cmd = vk::SyncContext::GetMainCommandBuffer();
+		vkResetCommandBuffer(cmd, 0);
 		editor.Update();
 		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
@@ -159,40 +159,45 @@ namespace wc
 
 		if (extent.width != 0 && extent.height != 0)
 		{
-			VkRenderPassBeginInfo rpInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+			VkClearValue clearValue = {
+				.color = { 0.f, 0.f, 0.f, 0.f },
+			};
 
-			rpInfo.renderPass = swapchain.RenderPass;
-			rpInfo.framebuffer = swapchain.Framebuffers[swapchainImageIndex];
-			rpInfo.renderArea.extent = extent;
-			rpInfo.clearValueCount = 1;
-			VkClearValue clearValue = {};
-			clearValue.color = { 0.f, 0.f, 0.f, 0.f };
-			rpInfo.pClearValues = &clearValue;
+			VkRenderPassBeginInfo rpInfo = { 
+				.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 
-			auto& cmd = vk::SyncContext::GetMainCommandBuffer();
+				.renderPass = swapchain.RenderPass,
+				.framebuffer = swapchain.Framebuffers[swapchainImageIndex],
+				.renderArea.extent = extent,
+				.clearValueCount = 1,
+				.pClearValues = &clearValue,
+			};
+
 			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd, rpInfo);
 
-			VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-
-			VkTimelineSemaphoreSubmitInfo timelineInfo = { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO };
-			timelineInfo.waitSemaphoreValueCount = 2;
-			uint64_t waitValues[] = { 0, vk::SyncContext::m_TimelineValue }; // @NOTE: Apparently the timeline semaphore should be waiting last?
-			timelineInfo.pWaitSemaphoreValues = waitValues;
-			submit.pNext = &timelineInfo;
-			submit.commandBufferCount = 1;
-			submit.pCommandBuffers = &cmd;
-
 			VkPipelineStageFlags waitStage[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-
-			submit.pWaitDstStageMask = waitStage;
-
 			vk::Semaphore waitSemaphores[] = { vk::SyncContext::GetImageAvaibleSemaphore(), vk::SyncContext::m_TimelineSemaphore, };
+			uint64_t waitValues[] = { 0, vk::SyncContext::m_TimelineValue }; // @NOTE: Apparently the timeline semaphore should be waiting last?
+			VkTimelineSemaphoreSubmitInfo timelineInfo = { 
+				.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+				.waitSemaphoreValueCount = std::size(waitValues),
+				.pWaitSemaphoreValues = waitValues,
+			};
 
-			submit.waitSemaphoreCount = std::size(waitSemaphores);
-			submit.pWaitSemaphores = (VkSemaphore*)waitSemaphores;
+			VkSubmitInfo submit = { 
+				.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+				.pNext = &timelineInfo,
+				.commandBufferCount = 1,
+				.pCommandBuffers = &cmd,
 
-			submit.signalSemaphoreCount = 1;
-			submit.pSignalSemaphores = &vk::SyncContext::GetPresentSemaphore();
+				.pWaitDstStageMask = waitStage,
+
+				.waitSemaphoreCount = std::size(waitSemaphores),
+				.pWaitSemaphores = (VkSemaphore*)waitSemaphores,
+
+				.signalSemaphoreCount = 1,
+				.pSignalSemaphores = &vk::SyncContext::GetPresentSemaphore(),
+			};
 
 			vk::SyncContext::GetGraphicsQueue().Submit(submit, vk::SyncContext::GetRenderFence());
 
