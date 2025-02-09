@@ -153,11 +153,11 @@ namespace wc
 									{
 										// Skip hidden/system files using attributes
 										//TODO - add for other systems
-#ifdef _WIN32
+                                        #ifdef _WIN32
 										DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
 										if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
 											continue;
-#endif
+                                        #endif
 
 										// Skip reserved system files
 										if (entry.path().filename().string()[0] == '$')
@@ -214,13 +214,11 @@ namespace wc
 								ImGuiTreeNodeFlags_NoTreePushOnOpen |
 								ImGuiTreeNodeFlags_OpenOnArrow;
 
-							if (!isDirectory)
-								flags |= ImGuiTreeNodeFlags_Leaf;
+							if (!isDirectory) flags |= ImGuiTreeNodeFlags_Leaf;
 
+							if (selectedPath == entry.path().string()) flags |= ImGuiTreeNodeFlags_Selected;
 
-							if (selectedPath == entry.path().string())
-								flags |= ImGuiTreeNodeFlags_Selected;
-
+						    gui::SetNextItemOpen(false, ImGuiCond_Always);
 							ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
 
 							if (ImGui::IsItemClicked())
@@ -276,7 +274,7 @@ namespace wc
 
 				// Action buttons
 				ImGui::BeginDisabled(selectedPath.empty());
-				if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
+				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
 				{
 					finalPath = selectedPath;
 					selectedPath.clear();
@@ -288,8 +286,8 @@ namespace wc
 				ImGui::EndDisabled();
 
 				ImGui::SameLine();
-				ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2);
-				if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+				ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - gui::GetContentRegionMax().x * 0.3f);
+				if (ImGui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Escape))
 				{
 					selectedPath.clear();
 					currentPath = disks[0];
@@ -544,9 +542,9 @@ namespace wc
 			return ImGui::IsDragDropActive() && strcmp(ImGui::GetDragDropPayload()->DataType, type) == 0;
 		}
 
-		inline void DrawBgRows(float itemSpacing = -1.f)
+		inline void DrawBgRows(float itemSpacingY = -1.f)
 		{
-			if (itemSpacing > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacing);
+			if (itemSpacingY > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacingY);
 
 			ImGuiWindow* window = ImGui::GetCurrentWindow();
 			if (window->SkipItems)

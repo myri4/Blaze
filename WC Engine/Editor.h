@@ -1070,10 +1070,30 @@ namespace wc
 							realRotation = glm::radians(rotation);
 							});
 
-						EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
+						EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component)
+						{
 							gui::ColorEdit4("color", glm::value_ptr(component.Color));
 							gui::Button("Texture");
-							});
+
+						    if (ui::MatchPayloadType("DND_PATH"))
+						    {
+						        std::filesystem::path path = static_cast<const char*>(gui::GetDragDropPayload()->Data);
+						        if (path.extension() == ".png" || path.extension() == ".jpg" || path.extension() == ".jpeg" ||
+						            path.extension() == ".bmp" || path.extension() == ".tga")
+						        {
+						            if (gui::BeginDragDropTarget())
+						            {
+						                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+						                {
+						                    const char* payloadPath = static_cast<const char*>(payload->Data);
+
+						                    // component.Texture = Texture2D::Load(payloadPath);
+						                }
+						                gui::EndDragDropTarget();
+						            }
+						        }
+                            }
+						});
 
 						EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
 							ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
@@ -1446,6 +1466,7 @@ namespace wc
 
 						gui::TableSetColumnIndex(1);
 
+					    //show icons
 						if (gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
 						{
 							if (selectedFolderPath == assetsPath)
@@ -1993,14 +2014,14 @@ namespace wc
 	        if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
 	        {
 	            //TODO - FIX: Crashes
-	            //Globals.window.Minimize();
+	            Globals.window.Minimize();
 	        }
 
 	        gui::SameLine(0, 0);
 	        if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
 	        {
 	            //TODO - FIX: Crashes
-	            //Globals.window.SetMaximized(!Globals.window.IsMaximized());
+	            Globals.window.SetMaximized(Globals.window.IsMaximized());
 	        }
 
 	        gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
@@ -2102,7 +2123,7 @@ namespace wc
 						const float widgetWidth = gui::GetItemRectSize().x;
 
 						gui::BeginDisabled(projName.empty());
-						if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+						if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 						{
 							if (Project::ExistListProject(projName))
 							{
@@ -2119,8 +2140,8 @@ namespace wc
 						gui::EndDisabled();
 						if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-						gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-						if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+						gui::SameLine(widgetWidth - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+						if (gui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
 						{
 							projName = "Untitled";
 							newProjectSavePath.clear();
@@ -2132,7 +2153,7 @@ namespace wc
 						if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 						{
 							gui::Text("Project with this name already exists!");
-							if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+							if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 							gui::EndPopup();
 						}
 
@@ -2183,21 +2204,20 @@ namespace wc
 							if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							{
 								gui::Text("Are you sure you want to delete this project?");
-								if (gui::Button("Yes##Delete") || gui::IsKeyPressed(ImGuiKey_Enter))
+								if (gui::Button("Yes##Delete", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 								{
 									Project::Delete(project);
 									gui::CloseCurrentPopup();
 								}
 
-								gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
-								if (gui::Button("No##Delete") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+								gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+								if (gui::Button("No##Delete", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
 								gui::EndPopup();
 							}
 						}
 					}
 					gui::EndChild();
-
 				}
 				else
 				{
@@ -2279,7 +2299,7 @@ namespace wc
 								const float widgetWidth = gui::GetItemRectSize().x;
 
 								gui::BeginDisabled(sceneName.empty());
-								if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+								if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 								{
 									m_Scene.Destroy();
 									m_ScenePath = newSceneSavePath + '\\' + sceneName + ".scene";
@@ -2293,8 +2313,8 @@ namespace wc
 								gui::EndDisabled();
 								if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
 
-								gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-								if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+								gui::SameLine(widgetWidth - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+								if (gui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
 								{
 									sceneName = "newScene";
 									newSceneSavePath.clear();
