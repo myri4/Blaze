@@ -13,6 +13,7 @@ namespace wc
 		// Change size if needed
 		ImFont* fontDefault = nullptr;
 		ImFont* fontBig = nullptr;
+	    ImFont* fontMenu = nullptr;
 		//ImFont* fontSmall = nullptr;
 		//ImFont* fontBold = nullptr;
 

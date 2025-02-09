@@ -265,6 +265,8 @@ namespace wc
 
     struct Window 
     {
+        //half of actual border size
+        const int borderSize = 5;
 		bool resized = false;
 		bool VSync = false;
 
@@ -349,7 +351,7 @@ namespace wc
             glfwPollEvents();
         }
 
-        glm::ivec2 GetPos() const
+        glm::ivec2 GetPosition() const
         {
             int xpos, ypos;
             glfwGetWindowPos(m_Window, &xpos, &ypos);
@@ -388,8 +390,6 @@ namespace wc
 
         bool IsOpen() const { return !glfwWindowShouldClose(m_Window); }
 
-		bool IsMinimized() const { return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED); }
-
         bool HasFocus() const { return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED); }
 
         void SetCursorPos(glm::ivec2 pos) { glfwSetCursorPos(m_Window, pos.x, pos.y); }
@@ -402,6 +402,14 @@ namespace wc
 
 		bool IsMaximized() const { return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED); }
 
+        void SetMinimized(bool minimized)
+		{
+		    if (minimized) glfwIconifyWindow(m_Window);
+		    else glfwRestoreWindow(m_Window);
+		}
+
+        bool IsMinimized() const { return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED); }
+
         void SetPosition(glm::ivec2 pos) { glfwSetWindowPos(m_Window, pos.x, pos.y); }
 
         void SetTitle(const std::string& title) { glfwSetWindowTitle(m_Window, title.c_str()); }
@@ -411,6 +419,8 @@ namespace wc
         void SetSizeLimits(glm::ivec2 minSize, glm::ivec2 maxSize) { glfwSetWindowSizeLimits(m_Window, minSize.x, minSize.y, maxSize.x, maxSize.y); }
 
         void Maximize() { glfwMaximizeWindow(m_Window); }
+
+        void Minimize() { glfwIconifyWindow(m_Window); }
 
         void Restore() { glfwRestoreWindow(m_Window); }
 

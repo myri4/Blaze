@@ -237,7 +237,7 @@ namespace wc
 					camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
 				}
 
-				glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPos()) - WindowPos;
+				glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPosition()) - WindowPos;
 				glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos, camera.Zoom);
 
 				if (Mouse::GetMouse(Mouse::RIGHT))
@@ -1975,29 +1975,100 @@ namespace wc
 			}
 		}
 
+	    void WindowButtons()
+        {
+	        // Buttons
+	        gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+	        gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+	        gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+	        gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+
+	        //get frame height gets font size
+	        gui::PushFont(Globals.fontMenu);
+	        float buttonSize = gui::GetFrameHeightWithSpacing() - 16;
+	        gui::PopFont();
+
+	        gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
+	        gui::SetCursorPosX(gui::GetWindowSize().x - (buttonSize + gui::GetStyle().FramePadding.x * 2) * 3);
+	        if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
+	        {
+	            //TODO - FIX: Crashes
+	            //Globals.window.Minimize();
+	        }
+
+	        gui::SameLine(0, 0);
+	        if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
+	        {
+	            //TODO - FIX: Crashes
+	            //Globals.window.SetMaximized(!Globals.window.IsMaximized());
+	        }
+
+	        gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
+	        gui::SameLine(0, 0);
+	        if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+	        {
+	            Globals.window.Close();
+	        }
+
+	        ImGui::PopStyleColor(4);
+	        ImGui::PopStyleVar(2); // 2
+
+            // Drag when hovering tab bar
+            //TODO - Maybe Reposition this
+	        static bool dragging = false;
+	        glm::vec2 mousePos = Globals.window.GetCursorPos() + Globals.window.GetPosition();
+            static glm::vec2 mouseCur = {};
+
+	        if (ImGui::IsMouseClicked(0) && Globals.window.GetCursorPos().y <= gui::GetFrameHeightWithSpacing() && !ImGui::IsAnyItemHovered() && !Globals.window.IsMaximized())
+	        {
+	            // TODO - FIX: check if not hovering edge
+	            bool top = (Globals.window.GetCursorPos().y >= -Globals.window.borderSize) && (Globals.window.GetCursorPos().y <= Globals.window.borderSize);
+	            bool left = (Globals.window.GetCursorPos().x >= -Globals.window.borderSize) && (Globals.window.GetCursorPos().x <= Globals.window.borderSize);
+	            bool right = (Globals.window.GetCursorPos().x >= Globals.window.GetSize().x - Globals.window.borderSize) && (Globals.window.GetCursorPos().x <= Globals.window.GetSize().x + Globals.window.borderSize);
+
+	            if (!top && !left && !right)
+	            {
+	                dragging = true;
+	                mouseCur = Globals.window.GetCursorPos();
+	            }
+	        }
+	        if (dragging && ImGui::IsMouseDown(0))
+	        {
+	            Globals.window.SetPosition({mousePos.x - mouseCur.x, mousePos.y - mouseCur.y});
+	        }
+	        if (ImGui::IsMouseReleased(0)) dragging = false;
+	    }
+
 		void UI()
 		{
-			static bool showPopup = false;
 			const ImGuiViewport* viewport = gui::GetMainViewport();
 			gui::SetNextWindowPos(viewport->WorkPos);
 			gui::SetNextWindowSize(viewport->WorkSize);
 			gui::SetNextWindowViewport(viewport->ID);
 
+		    gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.0f, 7.0f));
 			gui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
 			gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 			gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
 			static ImGuiWindowFlags windowFlags =
-				ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-				| ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
-				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+			    ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
+                | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+                | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 			if (gui::Begin("DockSpace", nullptr, windowFlags))
 			{
 				if (!Project::Exists())
 				{
-					gui::PopStyleVar(3);
+					gui::PopStyleVar(4);
 					windowFlags &= ~ImGuiWindowFlags_NoBackground;
-					windowFlags &= ~ImGuiWindowFlags_MenuBar;
+					//windowFlags &= ~ImGuiWindowFlags_MenuBar;
+
+				    if (gui::BeginMenuBar())
+				    {
+				        WindowButtons();
+				        gui::EndMenuBar();
+				    }
 
 					static bool openProjNamePopup = false; // New persistent flag
 
@@ -2130,7 +2201,7 @@ namespace wc
 				}
 				else
 				{
-					gui::PopStyleVar(3);
+					gui::PopStyleVar(4);
 					windowFlags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBackground;
 
 					ImGuiIO& io = gui::GetIO();
@@ -2148,7 +2219,8 @@ namespace wc
 							//WC_CORE_INFO("Empty space on main menu bar is hovered)"
 						}
 
-						if (gui::BeginMenu(("[" + Project::name + "]").c_str())) {
+					    if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.fontMenu))
+						{
 							if (gui::MenuItem("Change", "CTRL + P")) Project::Clear();
 
 							// Delete - TODO: FIX IF NEEDED
@@ -2177,9 +2249,9 @@ namespace wc
 
 						gui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 
-						if (gui::BeginMenu("File"))
-						{
-							ui::Separator();
+			            if (ui::BeginMenuFt("File", Globals.fontMenu))
+			            {
+							gui::SeparatorText("Scene");
 
 							static bool openSceneNamePopup = false;
 							if (ui::MenuItemButton("New", "CTRL + N", false))
@@ -2271,8 +2343,8 @@ namespace wc
 							gui::EndMenu();
 						}
 
-						if (gui::BeginMenu("View"))
-						{
+					    if (ui::BeginMenuFt("View", Globals.fontMenu))
+                        {
 							gui::MenuItem("Editor", nullptr, &showEditor);
 							gui::MenuItem("Scene properties", nullptr, &showSceneProperties);
 							gui::MenuItem("Entities", nullptr, &showEntities);
@@ -2319,35 +2391,7 @@ namespace wc
 							gui::EndMenu();
 						}
 
-						// Buttons
-						/*gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-						gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-						gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-						gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-
-						float buttonSize = gui::GetFrameHeightWithSpacing();
-
-						gui::SameLine(gui::GetContentRegionMax().x - 3 * (buttonSize + gui::GetStyle().ItemSpacing.x));
-						if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
-						{
-							//Globals.window.Collapse();
-						}
-
-						gui::SameLine();
-						if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-						{
-							//Globals.window.Maximize();
-						}
-
-						gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
-						gui::SameLine();
-						if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
-						{
-							Globals.window.Close();
-						}
-
-						gui::PopStyleVar();
-						gui::PopStyleColor(4);*/
+					    WindowButtons();
 
 						gui::EndMenuBar();
 					}

@@ -41,6 +41,8 @@
 
 #pragma warning(pop)
 
+namespace gui = ImGui;
+
 namespace wc
 {
 	Editor editor;
@@ -73,7 +75,7 @@ namespace wc
 			.StartMode = WindowMode::Maximized,
 			.VSync = false,
 			.Resizeable = true,
-			//	.Decorated = false;
+			.Decorated = false,
 		};
 		Globals.window.Create(windowInfo);
 		Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h)
@@ -95,6 +97,7 @@ namespace wc
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		Globals.fontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
 		Globals.fontBig = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 30.f);
+	    Globals.fontMenu = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 20.f);
 		io.FontDefault = Globals.fontDefault;
 
 		ImGui_ImplGlfw_Init(Globals.window, false);
@@ -108,8 +111,7 @@ namespace wc
 
 		return true;
 	}
-	//----------------------------------------------------------------------------------------------------------------------		
-
+	//----------------------------------------------------------------------------------------------------------------------
 	void OnUpdate()
 	{
 		auto r = vk::SyncContext::GetRenderFence().Wait();
@@ -234,8 +236,97 @@ namespace wc
 		{
 			Globals.window.PoolEvents();
 
-			if (Globals.window.HasFocus())
-				editor.Input();
+		    // Resize window
+			{
+			    // one struct for the operations
+                struct ResizeState {
+                    bool active = false;
+                    bool edges[4] = {}; // [left, right, top, bottom]
+                    glm::ivec2 initialPos;
+                    glm::ivec2 initialSize;
+                    glm::ivec2 initialMouseGlobal;
+                };
+                static ResizeState resize;
+
+			    // get window variables
+                auto& window = Globals.window;
+                const auto mousePos = window.GetCursorPos();
+                const auto windowSize = window.GetSize();
+                const auto windowPos = window.GetPosition();
+                constexpr int borderSize = 5;
+
+			    // calculate global mouse position
+                const glm::ivec2 globalMousePos = windowPos + mousePos;
+
+			    //calculate edges
+                enum Edges { LEFT = 0, RIGHT, TOP, BOTTOM };
+                bool edgeHover[4] = {
+                    (mousePos.x >= -borderSize) && (mousePos.x <= borderSize),
+                    (mousePos.x >= windowSize.x - borderSize) && (mousePos.x <= windowSize.x + borderSize),
+                    (mousePos.y >= -borderSize) && (mousePos.y <= borderSize),
+                    (mousePos.y >= windowSize.y - borderSize) && (mousePos.y <= windowSize.y + borderSize)
+                };
+
+                // check edges when window has focus and not resizing
+                const bool canResize = window.HasFocus() && !resize.active;
+                for (auto& edge : edgeHover) edge &= canResize;
+
+                // resize
+                if (!resize.active && ImGui::IsMouseClicked(0)) {
+                    for (int i = 0; i < 4; i++) {
+                        if (edgeHover[i]) {
+                            resize.active = true;
+                            resize.edges[i] = true;
+                            resize.initialPos = windowPos;
+                            resize.initialSize = windowSize;
+                            resize.initialMouseGlobal = globalMousePos;
+                            break;
+                        }
+                    }
+                }
+
+                // ongoing resize
+                if (resize.active) {
+                    if (ImGui::IsMouseDragging(0)) {
+                        const glm::ivec2 delta = globalMousePos - resize.initialMouseGlobal;
+
+                        // Horizontal
+                        if (resize.edges[LEFT]) {
+                            window.SetPosition({ resize.initialPos.x + delta.x, resize.initialPos.y });
+                            window.SetSize({ resize.initialSize.x - delta.x, windowSize.y });
+                        }
+                        else if (resize.edges[RIGHT]) {
+                            window.SetSize({ resize.initialSize.x + delta.x, windowSize.y });
+                        }
+
+                        // Vertical
+                        if (resize.edges[TOP]) {
+                            window.SetPosition({ resize.initialPos.x, resize.initialPos.y + delta.y });
+                            window.SetSize({ windowSize.x, resize.initialSize.y - delta.y });
+                        }
+                        else if (resize.edges[BOTTOM]) {
+                            window.SetSize({ windowSize.x, resize.initialSize.y + delta.y });
+                        }
+                    }
+
+                    if (ImGui::IsMouseReleased(0)) {
+                        memset(&resize, 0, sizeof(resize));
+                    }
+                }
+
+                // Update cursor
+                ImGuiMouseCursor cursor = ImGuiMouseCursor_Arrow;
+                if (resize.active || canResize) {
+                    const bool horizontal = edgeHover[LEFT] || edgeHover[RIGHT] || resize.edges[LEFT] || resize.edges[RIGHT];
+                    const bool vertical = edgeHover[TOP] || edgeHover[BOTTOM] || resize.edges[TOP] || resize.edges[BOTTOM];
+
+                    if (horizontal) cursor = ImGuiMouseCursor_ResizeEW;
+                    else if (vertical) cursor = ImGuiMouseCursor_ResizeNS;
+                }
+                if (!gui::IsAnyItemHovered())gui::SetMouseCursor(cursor);
+            }
+
+			if (Globals.window.HasFocus()) editor.Input();
 
 			OnUpdate();
 		}
