@@ -1,6 +1,5 @@
 #pragma once
 
-#include <wc/Math/Camera.h>
 #include <wc/Shader.h>
 #include <wc/Descriptors.h>
 
@@ -356,21 +355,19 @@ namespace wc
 		VkCommandBuffer m_ComputeCmd[FRAME_OVERLAP];
 		VkDescriptorSet ImguiImageID = VK_NULL_HANDLE;
 
-		OrthographicCamera* camera = nullptr;
+		auto GetHalfSize(glm::vec2 size, float Zoom) const { return size * Zoom; }
+		auto GetHalfSize(float Zoom) const { return GetHalfSize(m_RenderSize / 128.f, Zoom); }
 
-		auto GetHalfSize(glm::vec2 size) const { return size * camera->Zoom; }
-		auto GetHalfSize() const { return GetHalfSize(m_RenderSize / 128.f); }
-
-		auto ScreenToWorld(glm::vec2 coords) const
+		auto ScreenToWorld(glm::vec2 coords, float Zoom) const
 		{
 			float camX = ((2.f * coords.x / m_RenderSize.x) - 1.f);
 			float camY = (1.f - (2.f * coords.y / m_RenderSize.y));
-			return glm::vec2(camX, camY) * GetHalfSize();
+			return glm::vec2(camX, camY) * GetHalfSize(Zoom);
 		}
 
-		auto WorldToScreen(glm::vec2 worldCoords) const
+		auto WorldToScreen(glm::vec2 worldCoords, float Zoom) const
 		{
-			glm::vec2 relativeCoords = worldCoords / GetHalfSize();
+			glm::vec2 relativeCoords = worldCoords / GetHalfSize(Zoom);
 
 			float screenX = ((relativeCoords.x + 1.f) / 2.f) * m_RenderSize.x;
 			float screenY = ((1.f - relativeCoords.y) / 2.f) * m_RenderSize.y;
@@ -506,7 +503,7 @@ namespace wc
 		{
 			TextureCapacity = count;
 
-			if (m_DescriptorSet) 
+			if (m_DescriptorSet)
 				vk::descriptorAllocator.Free(m_DescriptorSet);
 
 			VkDescriptorSetVariableDescriptorCountAllocateInfo set_counts = {
@@ -623,7 +620,7 @@ namespace wc
 				crt.SetUp(m_ScreenSampler, output, input);
 			}
 
-			ImguiImageID = MakeImGuiDescriptor(ImguiImageID, { m_ScreenSampler, m_FinalImageView[0]/*m_OutputImageView*/, VK_IMAGE_LAYOUT_GENERAL});
+			ImguiImageID = MakeImGuiDescriptor(ImguiImageID, { m_ScreenSampler, m_FinalImageView[0]/*m_OutputImageView*/, VK_IMAGE_LAYOUT_GENERAL });
 		}
 
 		void Resize(glm::vec2 newSize)
@@ -669,7 +666,7 @@ namespace wc
 			m_RenderPass = VK_NULL_HANDLE;
 		}
 
-		void Flush(RenderData& renderData)
+		void Flush(RenderData& renderData, const glm::mat4& viewProj)
 		{
 			//if (!m_IndexCount && !m_LineVertexCount) return;
 
@@ -687,7 +684,7 @@ namespace wc
 
 				rpInfo.renderPass = m_RenderPass;
 				rpInfo.framebuffer = m_Framebuffer;
-				VkClearValue clearValues[] = { 
+				VkClearValue clearValues[] = {
 					{.color = {0.f, 0.f, 0.f, 1.f}},
 					{.color = {0, 0, 0, 0}}
 				};
@@ -723,7 +720,7 @@ namespace wc
 					glm::mat4 ViewProj;
 					VkDeviceAddress vertexBuffer;
 				} m_data;
-				m_data.ViewProj = camera->GetViewProjectionMatrix();
+				m_data.ViewProj = viewProj;
 				if (renderData.GetIndexCount())
 				{
 					renderData.UploadVertexData();

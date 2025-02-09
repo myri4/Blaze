@@ -15,73 +15,33 @@ namespace wc
 
 	struct Scene
 	{
-	private:
-		flecs::world m_World;
-		b2World m_PhysicsWorld;
-		PhysicsWorldData m_PhysicsWorldData;
+		flecs::world EntityWorld;
+		b2World PhysicsWorld;
+		PhysicsWorldData PhysicsWorldData;
 
-		std::vector<std::string> m_EntityOrder; // only parents
+		std::vector<std::string> EntityOrder; // only parents
 
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
 
-	public:
-	    std::unordered_map<std::string, PhysicsMaterial> Materials = {{ "Default", {} }};
-		auto GetWorld()	{ return m_World; }
-		auto GetPhysicsWorld() { return m_PhysicsWorld; }
-		auto& GetPhysicsWorldData() { return m_PhysicsWorldData; }
-		auto& GetParentEntityOrder() { return m_EntityOrder; }
+		std::unordered_map<std::string, PhysicsMaterial> Materials = { { "Default", {} } };
 
-		auto AddEntity() {	return m_World.entity().add<EntityTag>();	}
+		auto AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
 
-		auto AddEntity(const std::string& name) { m_EntityOrder.push_back(name); return m_World.entity(name.c_str()).add<EntityTag>(); }
-		
-		void RemoveChild(flecs::entity& child)
+		auto AddEntity(const std::string& name)
 		{
-		    if (child.parent() == flecs::entity::null()) 
-				return;
-
-		    auto parent = child.parent();
-			child.remove(flecs::ChildOf, parent);
-
-			auto orderData = parent.get_ref<EntityOrderComponent>();
-
-			if (orderData)
-			{
-				auto& order = orderData->EntityOrder;
-				auto it = std::remove(order.begin(), order.end(), child.name().c_str());
-				if (it != order.end())
-				{
-					order.erase(it, order.end());
-
-					if (order.empty())
-						parent.remove<EntityOrderComponent>();
-				}
-			}
-
-			m_EntityOrder.push_back(child.name().c_str());
+			EntityOrder.push_back(name);
+			return EntityWorld.entity(name.c_str()).add<EntityTag>();
 		}
 
-		void SetChild(flecs::entity& parent, flecs::entity& child)
-		{
-			if (child.parent() != flecs::entity::null())
-				RemoveChild(child);
-
-			parent.add<EntityOrderComponent>();
-			parent.get_ref<EntityOrderComponent>()->EntityOrder.push_back(child.name().c_str());
-			child.add(flecs::ChildOf, parent);
-
-			m_EntityOrder.erase(std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), child.name().c_str()), m_EntityOrder.end());
-		}
-
-		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(m_World, ent2, ent, true); }
+		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
 
 		void KillEntity(flecs::entity& ent)
 		{
-			auto it = std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), ent.name().c_str());
-			if (it != m_EntityOrder.end())
-				m_EntityOrder.erase(it, m_EntityOrder.end());
-			
+			auto it = std::remove(EntityOrder.begin(), EntityOrder.end(), ent.name().c_str());
+			if (it != EntityOrder.end())
+				EntityOrder.erase(it, EntityOrder.end());
+
 			auto parent = ent.parent();
 			if (parent != flecs::entity::null() && parent.has<EntityOrderComponent>())
 			{
@@ -99,12 +59,69 @@ namespace wc
 			ent.destruct();
 		}
 
+		void RemoveChild(flecs::entity& child)
+		{
+			if (child.parent() == flecs::entity::null())
+				return;
+
+			auto parent = child.parent();
+
+			{
+				if (parent.has<TransformComponent>() && child.has<TransformComponent>())
+				{
+					auto parentTransform = parent.get_ref<TransformComponent>();
+					auto& childTransform = *child.get_mut<TransformComponent>();
+					childTransform.Translation += parentTransform->Translation;
+					childTransform.Scale *= parentTransform->Scale;
+				}
+			}
+
+			child.remove(flecs::ChildOf, parent);
+
+			auto orderData = parent.get_ref<EntityOrderComponent>();
+
+			if (orderData)
+			{
+				auto& order = orderData->EntityOrder;
+				auto it = std::remove(order.begin(), order.end(), child.name().c_str());
+				if (it != order.end())
+				{
+					order.erase(it, order.end());
+
+					if (order.empty())
+						parent.remove<EntityOrderComponent>();
+				}
+			}
+
+			EntityOrder.push_back(child.name().c_str());
+		}
+
+		void SetChild(flecs::entity& parent, flecs::entity& child)
+		{
+			if (child.parent() != flecs::entity::null())
+				RemoveChild(child);
+
+			parent.add<EntityOrderComponent>();
+			parent.get_ref<EntityOrderComponent>()->EntityOrder.push_back(child.name().c_str());
+			child.add(flecs::ChildOf, parent);
+
+			if (parent.has<TransformComponent>() && child.has<TransformComponent>())
+			{
+				auto parentTransform = parent.get_ref<TransformComponent>();
+				auto& childTransform = *child.get_mut<TransformComponent>();
+				childTransform.Translation -= parentTransform->Translation;
+				childTransform.Scale /= parentTransform->Scale;
+			}
+
+			EntityOrder.erase(std::remove(EntityOrder.begin(), EntityOrder.end(), child.name().c_str()), EntityOrder.end());
+		}
+
 		void CreatePhysicsWorld()
 		{
 			b2WorldDef worldDef = b2DefaultWorldDef();
-			worldDef.gravity = { m_PhysicsWorldData.Gravity.x, m_PhysicsWorldData.Gravity.y };
-			m_PhysicsWorld.Create(worldDef);
-			m_World.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
+			worldDef.gravity = { PhysicsWorldData.Gravity.x, PhysicsWorldData.Gravity.y };
+			PhysicsWorld.Create(worldDef);
+			EntityWorld.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
 				if (p.body.IsValid()) return;
 				b2BodyDef bodyDef = p.GetBodyDef();
 
@@ -113,7 +130,7 @@ namespace wc
 					auto collDef = entt.get_ref<BoxCollider2DComponent>();
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
 					bodyDef.rotation = b2MakeRot(pos.Rotation);
-					p.body.Create(m_PhysicsWorld, bodyDef);
+					p.body.Create(PhysicsWorld, bodyDef);
 					collDef->Shape.CreatePolygonShape(p.body, collDef->Material.GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
 				}
 
@@ -122,48 +139,43 @@ namespace wc
 					auto collDef = entt.get_ref<CircleCollider2DComponent>();
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
 					bodyDef.rotation = b2MakeRot(pos.Rotation);
-					p.body.Create(m_PhysicsWorld, bodyDef);
+					p.body.Create(PhysicsWorld, bodyDef);
 					collDef->Shape.CreateCircleShape(p.body, collDef->Material.GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
 				}
 				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
 				p.previousRotation = pos.Rotation;
-			});
-		}
-
-		void DestroyPhysicsWorld()
-		{
-			m_PhysicsWorld.Destroy();
+				});
 		}
 
 		void Destroy()
 		{
-			if (m_PhysicsWorld.IsValid()) m_PhysicsWorld.Destroy();
+			if (PhysicsWorld) PhysicsWorld.Destroy();
 			DeleteAllEntities();
 		}
 
 		void UpdatePhysics()
 		{
-		    m_PhysicsWorld.SetGravity(m_PhysicsWorldData.Gravity);
+			PhysicsWorld.SetGravity(PhysicsWorldData.Gravity);
 
 			AccumulatedTime += Globals.deltaTime;
 
 			while (AccumulatedTime >= SimulationTime)
 			{
-				m_World.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
+				EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
 					p.prevPos = p.body.GetPosition();
 					p.previousRotation = p.body.GetAngle();
 					});
 
-				m_PhysicsWorld.Step(SimulationTime, 4);
+				PhysicsWorld.Step(SimulationTime, 4);
 
 				AccumulatedTime -= SimulationTime;
 			}
 
 			float alpha = AccumulatedTime / SimulationTime;
 
-			m_World.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
+			EntityWorld.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
-					pc.Translation = {glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z};
+					pc.Translation = { glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z };
 
 					float start = p.previousRotation;
 					float end = p.body.GetAngle();
@@ -186,7 +198,7 @@ namespace wc
 
 			if (entity.has<TransformComponent>())
 			{
-				auto component = entity.get<TransformComponent>();
+				auto component = entity.get_ref<TransformComponent>();
 				YAML::Node componentData;
 				componentData["Translation"] = component->Translation;
 				componentData["Scale"] = component->Scale;
@@ -196,7 +208,7 @@ namespace wc
 
 			if (entity.has<TextRendererComponent>())
 			{
-				auto component = entity.get<TextRendererComponent>();
+				auto component = entity.get_ref<TextRendererComponent>();
 				YAML::Node componentData;
 				componentData["Text"] = component->Text;
 				//componentData["Font"] = component->Font;		// @TODO: add support for serializing Font type
@@ -208,7 +220,7 @@ namespace wc
 
 			if (entity.has<SpriteRendererComponent>())
 			{
-				auto component = entity.get<SpriteRendererComponent>();
+				auto component = entity.get_ref<SpriteRendererComponent>();
 				YAML::Node componentData;
 				componentData["Color"] = component->Color;
 				componentData["Texture"] = component->Texture;  // @TODO: this should be in text form
@@ -217,7 +229,7 @@ namespace wc
 
 			if (entity.has<CircleRendererComponent>())
 			{
-				auto component = entity.get<CircleRendererComponent>();
+				auto component = entity.get_ref<CircleRendererComponent>();
 				YAML::Node componentData;
 				componentData["Color"] = component->Color;
 				componentData["Thickness"] = component->Thickness;
@@ -241,7 +253,7 @@ namespace wc
 
 			if (entity.has<BoxCollider2DComponent>())
 			{
-				auto component = entity.get<BoxCollider2DComponent>();
+				auto component = entity.get_ref<BoxCollider2DComponent>();
 				YAML::Node componentData;
 				componentData["Offset"] = component->Offset;
 				componentData["Size"] = component->Size;
@@ -265,7 +277,7 @@ namespace wc
 
 			if (entity.has<CircleCollider2DComponent>())
 			{
-				auto component = entity.get<CircleCollider2DComponent>();
+				auto component = entity.get_ref<CircleCollider2DComponent>();
 				YAML::Node componentData;
 				componentData["Offset"] = component->Offset;
 				componentData["Radius"] = component->Radius;
@@ -290,21 +302,35 @@ namespace wc
 
 		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData) const
 		{
+			if (!parent.has<EntityOrderComponent>()) return;
 			YAML::Node childrenData;
 
-			m_World.query_builder<EntityTag>()
-				.with(flecs::ChildOf, parent)
-				.each([&](flecs::entity child, EntityTag) {
+			for (const auto& name : parent.get_ref<EntityOrderComponent>()->EntityOrder)
+			{
+				auto child = EntityWorld.lookup(name.c_str());
+
 				YAML::Node childData;
-				
+
 				SerializeEntity(child, childData);
 
 				SerializeChildEntity(child, childData);
 
 				childrenData.push_back(childData);
-			});
+			}
 
-			if (childrenData.size() != 0) 
+			/*EntityWorld.query_builder<EntityTag>()
+			.with(flecs::ChildOf, parent)
+			.each([&](flecs::entity child, EntityTag) {
+				YAML::Node childData;
+
+				SerializeEntity(child, childData);
+
+				SerializeChildEntity(child, childData);
+
+				childrenData.push_back(childData);
+			});*/
+
+			if (childrenData.size() != 0)
 				entityData["Children"] = childrenData;
 		}
 
@@ -313,8 +339,9 @@ namespace wc
 			YAML::Node metaData;
 			YAML::Node entitiesData;
 
-			m_World.each([&](flecs::entity entity, EntityTag) {
-				if (entity.parent() != 0) return;
+			for (auto& name : EntityOrder)
+			{
+				auto entity = EntityWorld.lookup(name.c_str());
 
 				YAML::Node entityData;
 
@@ -323,17 +350,18 @@ namespace wc
 				SerializeChildEntity(entity, entityData);
 
 				entitiesData.push_back(entityData);
-				});
-
-			if (m_PhysicsWorld.IsValid())
-			{
-				metaData["Gravity"] = m_PhysicsWorld.GetGravity();
 			}
-			metaData["Entities"] = entitiesData;
+
+			if (PhysicsWorld.IsValid())
+			{
+				metaData["Gravity"] = PhysicsWorld.GetGravity();
+			}
+
+			if (entitiesData) 
+				metaData["Entities"] = entitiesData;
+
 			return metaData;
 		}
-
-		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }
 
 		void fromYAML(const YAML::Node& data)
 		{
@@ -369,7 +397,7 @@ namespace wc
 					glm::radians(transformComponent["Rotation"].as<float>())
 					});
 			}
-			
+
 			auto textRendererComponent = entity["TextRendererComponent"];
 			if (textRendererComponent)
 			{
@@ -398,7 +426,7 @@ namespace wc
 					circleRendererComponent["Fade"].as<float>()
 					});
 			}
-			
+
 			auto rigidBodyComponent = entity["RigidBodyComponent"];
 			if (rigidBodyComponent)
 			{
@@ -413,7 +441,7 @@ namespace wc
 				};
 				deserializedEntity.set<RigidBodyComponent>(component);
 			}
-			
+
 			{
 				auto componentData = entity["BoxCollider2DComponent"];
 				if (componentData)
@@ -474,21 +502,23 @@ namespace wc
 					flecs::entity deserializedChildEntity;
 
 					DeserializeEntity(deserializedChildEntity, child);
-					
+
 					SetChild(deserializedEntity, deserializedChildEntity);
 				}
 			}
 		}
 
-	    void DeleteAllEntities()
+		void DeleteAllEntities()
 		{
-			m_World.reset();
-			m_EntityOrder.clear();
+			EntityWorld.reset();
+			EntityOrder.clear();
 		}
+
+		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }
 
 		bool Load(const std::string& filepath, const bool clear = true)
 		{
-		    if (clear) DeleteAllEntities();
+			if (clear) DeleteAllEntities();
 			if (!std::filesystem::exists(filepath))
 			{
 				WC_CORE_ERROR("{} does not exist.", filepath);

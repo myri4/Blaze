@@ -1,46 +1,32 @@
 #pragma once
 
-#include <array>
-#include <filesystem>
 #include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <thread>
-#include <vector>
-#include <ranges>
-#include <unordered_map>
 
 #include <glm/gtc/type_ptr.hpp>
 
 #include <wc/vk/SyncContext.h>
 
-#include <wc/Utils/Time.h>
 #include <wc/Utils/List.h>
-#include <wc/Utils/Window.h>
-#include <wc/Utils/YAML.h>
 #include <wc/Utils/FileDialogs.h>
 
 // GUI
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
-#include <imgui/misc/cpp/imgui_stdlib.h>
-#include <imguizmo/ImGuizmo.h>
+#include "UI/Widgets.h"
 
 //ECS
 #include "Scene/Scene.h"
 
 #include "Globals.h"
-#include "UI/Widgets.h"
 #include "Project/Project.h"
 #include "Rendering/Renderer2D.h"
 #include "Scripting/Script.h"
+
+#include <wc/Math/Camera.h>
 
 namespace gui = ImGui;
 
 namespace wc
 {
-    glm::vec4 decompress(uint32_t num)
+	glm::vec4 decompress(uint32_t num)
 	{ // Remember! Convert from 0-255 to 0-1!
 		glm::vec4 Output;
 		Output.r = float((num & uint32_t(0x000000ff)));
@@ -53,7 +39,7 @@ namespace wc
 	void DrawTransformFcn(b2Transform transform, void* context)
 	{
 		auto t = glm::translate(glm::mat4(1.f), glm::vec3(transform.p.x, transform.p.y, 0.f)) * glm::rotate(glm::mat4(1.f), glm::radians(360.f) - b2Rot_GetAngle(transform.q), { 0.f, 0.f, 1.f });
-	    static_cast<RenderData*>(context)->DrawLineQuad(t);
+		static_cast<RenderData*>(context)->DrawLineQuad(t);
 	}
 
 	void DrawCircleFcn(b2Vec2 center, float radius, b2HexColor color, void* context)
@@ -80,7 +66,7 @@ namespace wc
 	}
 
 	void DrawSolidPolygonFcn(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
-    {
+	{
 		auto t = glm::translate(glm::mat4(1.f), glm::vec3(transform.p.x, transform.p.y, 0.f)) * glm::rotate(glm::mat4(1.f), glm::radians(360.f) - b2Rot_GetAngle(transform.q), { 0.f, 0.f, 1.f });
 
 		for (int i = 0; i < vertexCount; i++)
@@ -122,22 +108,22 @@ namespace wc
 		glm::vec2 m_BeginCameraPosition;
 		bool m_Panning = false;
 
-	    // Debug stats
-	    float m_DebugTimer = 0.f;
+		// Debug stats
+		float m_DebugTimer = 0.f;
 
-	    uint32_t m_PrevMaxFPS = 0;
-	    uint32_t m_MaxFPS = 0;
+		uint32_t m_PrevMaxFPS = 0;
+		uint32_t m_MaxFPS = 0;
 
-	    uint32_t m_PrevMinFPS = 0;
-	    uint32_t m_MinFPS = 0;
+		uint32_t m_PrevMinFPS = 0;
+		uint32_t m_MinFPS = 0;
 
-	    uint32_t m_FrameCount = 0;
-	    uint32_t m_FrameCounter = 0;
-	    uint32_t m_PrevFrameCounter = 0;
+		uint32_t m_FrameCount = 0;
+		uint32_t m_FrameCounter = 0;
+		uint32_t m_PrevFrameCounter = 0;
 
 		OrthographicCamera camera;
 
-	    RenderData m_RenderData[FRAME_OVERLAP];
+		RenderData m_RenderData[FRAME_OVERLAP];
 		Renderer2D m_Renderer;
 
 		Texture t_Close;
@@ -148,11 +134,11 @@ namespace wc
 		Texture t_File;
 		Texture t_FolderEmpty;
 		Texture t_Folder;
-        Texture t_Reorder;
-        Texture t_Bond;
-        Texture t_Play;
-        Texture t_Simulate;
-        Texture t_Stop;
+		Texture t_Reorder;
+		Texture t_Bond;
+		Texture t_Play;
+		Texture t_Simulate;
+		Texture t_Stop;
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
@@ -169,8 +155,8 @@ namespace wc
 		bool showProperties = true;
 		bool showConsole = true;
 		bool showFileExplorer = true;
-	    bool showDebugStats = false;
-	    bool showStyleEditor = false;
+		bool showDebugStats = false;
+		bool showStyleEditor = false;
 
 		flecs::entity m_SelectedEntity = flecs::entity::null();
 
@@ -183,58 +169,57 @@ namespace wc
 
 		// Settings
 		float ZoomSpeed = 2.f;
-	    b2DebugDraw m_PhysicsDebugDraw;
+		b2DebugDraw m_PhysicsDebugDraw;
 
-    public:
-	    AssetManager assetManager;
+	public:
+		AssetManager assetManager;
 
-	    void Create()
-	    {
-	        assetManager.Init();
+		void Create()
+		{
+			assetManager.Init();
 
-	        for (int i = 0; i < FRAME_OVERLAP; i++)
-	            m_RenderData[i].Allocate();
+			for (int i = 0; i < FRAME_OVERLAP; i++)
+				m_RenderData[i].Allocate();
 
-	        m_Renderer.camera = &camera;
-	        m_Renderer.Init();
+			m_Renderer.Init();
 
-	        // Load Textures
-	        t_Close.Load("assets/textures/menu/close.png");
-	        t_Minimize.Load("assets/textures/menu/minimize.png");
-	        t_Collapse.Load("assets/textures/menu/collapse.png");
-	        t_FolderOpen.Load("assets/textures/menu/folder-open.png");
-	        t_FolderClosed.Load("assets/textures/menu/folder-closed.png");
-	        t_File.Load("assets/textures/menu/file.png");
-	        t_FolderEmpty.Load("assets/textures/menu/folder-empty.png");
-	        t_Folder.Load("assets/textures/menu/folder-fill.png");
-	        t_Reorder.Load("assets/textures/menu/reorder.png");
-	        t_Bond.Load("assets/textures/menu/bond.png");
-	        t_Play.Load("assets/textures/menu/play.png");
-	        t_Simulate.Load("assets/textures/menu/simulate.png");
-	        t_Stop.Load("assets/textures/menu/stop.png");
+			// Load Textures
+			t_Close.Load("assets/textures/menu/close.png");
+			t_Minimize.Load("assets/textures/menu/minimize.png");
+			t_Collapse.Load("assets/textures/menu/collapse.png");
+			t_FolderOpen.Load("assets/textures/menu/folder-open.png");
+			t_FolderClosed.Load("assets/textures/menu/folder-closed.png");
+			t_File.Load("assets/textures/menu/file.png");
+			t_FolderEmpty.Load("assets/textures/menu/folder-empty.png");
+			t_Folder.Load("assets/textures/menu/folder-fill.png");
+			t_Reorder.Load("assets/textures/menu/reorder.png");
+			t_Bond.Load("assets/textures/menu/bond.png");
+			t_Play.Load("assets/textures/menu/play.png");
+			t_Simulate.Load("assets/textures/menu/simulate.png");
+			t_Stop.Load("assets/textures/menu/stop.png");
 
-	        m_PhysicsDebugDraw = {
-	            DrawPolygonFcn,
-                DrawSolidPolygonFcn,
-                DrawCircleFcn,
-                DrawSolidCircleFcn,
-                DrawSolidCapsuleFcn,
-                DrawSegmentFcn,
-                DrawTransformFcn,
-                DrawPointFcn,
-                DrawStringFcn,
+			m_PhysicsDebugDraw = {
+				DrawPolygonFcn,
+				DrawSolidPolygonFcn,
+				DrawCircleFcn,
+				DrawSolidCircleFcn,
+				DrawSolidCapsuleFcn,
+				DrawSegmentFcn,
+				DrawTransformFcn,
+				DrawPointFcn,
+				DrawStringFcn,
 				{ { -FLT_MAX, -FLT_MAX }, { FLT_MAX, FLT_MAX } },
 			};
 
-	        Project::LoadSavedProjects();
+			Project::LoadSavedProjects();
 
-	        m_Renderer.CreateScreen(Globals.window.GetSize());
+			m_Renderer.CreateScreen(Globals.window.GetSize());
 
 			//blaze::Script script;
 			//script.LoadFromFile("test.lua");
 			//script.SetVariable("a", "guz");
 			//script.Execute("printSmth");
-	    }
+		}
 
 		void Input()
 		{
@@ -249,11 +234,11 @@ namespace wc
 				{
 					camera.Zoom += -scroll * ZoomSpeed;
 					camera.Zoom = glm::max(camera.Zoom, 0.05f);
-					camera.Update(m_Renderer.GetHalfSize());
+					camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
 				}
 
 				glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPos()) - WindowPos;
-				glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos);
+				glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos, camera.Zoom);
 
 				if (Mouse::GetMouse(Mouse::RIGHT))
 				{
@@ -271,31 +256,31 @@ namespace wc
 					m_StartPan = glm::vec2(0.f);
 					m_BeginCameraPosition = camera.Position;
 					m_Panning = false;
-				}				
+				}
 			}
 		}
 
-	    void RenderEntity(flecs::entity entt, glm::mat4& transform)
+		void RenderEntity(flecs::entity entt, glm::mat4& transform)
 		{
-		    auto& renderData = m_RenderData[CURRENT_FRAME];
-		    if (entt.has<SpriteRendererComponent>())
-		    {
-		        auto& data = *entt.get<SpriteRendererComponent>();
+			auto& renderData = m_RenderData[CURRENT_FRAME];
+			if (entt.has<SpriteRendererComponent>())
+			{
+				auto& data = *entt.get<SpriteRendererComponent>();
 
-		        renderData.DrawQuad(transform, data.Texture, data.Color, entt.id());
-		    }
-		    else if (entt.has<CircleRendererComponent>())
-		    {
-		        auto& data = *entt.get<CircleRendererComponent>();
-		        renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color, entt.id());
-		    }
-		    else if (entt.has<TextRendererComponent>())
-		    {
-		        auto& data = *entt.get<TextRendererComponent>();
+				renderData.DrawQuad(transform, data.Texture, data.Color, entt.id());
+			}
+			else if (entt.has<CircleRendererComponent>())
+			{
+				auto& data = *entt.get<CircleRendererComponent>();
+				renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color, entt.id());
+			}
+			else if (entt.has<TextRendererComponent>())
+			{
+				auto& data = *entt.get<TextRendererComponent>();
 
-		        //renderData.DrawString(data.Text, data.Font, transform, data.Color, entt.id());
-		    }
-			m_Scene.GetWorld().query_builder<TransformComponent, EntityTag>()
+				//renderData.DrawString(data.Text, data.Font, transform, data.Color, entt.id());
+			}
+			m_Scene.EntityWorld.query_builder<TransformComponent, EntityTag>()
 				.with(flecs::ChildOf, entt)
 				.each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
 					{
@@ -304,10 +289,10 @@ namespace wc
 					});
 		}
 
-	    void Render()
+		void Render()
 		{
 			if (!Project::Exists()) return;
-		    auto& renderData = m_RenderData[CURRENT_FRAME];
+			auto& renderData = m_RenderData[CURRENT_FRAME];
 
 			if (m_Renderer.TextureCapacity < assetManager.Textures.size())
 				m_Renderer.AllocateNewDescriptor(assetManager.Textures.capacity());
@@ -318,28 +303,28 @@ namespace wc
 				m_Renderer.UpdateTextures(assetManager);
 			}
 
-		    m_Scene.GetWorld().each([&](flecs::entity entt, TransformComponent& p) {
-                if (entt.parent() != 0) return;
+			m_Scene.EntityWorld.each([&](flecs::entity entt, TransformComponent& p) {
+				if (entt.parent() != 0) return;
 
-                glm::mat4 transform = p.GetTransform();
-                RenderEntity(entt, transform);
-            });
+				glm::mat4 transform = p.GetTransform();
+				RenderEntity(entt, transform);
+				});
 
-		    if (m_SceneState != SceneState::Edit)
-		    {
-		        m_PhysicsDebugDraw.context = &renderData;
-		        m_Scene.GetPhysicsWorld().Draw(&m_PhysicsDebugDraw);
-		    }
+			if (m_SceneState != SceneState::Edit)
+			{
+				m_PhysicsDebugDraw.context = &renderData;
+				m_Scene.PhysicsWorld.Draw(&m_PhysicsDebugDraw);
+			}
 
-		    m_Renderer.Flush(renderData);
+			m_Renderer.Flush(renderData, camera.GetViewProjectionMatrix());
 
-		    renderData.Reset();
+			renderData.Reset();
 		}
 
 		void Update()
 		{
 			if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
-			    m_Scene.Update();
+				m_Scene.Update();
 		}
 
 		void ChangeSceneState(SceneState newState)
@@ -357,11 +342,11 @@ namespace wc
 			}
 			else if (newState == SceneState::Edit)
 			{
-				m_Scene.DestroyPhysicsWorld();
+				m_Scene.PhysicsWorld.Destroy();
 				m_Scene.Copy(m_TempScene);
 			}
 
-			if(m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.GetWorld().lookup(selectedEntityName.c_str());
+			if (m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.EntityWorld.lookup(selectedEntityName.c_str());
 			//WC_INFO("Scene state changed. Selected Entity: {0}", m_SelectedEntity.name().c_str());
 		}
 
@@ -400,13 +385,13 @@ namespace wc
 							auto image = m_Renderer.m_EntityImage;
 							image.SetLayout(cmd, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-						    VkBufferImageCopy copyRegion = {
-                                .imageSubresource = {
-                                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                    .layerCount = 1,
-                                },
-                                .imageExtent = { width, height, 1 },
-                            };
+							VkBufferImageCopy copyRegion = {
+								.imageSubresource = {
+									.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+									.layerCount = 1,
+								},
+								.imageExtent = { width, height, 1 },
+							};
 
 							vkCmdCopyImageToBuffer(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &copyRegion);
 
@@ -415,7 +400,7 @@ namespace wc
 
 						auto imagedata = (uint64_t*)stagingBuffer.Map();
 						auto id = imagedata[mousePos.x + mousePos.y * width];
-						m_SelectedEntity = flecs::entity(m_Scene.GetWorld(), id);
+						m_SelectedEntity = flecs::entity(m_Scene.EntityWorld, id);
 
 						stagingBuffer.Unmap();
 						stagingBuffer.Free();
@@ -438,17 +423,17 @@ namespace wc
 				bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
 				bool isPaused = (m_SceneState == SceneState::Edit);
 
-			    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
 				if (isPlayingOrSimulating) gui::BeginDisabled();
-				if (gui::ImageButton("play", t_Play, {10, 10}) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+				if (gui::ImageButton("play", t_Play, { 10, 10 }) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 
-			    if (gui::ImageButton("simulate", t_Simulate, {10, 10}) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+				if (gui::ImageButton("simulate", t_Simulate, { 10, 10 }) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 				if (isPlayingOrSimulating) gui::EndDisabled();
 
 				if (isPaused) gui::BeginDisabled();
-				if (gui::ImageButton("stop", t_Stop, {10, 10})) ChangeSceneState(SceneState::Edit);
+				if (gui::ImageButton("stop", t_Stop, { 10, 10 })) ChangeSceneState(SceneState::Edit);
 				if (isPaused) gui::EndDisabled();
-			    ImGui::PopStyleVar();
+				ImGui::PopStyleVar();
 
 				glm::mat4 projection = camera.ProjectionMatrix;
 				projection[1][1] *= -1;
@@ -537,9 +522,9 @@ namespace wc
 		{
 			if (gui::Begin("Scene Properties", &showSceneProperties))
 			{
-			    if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
+				if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					auto& worldData = m_Scene.GetPhysicsWorldData();
+					auto& worldData = m_Scene.PhysicsWorldData;
 					ui::DragButton2("Gravity", worldData.Gravity);
 					//{
 					//	auto rt = physicsWorld.GetRestitutionThreshold();
@@ -592,280 +577,280 @@ namespace wc
 		{
 			if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
 
-	        if (gui::BeginChild("##ShowEntities", {0, 0}, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
-	        {
-	            // Reorder
-	            auto separator = [&](flecs::entity entity) -> void
-                {
-                    if (ui::MatchPayloadType("ENTITY"))
-			            {
-			                gui::PushStyleColor(ImGuiCol_Separator, {0.5f, 0.5f, 0.5f, 0.f});
-			                gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
-			                gui::PopStyleColor();
+			if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
+			{
+				// Reorder
+				auto separator = [&](flecs::entity entity) -> void
+					{
+						if (ui::MatchPayloadType("ENTITY"))
+						{
+							gui::PushStyleColor(ImGuiCol_Separator, { 0.5f, 0.5f, 0.5f, 0.f });
+							gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
+							gui::PopStyleColor();
 
-			                if (gui::BeginDragDropTarget())
-			                {
-			                    if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-			                    {
-			                        IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-			                        flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
+							if (gui::BeginDragDropTarget())
+							{
+								if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+								{
+									IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+									flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
 
-			                        // Only allow reordering if both entities share the same parent.
-			                        if (droppedEntity.parent() == entity.parent())
-			                        {
-			                            // Get the list of names from the proper container.
-			                            // For top-level entities, use the scene's parent names;
-			                            // for children, use the parent's EntityOrderComponent.
-			                            std::vector<std::string>* entityOrder = nullptr;
-			                            if (entity.parent() == flecs::entity::null())
-											entityOrder = &m_Scene.GetParentEntityOrder();
-			                            else if (entity.parent().has<EntityOrderComponent>())
+									// Only allow reordering if both entities share the same parent.
+									if (droppedEntity.parent() == entity.parent())
+									{
+										// Get the list of names from the proper container.
+										// For top-level entities, use the scene's parent names;
+										// for children, use the parent's EntityOrderComponent.
+										std::vector<std::string>* entityOrder = nullptr;
+										if (entity.parent() == flecs::entity::null())
+											entityOrder = &m_Scene.EntityOrder;
+										else if (entity.parent().has<EntityOrderComponent>())
 											entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 
 										if (entityOrder)
-			                            {
-			                                // Find the positions of the target (the entity associated with the separator)
-			                                // and the dropped entity.
-			                                auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
-			                                auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
+										{
+											// Find the positions of the target (the entity associated with the separator)
+											// and the dropped entity.
+											auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
+											auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
 
-			                                if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
-			                                {
-			                                    // Remove the dropped entity from its current position.
-			                                    std::string droppedName = *droppedIt;
+											if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
+											{
+												// Remove the dropped entity from its current position.
+												std::string droppedName = *droppedIt;
 												entityOrder->erase(droppedIt);
 
-			                                    // Recalculate the target's index (in case removal shifted it).
-			                                    int newTargetIndex = std::distance(entityOrder->begin(),
-                                                    std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
+												// Recalculate the target's index (in case removal shifted it).
+												int newTargetIndex = std::distance(entityOrder->begin(),
+													std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
 
-			                                    // Insert the dropped entity immediately after the target.
-			                                    int insertIndex = newTargetIndex + 1;
-			                                    if (insertIndex > static_cast<int>(entityOrder->size()))
-			                                        insertIndex = static_cast<int>(entityOrder->size());
+												// Insert the dropped entity immediately after the target.
+												int insertIndex = newTargetIndex + 1;
+												if (insertIndex > static_cast<int>(entityOrder->size()))
+													insertIndex = static_cast<int>(entityOrder->size());
 												entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
-			                                }
-			                            }
-			                        }
-			                    }
-			                    gui::EndDragDropTarget();
-			                }
-			            }
-                };
+											}
+										}
+									}
+								}
+								gui::EndDragDropTarget();
+							}
+						}
+					};
 
-			    auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
-	            {
-			        if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
-			        {
-			            if (gui::IsItemHovered())
-			            {
-			                WC_INFO("Hovered {}", entity.name().c_str());
-			                gui::OpenPopup(std::to_string(entity.id()).c_str());
-			            }
-			            // TODO - ask if this is needed and fix it
-			            /*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
-                        {
-                            WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
-                            gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
-                        }*/
-			        }
+				auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
+					{
+						if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+						{
+							if (gui::IsItemHovered())
+							{
+								WC_INFO("Hovered {}", entity.name().c_str());
+								gui::OpenPopup(std::to_string(entity.id()).c_str());
+							}
+							// TODO - ask if this is needed and fix it
+							/*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+							{
+								WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
+								gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+							}*/
+						}
 
-			    	const bool is_selected = (m_SelectedEntity == entity);
+						const bool is_selected = (m_SelectedEntity == entity);
 
-			    	std::vector<flecs::entity> children;
-			    	if (entity.has<EntityOrderComponent>())
-			    	{
-			    		auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
-			    		for (const auto& childName : entityOrder)
-			    		{
-			    			std::string fullChildName = std::string(entity.name()) + "::" + childName;
+						std::vector<flecs::entity> children;
+						if (entity.has<EntityOrderComponent>())
+						{
+							auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
+							for (const auto& childName : entityOrder)
+							{
+								std::string fullChildName = std::string(entity.name()) + "::" + childName;
 
-			    			flecs::entity childEntity = entity;
-			    			while (childEntity.parent() != flecs::entity::null())
-			    			{
-			    				childEntity = childEntity.parent();
-			    				fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
-			    			}
+								flecs::entity childEntity = entity;
+								while (childEntity.parent() != flecs::entity::null())
+								{
+									childEntity = childEntity.parent();
+									fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
+								}
 
-                            if (auto childEntityResolved = m_Scene.GetWorld().lookup(fullChildName.c_str()))
-			    				children.push_back(childEntityResolved);
-			    		}
-			    	}
+								if (auto childEntityResolved = m_Scene.EntityWorld.lookup(fullChildName.c_str()))
+									children.push_back(childEntityResolved);
+							}
+						}
 
-			    	ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
-			    	if (is_selected)
-			    		node_flags |= ImGuiTreeNodeFlags_Selected;
+						ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+						if (is_selected)
+							node_flags |= ImGuiTreeNodeFlags_Selected;
 
-			    	if (children.empty())
-			    		node_flags |= ImGuiTreeNodeFlags_Leaf;
+						if (children.empty())
+							node_flags |= ImGuiTreeNodeFlags_Leaf;
 
-			    	if (m_SelectedEntity != flecs::entity::null())
-			    	{
-			    		auto parent = m_SelectedEntity.parent();
-			    		while (parent != flecs::entity::null())
-			    		{
-			    			if (parent == entity)
-			    			{
-			    				gui::SetNextItemOpen(true);
-			    				break;
-			    			}
-			    			parent = parent.parent();
-			    		}
-			    	}
+						if (m_SelectedEntity != flecs::entity::null())
+						{
+							auto parent = m_SelectedEntity.parent();
+							while (parent != flecs::entity::null())
+							{
+								if (parent == entity)
+								{
+									gui::SetNextItemOpen(true);
+									break;
+								}
+								parent = parent.parent();
+							}
+						}
 
-			    	// Render the entity
-			    	bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
+						// Render the entity
+						bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 
-			    	// Handle selection on click
-			    	if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
+						// Handle selection on click
+						if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
 
-			    	if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
-			    	{
-			    		if (entity.has<TransformComponent>())
-			    			camera.Position = entity.get<TransformComponent>()->Translation;
-			    	}
+						if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
+						{
+							if (entity.has<TransformComponent>())
+								camera.Position = entity.get<TransformComponent>()->Translation;
+						}
 
-			    	if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
-			    	{
-			    		gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
-			    		gui::Text("Dragging %s", entity.name().c_str());
-			    		gui::EndDragDropSource();
-			    	}
+						if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
+						{
+							gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
+							gui::Text("Dragging %s", entity.name().c_str());
+							gui::EndDragDropSource();
+						}
 
-			        // Bond
-			    	if (gui::BeginDragDropTarget())
-			    	{
-			    		if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-			    		{
-			    			IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-			    			flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+						// Bond
+						if (gui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+							{
+								IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+								flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
 
-			    			// Check if the drop target is empty space
-			    			 if (droppedEntity != entity.parent())
-			    				m_Scene.SetChild(entity, droppedEntity);
-			    		}
-			    		gui::EndDragDropTarget();
-			    	}
+								// Check if the drop target is empty space
+								if (droppedEntity != entity.parent())
+									m_Scene.SetChild(entity, droppedEntity);
+							}
+							gui::EndDragDropTarget();
+						}
 
-			    	// Display the popup menu
-			    	if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
-			    	{
-			    		gui::Text("%s", entity.name().c_str());
-			    		gui::Separator();
+						// Display the popup menu
+						if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
+						{
+							gui::Text("%s", entity.name().c_str());
+							gui::Separator();
 
-			    		if (gui::MenuItem("Clone"))
-			    		{
-			    			WC_CORE_INFO("Implement Clone");
-			    			gui::CloseCurrentPopup();
-			    		}
+							if (gui::MenuItem("Clone"))
+							{
+								WC_CORE_INFO("Implement Clone");
+								gui::CloseCurrentPopup();
+							}
 
-			    		if (gui::MenuItem("Export"))
-			    		{
-			    			WC_CORE_INFO("Implement Export");
-			    			gui::CloseCurrentPopup();
-			    		}
+							if (gui::MenuItem("Export"))
+							{
+								WC_CORE_INFO("Implement Export");
+								gui::CloseCurrentPopup();
+							}
 
-			    		if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-			    		{
-			    			//auto parent = entity.parent();
-			    			m_Scene.RemoveChild(entity);
-			    		}
+							if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
+							{
+								//auto parent = entity.parent();
+								m_Scene.RemoveChild(entity);
+							}
 
-			    		if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
-			    		{
-			    			if (gui::MenuItem("Set Child of Selected"))
-			    				m_Scene.SetChild(m_SelectedEntity, entity);
-			    		}
+							if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
+							{
+								if (gui::MenuItem("Set Child of Selected"))
+									m_Scene.SetChild(m_SelectedEntity, entity);
+							}
 
-			    		gui::Separator();
+							gui::Separator();
 
-			    		gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-			    		if (gui::MenuItem("Delete"))
-			    		{
-			    			m_Scene.KillEntity(entity);
-			    			m_SelectedEntity = flecs::entity::null();
-			    			gui::CloseCurrentPopup();
-			    		}
-			    		gui::PopStyleColor();
+							gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+							if (gui::MenuItem("Delete"))
+							{
+								m_Scene.KillEntity(entity);
+								m_SelectedEntity = flecs::entity::null();
+								gui::CloseCurrentPopup();
+							}
+							gui::PopStyleColor();
 
-			    		gui::EndPopup();
-			    	}
+							gui::EndPopup();
+						}
 
 
-			    	// If the node is open, recursively display children
-			    	if (is_open)
-			    	{
-			    	    gui::TreePop(); // Pop before separator
+						// If the node is open, recursively display children
+						if (is_open)
+						{
+							gui::TreePop(); // Pop before separator
 
-			            separator(entity);
+							separator(entity);
 
-			    	    gui::TreePush(entity.name().c_str());
-			    		for (const auto& child : children)
-			    			displayEntityRef(child, displayEntityRef);
-			            gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
-			    	}
-			        else separator(entity);
+							gui::TreePush(entity.name().c_str());
+							for (const auto& child : children)
+								displayEntityRef(child, displayEntityRef);
+							gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
+						}
+						else separator(entity);
 
-	            };
+					};
 
-	            ui::DrawBgRows(10);
-	            gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
-			    for (const auto& name : m_Scene.GetParentEntityOrder())
-			    {
-			    	auto rootEntity = m_Scene.GetWorld().lookup(name.c_str());
-			    	if (rootEntity) displayEntity(rootEntity, displayEntity);
-			    }
-	            gui::PopStyleVar();
-	        }
-	        gui::EndChild();
+				ui::DrawBgRows(10);
+				gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
+				for (const auto& name : m_Scene.EntityOrder)
+				{
+					auto rootEntity = m_Scene.EntityWorld.lookup(name.c_str());
+					if (rootEntity) displayEntity(rootEntity, displayEntity);
+				}
+				gui::PopStyleVar();
+			}
+			gui::EndChild();
 		}
 
 		void UI_Entities()
 		{
-            static bool showPopup = false;
+			static bool showPopup = false;
 			if (gui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 			{
-			    std::string entityFilter;
-                if (gui::BeginMenuBar())
-                {
-                    //TODO - Implement search
-                    char filterBuff[256];
-                    //TODO - fix, imgui is DnD active crashes flecs for some reason
-                    bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
-                    //WC_INFO("1: {}", gui::IsDragDropActive());
-                    gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
-                    gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
-                    if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)){ entityFilter = filterBuff; }
+				std::string entityFilter;
+				if (gui::BeginMenuBar())
+				{
+					//TODO - Implement search
+					char filterBuff[256];
+					//TODO - fix, imgui is DnD active crashes flecs for some reason
+					bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
+					//WC_INFO("1: {}", gui::IsDragDropActive());
+					gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
+					gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
+					if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)) { entityFilter = filterBuff; }
 
-                    gui::BeginDisabled(buttonDnD);
-                    if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
-                    gui::EndDisabled();
+					gui::BeginDisabled(buttonDnD);
+					if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
+					gui::EndDisabled();
 
-                    if (buttonDnD && gui::BeginDragDropTarget())
-                    {
-                        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-                        {
-                            IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-                            flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+					if (buttonDnD && gui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+						{
+							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+							flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
 
-                            if (droppedEntity.parent() != flecs::entity::null())
-                                m_Scene.RemoveChild(droppedEntity);
-                        }
-                        gui::EndDragDropTarget();
-                    }
+							if (droppedEntity.parent() != flecs::entity::null())
+								m_Scene.RemoveChild(droppedEntity);
+						}
+						gui::EndDragDropTarget();
+					}
 
-                    gui::EndMenuBar();
-                }
+					gui::EndMenuBar();
+				}
 
-			    ShowEntities();
+				ShowEntities();
 
-			    if (showPopup)
-                {
-                    gui::OpenPopup("Add Entity");
-			        showPopup = false;
-                }
+				if (showPopup)
+				{
+					gui::OpenPopup("Add Entity");
+					showPopup = false;
+				}
 
-			    ui::CenterNextWindow();
+				ui::CenterNextWindow();
 				if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 				{
 					ImVec2 center = gui::GetMainViewport()->GetCenter();
@@ -873,42 +858,42 @@ namespace wc
 					ImVec2 windowPos = ImVec2(center.x - windowSize.x * 0.5f, center.y - windowSize.y * 0.5f);
 					gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
-					static std::string name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-				    gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
-				    const float widgetSize = gui::GetItemRectSize().x;
+					static std::string name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+					gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
+					const float widgetSize = gui::GetItemRectSize().x;
 
-                    gui::BeginDisabled(name.empty());
+					gui::BeginDisabled(name.empty());
 					if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 					{
-					    if (m_Scene.GetWorld().lookup(name.c_str()) == flecs::entity::null())
-					    {
-					        m_SelectedEntity = m_Scene.AddEntity(name);
-					        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-					        gui::CloseCurrentPopup();
-					    }
-					    else gui::OpenPopup("WarnNameExists");
+						if (m_Scene.EntityWorld.lookup(name.c_str()) == flecs::entity::null())
+						{
+							m_SelectedEntity = m_Scene.AddEntity(name);
+							name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+							gui::CloseCurrentPopup();
+						}
+						else gui::OpenPopup("WarnNameExists");
 					}
-				    gui::EndDisabled();
-				    if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
+					gui::EndDisabled();
+					if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
 
-				    gui::SameLine();
-				    gui::SetCursorPosX(widgetSize);
-				    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
-				    {
-				        name = "Entity " + std::to_string(m_Scene.GetWorld().count<EntityTag>());
-				        gui::CloseCurrentPopup();
-				    }
+					gui::SameLine();
+					gui::SetCursorPosX(widgetSize);
+					if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+					{
+						name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+						gui::CloseCurrentPopup();
+					}
 
-				    ui::CenterNextWindow();
-				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
-				    {
-				        gui::Text("Name already exists!");
+					ui::CenterNextWindow();
+					if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
+					{
+						gui::Text("Name already exists!");
 
-				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-				        gui::EndPopup();
-				    }
+						if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+						gui::EndPopup();
+					}
 
-			        gui::EndPopup();
+					gui::EndPopup();
 				}
 			}
 			gui::End();
@@ -937,33 +922,33 @@ namespace wc
 				{
 					std::string nameBuffer = m_SelectedEntity.name().c_str();
 
-				    if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
-				    {
-				        if (!nameBuffer.empty())
-				        {
-				            if (m_Scene.GetWorld().lookup(nameBuffer.c_str()) != flecs::entity::null())
-				                gui::OpenPopup("WarnNameExists");
-				            else
-				            {
-				                if (m_SelectedEntity.parent() == flecs::entity::null())
-				                {
-				                    auto& parentNames = m_Scene.GetParentEntityOrder();
-				                    for (auto& name : parentNames)
-				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
-				                }
-				                else
-				                {
-				                    auto& childrenNames = m_SelectedEntity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
-				                    for (auto& name : childrenNames)
-				                        if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
-				                }
+					if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
+					{
+						if (!nameBuffer.empty())
+						{
+							if (m_Scene.EntityWorld.lookup(nameBuffer.c_str()) != flecs::entity::null())
+								gui::OpenPopup("WarnNameExists");
+							else
+							{
+								if (m_SelectedEntity.parent() == flecs::entity::null())
+								{
+									auto& parentNames = m_Scene.EntityOrder;
+									for (auto& name : parentNames)
+										if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
+								}
+								else
+								{
+									auto& childrenNames = m_SelectedEntity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
+									for (auto& name : childrenNames)
+										if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
+								}
 
-				                m_SelectedEntity.set_name(nameBuffer.c_str());
-				            }
-				        }
-				    }
-				    ui::HelpMarker("Press ENTER or Deselect to confirm");
-				    static bool showAddComponent = false;
+								m_SelectedEntity.set_name(nameBuffer.c_str());
+							}
+						}
+					}
+					ui::HelpMarker("Press ENTER or Deselect to confirm");
+					static bool showAddComponent = false;
 					static enum { None, Transform, Render, Rigid } menu = None;
 					if (gui::Button("Add Component", { gui::CalcItemWidth(), 0 }))
 					{
@@ -1011,16 +996,16 @@ namespace wc
 
 							gui::SameLine();
 
-						    const char* menuText = "";
-						    switch (menu)
-						    {
-						        case None: menuText = "Components"; break;
-						        case Transform: menuText = "Transform"; break;
-						        case Render: menuText = "Render"; break;
-						        case Rigid: menuText = "Rigid Body"; break;
-						    }
-						    gui::SetCursorPosX((gui::GetWindowSize().x - gui::CalcTextSize(menuText).x) * 0.5f);
-						    gui::Text("%s", menuText);
+							const char* menuText = "";
+							switch (menu)
+							{
+							case None: menuText = "Components"; break;
+							case Transform: menuText = "Transform"; break;
+							case Render: menuText = "Render"; break;
+							case Rigid: menuText = "Rigid Body"; break;
+							}
+							gui::SetCursorPosX((gui::GetWindowSize().x - gui::CalcTextSize(menuText).x) * 0.5f);
+							gui::Text("%s", menuText);
 
 							gui::Separator();
 
@@ -1059,13 +1044,13 @@ namespace wc
 						gui::End();
 					}
 
-				    ui::CenterNextWindow();
-				    if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
-				    {
-				        gui::Text("Name already exists!");
-				        if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-				        gui::EndPopup();
-				    }
+					ui::CenterNextWindow();
+					if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+					{
+						gui::Text("Name already exists!");
+						if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+						gui::EndPopup();
+					}
 
 					// Display the entity's ID
 					//gui::Text("ID: %u", selected_entity.id());
@@ -1073,163 +1058,163 @@ namespace wc
 					//NOTE: for every new component, a new if statement is needed
 					gui::SeparatorText("Components");
 
-				    if (gui::BeginChild("components"))
-				    {
-				        EditComponent<TransformComponent>("Transform", [](auto& component){
-                            auto& realRotation = const_cast<float&>(component.Rotation);
-                            auto rotation = glm::degrees(realRotation);
+					if (gui::BeginChild("components"))
+					{
+						EditComponent<TransformComponent>("Transform", [](auto& component) {
+							auto& realRotation = const_cast<float&>(component.Rotation);
+							auto rotation = glm::degrees(realRotation);
 
-                            ui::DragButton3("Position", component.Translation);
-                            ui::DragButton2("Scale", component.Scale);
-                            ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
-                            realRotation = glm::radians(rotation);
-                        });
+							ui::DragButton3("Position", component.Translation);
+							ui::DragButton2("Scale", component.Scale);
+							ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+							realRotation = glm::radians(rotation);
+							});
 
-				        EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
-                            gui::ColorEdit4("color", glm::value_ptr(component.Color));
-                            gui::Button("Texture");
-                        });
+						EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
+							gui::ColorEdit4("color", glm::value_ptr(component.Color));
+							gui::Button("Texture");
+							});
 
-				        EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
-                            ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
-                            ui::Slider("Fade", component.Fade, 0.0f, 1.0f);
-                            gui::ColorEdit4("Color", glm::value_ptr(component.Color));
-                            });
+						EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
+							ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
+							ui::Slider("Fade", component.Fade, 0.0f, 1.0f);
+							gui::ColorEdit4("Color", glm::value_ptr(component.Color));
+							});
 
-				        EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
-                            //auto& font = const_cast<std::string&>(t.Font);
-                            gui::InputText("Text", &component.Text);
-                            //gui::InputText("Font", &font);
-                            gui::ColorEdit4("Color", glm::value_ptr(component.Color));
-                        });
+						EditComponent<TextRendererComponent>("Text Renderer", [](auto& component) {
+							//auto& font = const_cast<std::string&>(t.Font);
+							gui::InputText("Text", &component.Text);
+							//gui::InputText("Font", &font);
+							gui::ColorEdit4("Color", glm::value_ptr(component.Color));
+							});
 
-				        auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
-				        {
-				            ui::Separator("Material");
-				            static int currentMaterialIndex = 0;  // Track the selected material
+						auto UI_PhysicsMaterial = [&](PhysicsMaterial& material)
+							{
+								ui::Separator("Material");
+								static int currentMaterialIndex = 0;  // Track the selected material
 
-				            auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
-				            std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
+								auto materialIt = std::next(m_Scene.Materials.begin(), currentMaterialIndex);
+								std::string currentMaterialName = (materialIt != m_Scene.Materials.end()) ? materialIt->first : "Unknown";
 
-				            if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
-				            {
-				                gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-				                if (gui::Button("New Material", {gui::GetContentRegionAvail().x, 0}))
-				                    gui::OpenPopup("Create Material##popup");
-				                gui::PopStyleColor();
+								if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
+								{
+									gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+									if (gui::Button("New Material", { gui::GetContentRegionAvail().x, 0 }))
+										gui::OpenPopup("Create Material##popup");
+									gui::PopStyleColor();
 
-				                ui::CenterNextWindow();
-				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
-				                {
-				                    static std::string name;
-				                    gui::InputText("Name", &name);
-				                    const float widgetSize = gui::GetItemRectSize().x;
+									ui::CenterNextWindow();
+									if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
+									{
+										static std::string name;
+										gui::InputText("Name", &name);
+										const float widgetSize = gui::GetItemRectSize().x;
 
-				                    if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
-				                    {
-				                        m_Scene.Materials[name] = PhysicsMaterial();
-				                        name = "";
-				                        gui::CloseCurrentPopup();
-				                    }
-				                    gui::SameLine();
-				                    gui::SetCursorPosX(widgetSize);
-				                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+										if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
+										{
+											m_Scene.Materials[name] = PhysicsMaterial();
+											name = "";
+											gui::CloseCurrentPopup();
+										}
+										gui::SameLine();
+										gui::SetCursorPosX(widgetSize);
+										if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
-				                    gui::EndPopup();
-				                }
-				                gui::Separator();
+										gui::EndPopup();
+									}
+									gui::Separator();
 
-				                int index = 0;
-				                for (const auto& [name, mat] : m_Scene.Materials)
-				                {
-				                    bool isSelected = (currentMaterialIndex == index);
-				                    gui::PushStyleColor(ImGuiCol_Header, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-				                    if (gui::Selectable(name.c_str(), isSelected))
-				                        currentMaterialIndex = index;
+									int index = 0;
+									for (const auto& [name, mat] : m_Scene.Materials)
+									{
+										bool isSelected = (currentMaterialIndex == index);
+										gui::PushStyleColor(ImGuiCol_Header, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
+										if (gui::Selectable(name.c_str(), isSelected))
+											currentMaterialIndex = index;
 
-				                    gui::PopStyleColor();
-				                    if (isSelected)
-				                        gui::SetItemDefaultFocus();
+										gui::PopStyleColor();
+										if (isSelected)
+											gui::SetItemDefaultFocus();
 
-				                    ++index;
-				                }
-				                gui::EndCombo();
-				            }
+										++index;
+									}
+									gui::EndCombo();
+								}
 
-				            // Get the selected material
-				            auto& curMaterial = m_Scene.Materials[currentMaterialName];
+								// Get the selected material
+								auto& curMaterial = m_Scene.Materials[currentMaterialName];
 
-				            gui::BeginDisabled(currentMaterialName == "Default");
-				            gui::BeginGroup();
-				            ui::Drag("Density", curMaterial.Density);
-				            ui::Drag("Friction", curMaterial.Friction);
-				            ui::Drag("Restitution", curMaterial.Restitution);
-				            ui::Drag("Rolling Resistance", curMaterial.RollingResistance);
+								gui::BeginDisabled(currentMaterialName == "Default");
+								gui::BeginGroup();
+								ui::Drag("Density", curMaterial.Density);
+								ui::Drag("Friction", curMaterial.Friction);
+								ui::Drag("Restitution", curMaterial.Restitution);
+								ui::Drag("Rolling Resistance", curMaterial.RollingResistance);
 
-				            ui::Separator();
-				            gui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
+								ui::Separator();
+								gui::ColorEdit4("Debug Color", glm::value_ptr(curMaterial.DebugColor));
 
-				            ui::Separator();
-				            ui::Checkbox("Sensor", curMaterial.Sensor);
-				            ui::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
-				            ui::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
-				            ui::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
-				            ui::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
-				            ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
-				            gui::EndGroup();
-				            gui::EndDisabled();
-				            if (currentMaterialName == "Default")
-				                gui::SetItemTooltip("Cannot edit Default material values");
+								ui::Separator();
+								ui::Checkbox("Sensor", curMaterial.Sensor);
+								ui::Checkbox("Enable Contact Events", curMaterial.EnableContactEvents);
+								ui::Checkbox("Enable Hit Events", curMaterial.EnableHitEvents);
+								ui::Checkbox("Enable Pre-Solve Events", curMaterial.EnablePreSolveEvents);
+								ui::Checkbox("Invoke Contact Creation", curMaterial.InvokeContactCreation);
+								ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
+								gui::EndGroup();
+								gui::EndDisabled();
+								if (currentMaterialName == "Default")
+									gui::SetItemTooltip("Cannot edit Default material values");
 
-				            material = curMaterial;
+								material = curMaterial;
 
-				        };
+							};
 
-				        EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
+						EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
 
-                            const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
-                            const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
+							const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
+							const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
 
-                            if (gui::BeginCombo("Body Type", currentBodyTypeString))
-                            {
-                                for (int i = 0; i < 3; i++)
-                                {
-                                    bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
-                                    if (gui::Selectable(bodyTypeStrings[i], &isSelected))
-                                    {
-                                        currentBodyTypeString = bodyTypeStrings[i];
-                                        component.Type = BodyType(i);
-                                    }
+							if (gui::BeginCombo("Body Type", currentBodyTypeString))
+							{
+								for (int i = 0; i < 3; i++)
+								{
+									bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
+									if (gui::Selectable(bodyTypeStrings[i], &isSelected))
+									{
+										currentBodyTypeString = bodyTypeStrings[i];
+										component.Type = BodyType(i);
+									}
 
-                                    if (isSelected)
-                                        gui::SetItemDefaultFocus();
-                                }
-                                gui::EndCombo();
-                            }
+									if (isSelected)
+										gui::SetItemDefaultFocus();
+								}
+								gui::EndCombo();
+							}
 
-                            ui::Drag("Gravity Scale", component.GravityScale);
-                            ui::Drag("Linear Damping", component.LinearDamping);
-                            ui::Drag("Angular Damping", component.AngularDamping);
-                            ui::Checkbox("Fixed Rotation", component.FixedRotation);
-                            ui::Checkbox("Bullet", component.Bullet);
-                            ui::Checkbox("Fast Rotation", component.FastRotation);
-                        });
+							ui::Drag("Gravity Scale", component.GravityScale);
+							ui::Drag("Linear Damping", component.LinearDamping);
+							ui::Drag("Angular Damping", component.AngularDamping);
+							ui::Checkbox("Fixed Rotation", component.FixedRotation);
+							ui::Checkbox("Bullet", component.Bullet);
+							ui::Checkbox("Fast Rotation", component.FastRotation);
+							});
 
-				        EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
-                            ui::DragButton2("Offset", component.Offset);
-                            ui::DragButton2("Size", component.Size);
+						EditComponent<BoxCollider2DComponent>("Box Collider", [UI_PhysicsMaterial](auto& component) {
+							ui::DragButton2("Offset", component.Offset);
+							ui::DragButton2("Size", component.Size);
 
-                            UI_PhysicsMaterial(component.Material);
-                        });
+							UI_PhysicsMaterial(component.Material);
+							});
 
-				        EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
-                            ui::DragButton2("Offset", component.Offset);
-                            ui::Drag("Radius", component.Radius);
+						EditComponent<CircleCollider2DComponent>("Circle Collider", [UI_PhysicsMaterial](auto& component) {
+							ui::DragButton2("Offset", component.Offset);
+							ui::Drag("Radius", component.Radius);
 
-                            UI_PhysicsMaterial(component.Material);
-                        });
-				    }
-				    gui::EndChild();
+							UI_PhysicsMaterial(component.Material);
+							});
+					}
+					gui::EndChild();
 				}
 			}
 			gui::End();
@@ -1246,21 +1231,21 @@ namespace wc
 				}
 
 				gui::SameLine();
-			    if (gui::Button("Copy"))
-			    {
-			        std::string logData;
-			        for (const auto& msg : Log::GetConsoleSink()->messages)
-			        {
-			            auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
-			            std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
-			            logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
-			        }
-			        gui::SetClipboardText(logData.c_str());
-			    }
+				if (gui::Button("Copy"))
+				{
+					std::string logData;
+					for (const auto& msg : Log::GetConsoleSink()->messages)
+					{
+						auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+						std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
+						logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
+					}
+					gui::SetClipboardText(logData.c_str());
+				}
 
-			    // TODO - make work
+				// TODO - make work
 				gui::SameLine();
-			    gui::PushItemWidth(ImGui::GetContentRegionAvail().x - gui::CalcTextSize("Filter").x - gui::GetStyle().ItemSpacing.x);
+				gui::PushItemWidth(ImGui::GetContentRegionAvail().x - gui::CalcTextSize("Filter").x - gui::GetStyle().ItemSpacing.x);
 				gui::InputText("Input", const_cast<char*>(""), 0);
 
 				gui::Separator();
@@ -1281,12 +1266,12 @@ namespace wc
 						auto it = level_colors.find(msg.level);
 						if (it != level_colors.end())
 						{
-						    const auto& [color, prefix] = it->second;
-						    auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
-						    std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
-						    gui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
-						    ui::Text(timeStr + prefix + msg.payload);
-						    gui::PopStyleColor();
+							const auto& [color, prefix] = it->second;
+							auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+							std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
+							gui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
+							ui::Text(timeStr + prefix + msg.payload);
+							gui::PopStyleColor();
 						}
 						else
 							ui::Text(msg.payload);
@@ -1303,24 +1288,24 @@ namespace wc
 
 		void UI_Assets()
 		{
-	        auto assetsPath = std::filesystem::path(Project::rootPath);
+			auto assetsPath = std::filesystem::path(Project::rootPath);
 			static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
 			static std::filesystem::path selectedFolderPath = assetsPath;
 			static std::vector<std::filesystem::path> openedFiles;
 			static std::unordered_set<std::string> openedFileNames;
-	        static bool showIcons = true;
-	        static bool previewAsset = true;
+			static bool showIcons = true;
+			static bool previewAsset = true;
 
-	        // reset variables every time root changes
-	        static std::filesystem::path prevRootPath;
-	        if (assetsPath != prevRootPath)
-	        {
-	            selectedFolderPath = assetsPath;
-	            folderStates.clear();
-	            openedFiles.clear();
-	            openedFileNames.clear();
-	            prevRootPath = assetsPath;
-	        }
+			// reset variables every time root changes
+			static std::filesystem::path prevRootPath;
+			if (assetsPath != prevRootPath)
+			{
+				selectedFolderPath = assetsPath;
+				folderStates.clear();
+				openedFiles.clear();
+				openedFileNames.clear();
+				prevRootPath = assetsPath;
+			}
 
 			// Expand all helper func
 			std::function<void(const std::filesystem::path&, bool)> setFolderStatesRecursively =
@@ -1333,7 +1318,7 @@ namespace wc
 						setFolderStatesRecursively(entry.path(), state);
 					}
 				}
-			};
+				};
 
 			if (gui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
 			{
@@ -1373,73 +1358,73 @@ namespace wc
 						{
 							const auto& filenameStr = entry.path().filename().string();
 							const auto& fullPathStr = entry.path().string();
-						    if (std::filesystem::exists(entry.path()))
-						    {
-						        if (entry.is_directory())
-						        {
-						            auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
-						            bool& isOpen = it->second;
+							if (std::filesystem::exists(entry.path()))
+							{
+								if (entry.is_directory())
+								{
+									auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
+									bool& isOpen = it->second;
 
-						            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-						            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-						            if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
-						                isOpen = !isOpen;
+									gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+									gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+									if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+										isOpen = !isOpen;
 
-						            gui::PopStyleColor();
-						            gui::PopStyleVar();
-						            gui::SameLine();
+									gui::PopStyleColor();
+									gui::PopStyleVar();
+									gui::SameLine();
 
-						            if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
-						                selectedFolderPath = entry.path();
+									if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+										selectedFolderPath = entry.path();
 
-						            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-						                isOpen = !isOpen;
+									if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
+										isOpen = !isOpen;
 
-						            if (isOpen)
-						                displayDirectory(entry.path());
-						        }
-						        else
-						        {
-						            ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-						            gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
-						            if (gui::IsItemHovered())
-						            {
-						                if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
+									if (isOpen)
+										displayDirectory(entry.path());
+								}
+								else
+								{
+									ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+									gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
+									if (gui::IsItemHovered())
+									{
+										if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-						                if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-						                    if (entry.path().extension() != ".scene")
-						                    {
-						                        if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
-						                    }
-						                    else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
+										if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+											if (entry.path().extension() != ".scene")
+											{
+												if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
+											}
+											else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
 
-						                gui::SetNextWindowPos({gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y});
-						                if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
-						                {
-						                    gui::Text("Preview: %s", filenameStr.c_str());
-						                    gui::EndPopup();
-						                }
-						            }
+										gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
+										if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
+										{
+											gui::Text("Preview: %s", filenameStr.c_str());
+											gui::EndPopup();
+										}
+									}
 
-							    ui::CenterNextWindow();
-							    if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-							    {
-							        gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-							        const float widgetWidth = gui::GetItemRectSize().x;
-							        if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-							        {
-										m_ScenePath = entry.path().string();
-										WC_INFO(m_ScenePath);
-							            gui::CloseCurrentPopup();
-							        }
-							        gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-							        if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
-							            gui::CloseCurrentPopup();
+									ui::CenterNextWindow();
+									if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+									{
+										gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+										const float widgetWidth = gui::GetItemRectSize().x;
+										if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+										{
+											m_ScenePath = entry.path().string();
+											WC_INFO(m_ScenePath);
+											gui::CloseCurrentPopup();
+										}
+										gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+										if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+											gui::CloseCurrentPopup();
 
-						                gui::EndPopup();
-						            }
-						        }
-						    }
+										gui::EndPopup();
+									}
+								}
+							}
 						}
 
 						if (path != assetsPath) gui::Unindent(20);
@@ -1466,45 +1451,45 @@ namespace wc
 							if (selectedFolderPath == assetsPath)
 							{
 								gui::BeginDisabled();
-							    gui::ArrowButton("Back", ImGuiDir_Left);
+								gui::ArrowButton("Back", ImGuiDir_Left);
 								gui::EndDisabled();
 							}
 							else
 							{
-							    if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+								if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
-							    if (gui::BeginDragDropTarget())
-							    {
-							        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-							        {
-							            const char* payloadPath = static_cast<const char*>(payload->Data);
-							            std::filesystem::path sourcePath(payloadPath);
+								if (gui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+									{
+										const char* payloadPath = static_cast<const char*>(payload->Data);
+										std::filesystem::path sourcePath(payloadPath);
 
-							            try
-							            {
-							                std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
-							            }
-							            catch (const std::exception& e)
-                                        {
-                                            WC_ERROR("Failed to move directory: {}", e.what());
-                                        }
-							        }
-							        gui::EndDragDropTarget();
-							    }
+										try
+										{
+											std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
+										}
+										catch (const std::exception& e)
+										{
+											WC_ERROR("Failed to move directory: {}", e.what());
+										}
+									}
+									gui::EndDragDropTarget();
+								}
 							}
 
-						    static std::string previewPath;
-						    gui::SameLine();
-						    //gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
-						    gui::PushItemWidth(gui::GetContentRegionAvail().x);
-						    gui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
-						    gui::PopItemWidth();
-						    if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
-						    else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
+							static std::string previewPath;
+							gui::SameLine();
+							//gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
+							gui::PushItemWidth(gui::GetContentRegionAvail().x);
+							gui::InputText("", &previewPath, ImGuiInputTextFlags_ReadOnly);
+							gui::PopItemWidth();
+							if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
+							else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
 
-						    gui::Separator();
+							gui::Separator();
 
-						    constexpr float buttonSize = 70;
+							constexpr float buttonSize = 70;
 							float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
 							int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
 
@@ -1518,142 +1503,142 @@ namespace wc
 									if (i > 0 && i % itemsPerRow != 0)
 										gui::SameLine();
 
-								    if (std::filesystem::exists(entry.path()))
-								    {
-								        if (entry.is_directory())
-								        {
-								            gui::BeginGroup();
-								            gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-								            gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-								            // TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
-								            gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
-								            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
+									if (std::filesystem::exists(entry.path()))
+									{
+										if (entry.is_directory())
+										{
+											gui::BeginGroup();
+											gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+											gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+											// TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
+											gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
+											if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
 
-								            if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-								            {
-								                std::string path = entry.path().string();
-								                gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-								                gui::Text("Moving %s", entry.path().filename().string().c_str());
-								                gui::EndDragDropSource();
-								            }
+											if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+											{
+												std::string path = entry.path().string();
+												gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+												gui::Text("Moving %s", entry.path().filename().string().c_str());
+												gui::EndDragDropSource();
+											}
 
-								            if (gui::BeginDragDropTarget())
-								            {
-								                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-								                {
-								                    const char* payloadPath = static_cast<const char*>(payload->Data);
-								                    std::filesystem::path sourcePath(payloadPath);
-								                    std::filesystem::path targetPath = entry.path() / sourcePath.filename();
+											if (gui::BeginDragDropTarget())
+											{
+												if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+												{
+													const char* payloadPath = static_cast<const char*>(payload->Data);
+													std::filesystem::path sourcePath(payloadPath);
+													std::filesystem::path targetPath = entry.path() / sourcePath.filename();
 
-								                    std::filesystem::rename(sourcePath, targetPath);
-								                }
-								                gui::EndDragDropTarget();
-								            }
+													std::filesystem::rename(sourcePath, targetPath);
+												}
+												gui::EndDragDropTarget();
+											}
 
-								            gui::PopStyleColor();
-								            gui::PopStyleVar();
+											gui::PopStyleColor();
+											gui::PopStyleVar();
 
-								            std::string filename = entry.path().filename().string();
-								            float wrapWidth = buttonSize; // Width for wrapping the text
+											std::string filename = entry.path().filename().string();
+											float wrapWidth = buttonSize; // Width for wrapping the text
 
-								            // Split the text into words
-								            std::istringstream stream(filename);
-								            std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
+											// Split the text into words
+											std::istringstream stream(filename);
+											std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
 
-								            // Display each line centered
-								            std::string currentLine;
-								            float currentLineWidth = 0.0f;
-								            gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
-								            for (const auto& word : words)
-								            {
-								                ImVec2 wordSize = gui::CalcTextSize(word.c_str());
-								                if (currentLineWidth + wordSize.x > wrapWidth)
-								                {
-								                    // Push the current line and start a new one
-								                    gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-								                    gui::TextUnformatted(currentLine.c_str());
-								                    currentLine.clear();
-								                    currentLineWidth = 0.0f;
-								                }
+											// Display each line centered
+											std::string currentLine;
+											float currentLineWidth = 0.0f;
+											gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
+											for (const auto& word : words)
+											{
+												ImVec2 wordSize = gui::CalcTextSize(word.c_str());
+												if (currentLineWidth + wordSize.x > wrapWidth)
+												{
+													// Push the current line and start a new one
+													gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+													gui::TextUnformatted(currentLine.c_str());
+													currentLine.clear();
+													currentLineWidth = 0.0f;
+												}
 
-								                if (!currentLine.empty())
-								                {
-								                    currentLine += " "; // Add a space before the next word
-								                    currentLineWidth += gui::CalcTextSize(" ").x;
-								                }
-								                currentLine += word;
-								                currentLineWidth += wordSize.x;
-								            }
+												if (!currentLine.empty())
+												{
+													currentLine += " "; // Add a space before the next word
+													currentLineWidth += gui::CalcTextSize(" ").x;
+												}
+												currentLine += word;
+												currentLineWidth += wordSize.x;
+											}
 
-								            // Add the last line if there's any remaining text
-								            if (!currentLine.empty())
-								            {
-								                gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-								                gui::TextUnformatted(currentLine.c_str());
-								            }
-								            gui::PopStyleVar(); // Restore item spacing for text
+											// Add the last line if there's any remaining text
+											if (!currentLine.empty())
+											{
+												gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+												gui::TextUnformatted(currentLine.c_str());
+											}
+											gui::PopStyleVar(); // Restore item spacing for text
 
-								            gui::EndGroup();
-								        }
-								        else
-								        {
-								            gui::BeginGroup();
-								            gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-								            gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-								            gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
-								            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-								            {
-								                if (entry.path().extension() != ".scene")
-								                {
-								                    if (openedFileNames.insert(entry.path().string()).second)
-								                        openedFiles.push_back(entry.path());
-								                }
-								                else
-								                    gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
-								            }
+											gui::EndGroup();
+										}
+										else
+										{
+											gui::BeginGroup();
+											gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+											gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+											gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
+											if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
+											{
+												if (entry.path().extension() != ".scene")
+												{
+													if (openedFileNames.insert(entry.path().string()).second)
+														openedFiles.push_back(entry.path());
+												}
+												else
+													gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
+											}
 
-								            // Drag source for files
-								            if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-								            {
-								                std::string path = entry.path().string();
-								                gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-								                gui::Text("Moving %s", entry.path().filename().string().c_str());
-								                gui::EndDragDropSource();
-								            }
+											// Drag source for files
+											if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+											{
+												std::string path = entry.path().string();
+												gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+												gui::Text("Moving %s", entry.path().filename().string().c_str());
+												gui::EndDragDropSource();
+											}
 
-								            gui::PopStyleVar();
-								            gui::PopStyleColor();
+											gui::PopStyleVar();
+											gui::PopStyleColor();
 
-								            gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
-								            gui::TextWrapped(entry.path().filename().string().c_str());
-								            gui::PopTextWrapPos();
-								            gui::EndGroup();
+											gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
+											gui::TextWrapped(entry.path().filename().string().c_str());
+											gui::PopTextWrapPos();
+											gui::EndGroup();
 
-								            ui::CenterNextWindow();
-								            if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
-								            {
-								                gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-								                const float widgetWidth = gui::GetItemRectSize().x;
+											ui::CenterNextWindow();
+											if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+											{
+												gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+												const float widgetWidth = gui::GetItemRectSize().x;
 
-								                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-								                {
+												if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+												{
 													m_ScenePath = entry.path().string();
-								                    m_Scene.Load(m_ScenePath);
-								                    gui::CloseCurrentPopup();
-								                }
+													m_Scene.Load(m_ScenePath);
+													gui::CloseCurrentPopup();
+												}
 
-								                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-								                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+												gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+												if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
-								                gui::EndPopup();
-								            }
-								        }
-								    }
+												gui::EndPopup();
+											}
+										}
+									}
 									i++;
 								}
 							}
 						}
-					    gui::EndChild();
+						gui::EndChild();
 
 						gui::EndTable();
 					}
@@ -1686,54 +1671,54 @@ namespace wc
 			}
 		}
 
-        void UI_DebugStats()
-	    {
-	        if (gui::Begin("Debug Stats", &showDebugStats, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize))
-	        {
-	            // Draw background if docked, if not, only tint
-	            ImGuiDockNode* dockNode = gui::GetWindowDockNode();
-	            if (!dockNode) // Window is floating
-	            {
-	                gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y}, IM_COL32(20, 20, 20, 60));
-	            }
-	            else // Window is docked
-	            {
-	                ImVec4 bgColor = gui::GetStyleColorVec4(ImGuiCol_WindowBg);
-	                gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(),
-                        {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y},
-                        gui::ColorConvertFloat4ToU32(bgColor));
-	            }
+		void UI_DebugStats()
+		{
+			if (gui::Begin("Debug Stats", &showDebugStats, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize))
+			{
+				// Draw background if docked, if not, only tint
+				ImGuiDockNode* dockNode = gui::GetWindowDockNode();
+				if (!dockNode) // Window is floating
+				{
+					gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), { gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y }, IM_COL32(20, 20, 20, 60));
+				}
+				else // Window is docked
+				{
+					ImVec4 bgColor = gui::GetStyleColorVec4(ImGuiCol_WindowBg);
+					gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(),
+						{ gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y },
+						gui::ColorConvertFloat4ToU32(bgColor));
+				}
 
-	            uint32_t fps = 1.f / Globals.deltaTime;
-	            ui::Text(std::format("Frame time: {:.4f}ms", Globals.deltaTime * 1000.f));
-	            ui::Text(std::format("FPS: {}", fps));
-	            ui::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
-	            ui::Text(std::format("Min FPS: {}", m_PrevMinFPS));
-	            ui::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
+				uint32_t fps = 1.f / Globals.deltaTime;
+				ui::Text(std::format("Frame time: {:.4f}ms", Globals.deltaTime * 1000.f));
+				ui::Text(std::format("FPS: {}", fps));
+				ui::Text(std::format("Max FPS: {}", m_PrevMaxFPS));
+				ui::Text(std::format("Min FPS: {}", m_PrevMinFPS));
+				ui::Text(std::format("Average FPS: {}", m_PrevFrameCounter));
 
-	            m_DebugTimer += Globals.deltaTime;
+				m_DebugTimer += Globals.deltaTime;
 
-	            m_MaxFPS = glm::max(m_MaxFPS, fps);
-	            m_MinFPS = glm::min(m_MinFPS, fps);
+				m_MaxFPS = glm::max(m_MaxFPS, fps);
+				m_MinFPS = glm::min(m_MinFPS, fps);
 
-	            m_FrameCount++;
-	            m_FrameCounter += fps;
+				m_FrameCount++;
+				m_FrameCounter += fps;
 
-	            if (m_DebugTimer >= 1.f)
-	            {
-	                m_PrevMaxFPS = m_MaxFPS;
-	                m_PrevMinFPS = m_MinFPS;
-	                m_PrevFrameCounter = m_FrameCounter / m_FrameCount;
-	                m_DebugTimer = 0.f;
+				if (m_DebugTimer >= 1.f)
+				{
+					m_PrevMaxFPS = m_MaxFPS;
+					m_PrevMinFPS = m_MinFPS;
+					m_PrevFrameCounter = m_FrameCounter / m_FrameCount;
+					m_DebugTimer = 0.f;
 
-	                m_FrameCount = 0;
-	                m_FrameCounter = 0;
+					m_FrameCount = 0;
+					m_FrameCounter = 0;
 
-	                m_MaxFPS = m_MinFPS = fps;
-	            }
-	        }
-	        gui::End();
-	    }
+					m_MaxFPS = m_MinFPS = fps;
+				}
+			}
+			gui::End();
+		}
 
 		void UI_StyleEditor(ImGuiStyle* ref = nullptr)
 		{
@@ -1992,395 +1977,394 @@ namespace wc
 
 		void UI()
 		{
-	        static bool showPopup = false;
-		    const ImGuiViewport* viewport = gui::GetMainViewport();
+			static bool showPopup = false;
+			const ImGuiViewport* viewport = gui::GetMainViewport();
 			gui::SetNextWindowPos(viewport->WorkPos);
 			gui::SetNextWindowSize(viewport->WorkSize);
 			gui::SetNextWindowViewport(viewport->ID);
 
-	        gui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-	        gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-	        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
+			gui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+			gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+			gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
-	        static ImGuiWindowFlags windowFlags =
-	            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-	            | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
-    	        | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+			static ImGuiWindowFlags windowFlags =
+				ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+				| ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+				| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 			if (gui::Begin("DockSpace", nullptr, windowFlags))
 			{
-			    if (!Project::Exists())
-			    {
-			        gui::PopStyleVar(3);
-			        windowFlags &= ~ImGuiWindowFlags_NoBackground;
-			        windowFlags &= ~ImGuiWindowFlags_MenuBar;
+				if (!Project::Exists())
+				{
+					gui::PopStyleVar(3);
+					windowFlags &= ~ImGuiWindowFlags_NoBackground;
+					windowFlags &= ~ImGuiWindowFlags_MenuBar;
 
-			        static bool openProjNamePopup = false; // New persistent flag
+					static bool openProjNamePopup = false; // New persistent flag
 
-			        gui::PushFont(Globals.fontBig);
-			        if (gui::Button("New Project"))
-			        {
-			            gui::OpenPopup("New Project");
-			        }
-			        gui::PopFont();
+					gui::PushFont(Globals.fontBig);
+					if (gui::Button("New Project"))
+					{
+						gui::OpenPopup("New Project");
+					}
+					gui::PopFont();
 
-			        // File dialog logic
-			        std::string newProjectPath = ui::FileDialog("New Project", ".");
-			        static std::string newProjectSavePath;
-			        if (!newProjectPath.empty())
-			        {
-			            newProjectSavePath = newProjectPath;
-			            openProjNamePopup = true;
-			        }
+					// File dialog logic
+					std::string newProjectPath = ui::FileDialog("New Project", ".");
+					static std::string newProjectSavePath;
+					if (!newProjectPath.empty())
+					{
+						newProjectSavePath = newProjectPath;
+						openProjNamePopup = true;
+					}
 
-			        if (openProjNamePopup)
-			        {
-			            gui::OpenPopup("New Project - Name");
-			            openProjNamePopup = false;
-			        }
+					if (openProjNamePopup)
+					{
+						gui::OpenPopup("New Project - Name");
+						openProjNamePopup = false;
+					}
 
-			        ui::CenterNextWindow();
-			        if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-			        {
-			            static std::string projName = "Untitled";
-			            gui::InputText("Project Name", &projName);
-			            const float widgetWidth = gui::GetItemRectSize().x;
+					ui::CenterNextWindow();
+					if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+					{
+						static std::string projName = "Untitled";
+						gui::InputText("Project Name", &projName);
+						const float widgetWidth = gui::GetItemRectSize().x;
 
-			            gui::BeginDisabled(projName.empty());
-			            if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
-			            {
-			                if (Project::ExistListProject(projName))
-			                {
-			                    gui::OpenPopup("Project Already Exists");
-			                }
-			                else
-			                {
-			                    Project::Create(newProjectSavePath, projName);
-			                    newProjectSavePath.clear();
-			                    openProjNamePopup = false;
-			                    gui::CloseCurrentPopup();
-			                }
-			            }
-			            gui::EndDisabled();
-			            if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
+						gui::BeginDisabled(projName.empty());
+						if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+						{
+							if (Project::ExistListProject(projName))
+							{
+								gui::OpenPopup("Project Already Exists");
+							}
+							else
+							{
+								Project::Create(newProjectSavePath, projName);
+								newProjectSavePath.clear();
+								openProjNamePopup = false;
+								gui::CloseCurrentPopup();
+							}
+						}
+						gui::EndDisabled();
+						if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-			            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-			            if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
-			            {
-			                projName = "Untitled";
-			                newProjectSavePath.clear();
-			                openProjNamePopup = false;
-			                gui::CloseCurrentPopup();
-			            }
+						gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+						if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+						{
+							projName = "Untitled";
+							newProjectSavePath.clear();
+							openProjNamePopup = false;
+							gui::CloseCurrentPopup();
+						}
 
-			            ui::CenterNextWindow();
-                        if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-                        {
-                            gui::Text("Project with this name already exists!");
-                            if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-                            gui::EndPopup();
-                        }
+						ui::CenterNextWindow();
+						if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+						{
+							gui::Text("Project with this name already exists!");
+							if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+							gui::EndPopup();
+						}
 
-			            gui::EndPopup();
-			        }
+						gui::EndPopup();
+					}
 
-			        gui::SameLine();
+					gui::SameLine();
 
-			        gui::PushFont(Globals.fontBig);
-			        if (gui::Button("Open Project"))
-			        {
-			            gui::OpenPopup("Open Project");
-			        }
-			        gui::PopFont();
-			        std::string openProjectPath = ui::FileDialog("Open Project", ".");
-			        if (!openProjectPath.empty())
-                    {
-                        Project::Load(openProjectPath);
-                    }
+					gui::PushFont(Globals.fontBig);
+					if (gui::Button("Open Project"))
+					{
+						gui::OpenPopup("Open Project");
+					}
+					gui::PopFont();
+					std::string openProjectPath = ui::FileDialog("Open Project", ".");
+					if (!openProjectPath.empty())
+					{
+						Project::Load(openProjectPath);
+					}
 
-			        gui::Separator();
+					gui::Separator();
 
-			        if (gui::BeginChild("Project Display", ImVec2(0, 0)))
-			        {
-			            for (auto project : Project::savedProjectPaths)
-                        {
-			                gui::PushFont(Globals.fontBig);
-			                std::filesystem::path path = project;
-			                if (std::filesystem::exists(path))
-			                {
-			                    if (gui::Button((path.filename().string() + "##" + path.string()).c_str()))
-                                {
-                                    Project::Load(project);
-                                }
+					if (gui::BeginChild("Project Display", ImVec2(0, 0)))
+					{
+						for (auto project : Project::savedProjectPaths)
+						{
+							gui::PushFont(Globals.fontBig);
+							std::filesystem::path path = project;
+							if (std::filesystem::exists(path))
+							{
+								if (gui::Button((path.filename().string() + "##" + path.string()).c_str()))
+								{
+									Project::Load(project);
+								}
 
-			                    gui::SameLine(0, 100);
-			                    gui::Text("FullPath: %s", project.c_str());
-			                    gui::SameLine();
-			                    if (gui::Button(("Delete##" + path.string()).c_str()))
-			                    {
-			                        gui::OpenPopup(("Delete Project##" + project).c_str());
-			                    }
-			                }
-			                else WC_CORE_WARN("Project path does not exist: {0}", project);
-			                gui::PopFont();
+								gui::SameLine(0, 100);
+								gui::Text("FullPath: %s", project.c_str());
+								gui::SameLine();
+								if (gui::Button(("Delete##" + path.string()).c_str()))
+								{
+									gui::OpenPopup(("Delete Project##" + project).c_str());
+								}
+							}
+							else WC_CORE_WARN("Project path does not exist: {0}", project);
+							gui::PopFont();
 
-			                ui::CenterNextWindow();
-			                if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-			                {
-			                    gui::Text("Are you sure you want to delete this project?");
-			                    if (gui::Button("Yes##Delete") || gui::IsKeyPressed(ImGuiKey_Enter))
-			                    {
-			                        Project::Delete(project);
-			                        gui::CloseCurrentPopup();
-			                    }
+							ui::CenterNextWindow();
+							if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+							{
+								gui::Text("Are you sure you want to delete this project?");
+								if (gui::Button("Yes##Delete") || gui::IsKeyPressed(ImGuiKey_Enter))
+								{
+									Project::Delete(project);
+									gui::CloseCurrentPopup();
+								}
 
-			                    gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
-			                    if (gui::Button("No##Delete") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+								gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
+								if (gui::Button("No##Delete") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
-			                    gui::EndPopup();
-			                }
-                        }
-			        }
-			        gui::EndChild();
+								gui::EndPopup();
+							}
+						}
+					}
+					gui::EndChild();
 
-			    }
-			    else
-			    {
-			        gui::PopStyleVar(3);
-			        windowFlags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBackground;
+				}
+				else
+				{
+					gui::PopStyleVar(3);
+					windowFlags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBackground;
 
-			        ImGuiIO& io = gui::GetIO();
-			        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
-			        {
-			            ImGuiID dockspace_id = gui::GetID("MainDockSpace");
-			            gui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
-			        }
+					ImGuiIO& io = gui::GetIO();
+					if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+					{
+						ImGuiID dockspace_id = gui::GetID("MainDockSpace");
+						gui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
+					}
 
-			        if (gui::BeginMenuBar())
-			        {
-			            // TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
-			            if (gui::IsWindowHovered() && !gui::IsAnyItemHovered())
-			            {
-			                //WC_CORE_INFO("Empty space on main menu bar is hovered)"
-			            }
+					if (gui::BeginMenuBar())
+					{
+						// TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
+						if (gui::IsWindowHovered() && !gui::IsAnyItemHovered())
+						{
+							//WC_CORE_INFO("Empty space on main menu bar is hovered)"
+						}
 
-			            if (gui::BeginMenu(("[" + Project::name + "]").c_str())){
-			                if (gui::MenuItem("Change", "CTRL + P")) Project::Clear();
+						if (gui::BeginMenu(("[" + Project::name + "]").c_str())) {
+							if (gui::MenuItem("Change", "CTRL + P")) Project::Clear();
 
-			                // Delete - TODO: FIX IF NEEDED
-			                /*ImGui::Separator();
-			                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.f, 0.f, 0.f, 1.f));
-			                if (ui::MenuItemButton("Delete")) gui::OpenPopup("Delete Project");
-			                ImGui::PopStyleColor();
+							// Delete - TODO: FIX IF NEEDED
+							/*ImGui::Separator();
+							ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.f, 0.f, 0.f, 1.f));
+							if (ui::MenuItemButton("Delete")) gui::OpenPopup("Delete Project");
+							ImGui::PopStyleColor();
 
-			                if (gui::BeginPopupModal("Delete Project"))
-			                {
-                                gui::Text("Are you sure you want to delete this project?");
-			                    if (gui::Button("Yes"))
-                                {
-			                        const std::string path = Project::rootPath;
+							if (gui::BeginPopupModal("Delete Project"))
+							{
+								gui::Text("Are you sure you want to delete this project?");
+								if (gui::Button("Yes"))
+								{
+									const std::string path = Project::rootPath;
 
 
-                                    gui::CloseCurrentPopup();
-                                }
-			                    gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-			                    if (gui::Button("Cancel")) gui::CloseCurrentPopup();
-			                    gui::EndPopup();
-			                }*/
+									gui::CloseCurrentPopup();
+								}
+								gui::SameLine(gui::GetContentRegionAvail().x - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+								if (gui::Button("Cancel")) gui::CloseCurrentPopup();
+								gui::EndPopup();
+							}*/
 
-			                gui::EndMenu();
-			            }
+							gui::EndMenu();
+						}
 
-			            gui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+						gui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 
-			            if (gui::BeginMenu("File"))
-			            {
-			                ui::Separator();
+						if (gui::BeginMenu("File"))
+						{
+							ui::Separator();
 
-			                static bool openSceneNamePopup = false;
-			                if (ui::MenuItemButton("New", "CTRL + N", false))
-                                gui::OpenPopup("New Scene");
+							static bool openSceneNamePopup = false;
+							if (ui::MenuItemButton("New", "CTRL + N", false))
+								gui::OpenPopup("New Scene");
 
 							std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
-			                static std::string newSceneSavePath;
-			                if (!newScenePath.empty())
-                            {
-			                    newSceneSavePath = newScenePath;
-                                openSceneNamePopup = true;
-                            }
+							static std::string newSceneSavePath;
+							if (!newScenePath.empty())
+							{
+								newSceneSavePath = newScenePath;
+								openSceneNamePopup = true;
+							}
 
-			                if (openSceneNamePopup)
-			                {
-			                    gui::OpenPopup("New Scene - Name");
-			                    openSceneNamePopup = false;
-			                }
+							if (openSceneNamePopup)
+							{
+								gui::OpenPopup("New Scene - Name");
+								openSceneNamePopup = false;
+							}
 
-			                ui::CenterNextWindow();
-			                if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-			                {
-			                    static std::string sceneName = "newScene";
-			                    gui::InputText("Scene Name", &sceneName);
-			                    const float widgetWidth = gui::GetItemRectSize().x;
+							ui::CenterNextWindow();
+							if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+							{
+								static std::string sceneName = "newScene";
+								gui::InputText("Scene Name", &sceneName);
+								const float widgetWidth = gui::GetItemRectSize().x;
 
-			                    gui::BeginDisabled(sceneName.empty());
-			                    if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
-			                    {
+								gui::BeginDisabled(sceneName.empty());
+								if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+								{
 									m_Scene.Destroy();
 									m_ScenePath = newSceneSavePath + '\\' + sceneName + ".scene";
-									WC_CORE_INFO(m_ScenePath);
+									m_SelectedEntity = flecs::entity::null();
 
+									sceneName = "newScene";
+									newSceneSavePath.clear();
+									openSceneNamePopup = false;
+									gui::CloseCurrentPopup();
+								}
+								gui::EndDisabled();
+								if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
 
-			                        sceneName = "newScene";
-			                        newSceneSavePath.clear();
-			                        openSceneNamePopup = false;
-			                        gui::CloseCurrentPopup();
-			                    }
-			                    gui::EndDisabled();
-			                    if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
+								gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+								if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+								{
+									sceneName = "newScene";
+									newSceneSavePath.clear();
+									openSceneNamePopup = false;
+									gui::CloseCurrentPopup();
+								}
 
-			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
-			                    {
-			                        sceneName = "newScene";
-			                        newSceneSavePath.clear();
-			                        openSceneNamePopup = false;
-			                        gui::CloseCurrentPopup();
-			                    }
+								gui::EndPopup();
+							}
 
-			                    gui::EndPopup();
-			                }
+							if (ui::MenuItemButton("Open", "CTRL + O", false))
+							{
+								gui::OpenPopup("Open Scene");
+							}
 
-			                if (ui::MenuItemButton("Open", "CTRL + O", false))
-			                {
-			                    gui::OpenPopup("Open Scene");
-			                }
-
-			                std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath);
-			                if (!sOpenPath.empty())
-			                {
+							std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath);
+							if (!sOpenPath.empty())
+							{
 								m_ScenePath = sOpenPath;
-			                    m_Scene.Load(m_ScenePath);
-			                    gui::CloseCurrentPopup();
-			                }
+								m_Scene.Load(m_ScenePath);
+								gui::CloseCurrentPopup();
+							}
 
-			                gui::SeparatorText("File");
+							gui::SeparatorText("File");
 
-			                if (gui::MenuItem("Save", "CTRL + S"))
-			                {
-			                    m_Scene.Save(m_ScenePath);
-			                }
+							if (gui::MenuItem("Save", "CTRL + S"))
+							{
+								m_Scene.Save(m_ScenePath);
+							}
 
 							if (gui::MenuItem("Save As", "CTRL + A + S"))
 							{
 								m_Scene.Save(m_ScenePath);
 							}
 
-			                if (gui::MenuItem("Undo", "CTRL + Z"))
-                            {
-                                WC_INFO("Undo");
-                            }
+							if (gui::MenuItem("Undo", "CTRL + Z"))
+							{
+								WC_INFO("Undo");
+							}
 
-			                if (gui::MenuItem("Redo", "CTRL + Y"))
-                            {
-                                WC_INFO("Redo");
-                            }
+							if (gui::MenuItem("Redo", "CTRL + Y"))
+							{
+								WC_INFO("Redo");
+							}
 
-			                gui::EndMenu();
-			            }
+							gui::EndMenu();
+						}
 
-			            if (gui::BeginMenu("View"))
-			            {
-			                gui::MenuItem("Editor", nullptr, &showEditor);
-			                gui::MenuItem("Scene properties", nullptr, &showSceneProperties);
-			                gui::MenuItem("Entities", nullptr, &showEntities);
-			                gui::MenuItem("Properties", nullptr, &showProperties);
-			                gui::MenuItem("Console", nullptr, &showConsole);
-			                gui::MenuItem("File Explorer", nullptr, &showFileExplorer);
-			                gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
-			                gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
+						if (gui::BeginMenu("View"))
+						{
+							gui::MenuItem("Editor", nullptr, &showEditor);
+							gui::MenuItem("Scene properties", nullptr, &showSceneProperties);
+							gui::MenuItem("Entities", nullptr, &showEntities);
+							gui::MenuItem("Properties", nullptr, &showProperties);
+							gui::MenuItem("Console", nullptr, &showConsole);
+							gui::MenuItem("File Explorer", nullptr, &showFileExplorer);
+							gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
+							gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
 
-			                if (gui::BeginMenu("Theme"))
-			                {
-			                    // TODO - Add more themes / custom themes / save themes
-			                    static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
-			                    static int currentTheme = 0;
-			                    static float hue = 0.0f;
+							if (gui::BeginMenu("Theme"))
+							{
+								// TODO - Add more themes / custom themes / save themes
+								static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
+								static int currentTheme = 0;
+								static float hue = 0.0f;
 
-			                    if (gui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
-			                    {
-			                        switch (currentTheme)
-			                        {
-			                            case 0:
-			                                gui::GetStyle() = ui::SoDark(hue);
-			                            break;
-			                            case 1:
-			                                gui::StyleColorsClassic();
-			                            break;
-			                            case 2:
-			                                gui::StyleColorsDark();
-			                            break;
-			                            case 3:
-			                                gui::StyleColorsLight();
-			                            break;
-			                        }
-			                    }
+								if (gui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
+								{
+									switch (currentTheme)
+									{
+									case 0:
+										gui::GetStyle() = ui::SoDark(hue);
+										break;
+									case 1:
+										gui::StyleColorsClassic();
+										break;
+									case 2:
+										gui::StyleColorsDark();
+										break;
+									case 3:
+										gui::StyleColorsLight();
+										break;
+									}
+								}
 
-			                    if (currentTheme == 0 && gui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
-			                    {
-			                        gui::GetStyle() = ui::SoDark(hue);
-			                    }
+								if (currentTheme == 0 && gui::SliderFloat("Hue", &hue, 0.0f, 1.0f))
+								{
+									gui::GetStyle() = ui::SoDark(hue);
+								}
 
-			                    gui::EndMenu();
-			                }
+								gui::EndMenu();
+							}
 
-			                gui::EndMenu();
-			            }
+							gui::EndMenu();
+						}
 
-			            // Buttons
-			            /*gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
-			            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
-			            gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-			            gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+						// Buttons
+						/*gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, 0.0f));
+						gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_MenuBarBg]);
+						gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+						gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 
-			            float buttonSize = gui::GetFrameHeightWithSpacing();
+						float buttonSize = gui::GetFrameHeightWithSpacing();
 
-			            gui::SameLine(gui::GetContentRegionMax().x - 3 * (buttonSize + gui::GetStyle().ItemSpacing.x));
-			            if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
-			            {
-			                //Globals.window.Collapse();
-			            }
+						gui::SameLine(gui::GetContentRegionMax().x - 3 * (buttonSize + gui::GetStyle().ItemSpacing.x));
+						if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
+						{
+							//Globals.window.Collapse();
+						}
 
-			            gui::SameLine();
-			            if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-			            {
-			                //Globals.window.Maximize();
-			            }
+						gui::SameLine();
+						if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
+						{
+							//Globals.window.Maximize();
+						}
 
-			            gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
-			            gui::SameLine();
-			            if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
-			            {
-			                Globals.window.Close();
-			            }
+						gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
+						gui::SameLine();
+						if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+						{
+							Globals.window.Close();
+						}
 
-			            gui::PopStyleVar();
-			            gui::PopStyleColor(4);*/
+						gui::PopStyleVar();
+						gui::PopStyleColor(4);*/
 
-			            gui::EndMenuBar();
-			        }
+						gui::EndMenuBar();
+					}
 
-			        //Display tabs - check project again because we can change state with menu bar (inside this else-case)
-			        if (Project::Exists())
-			        {
-			            if (showEditor) UI_Editor();
-			            if (showSceneProperties) UI_SceneProperties();
-			            if (showEntities) UI_Entities();
-			            if (showProperties) UI_Properties();
-			            if (showConsole) UI_Console();
-			            if (showFileExplorer) UI_Assets();
-			            if (showDebugStats) UI_DebugStats();
-			            if (showStyleEditor) UI_StyleEditor();
-			        }
-			    }
+					//Display tabs - check project again because we can change state with menu bar (inside this else-case)
+					if (Project::Exists())
+					{
+						if (showEditor) UI_Editor();
+						if (showSceneProperties) UI_SceneProperties();
+						if (showEntities) UI_Entities();
+						if (showProperties) UI_Properties();
+						if (showConsole) UI_Console();
+						if (showFileExplorer) UI_Assets();
+						if (showDebugStats) UI_DebugStats();
+						if (showStyleEditor) UI_StyleEditor();
+					}
+				}
 			}
 			gui::End();
 		}
@@ -2401,17 +2385,17 @@ namespace wc
 			t_File.Destroy();
 			t_Folder.Destroy();
 			t_FolderEmpty.Destroy();
-	        t_Reorder.Destroy();
-	        t_Bond.Destroy();
-	        t_Play.Destroy();
-	        t_Simulate.Destroy();
-	        t_Stop.Destroy();
+			t_Reorder.Destroy();
+			t_Bond.Destroy();
+			t_Play.Destroy();
+			t_Simulate.Destroy();
+			t_Stop.Destroy();
 
-	        assetManager.Free();
+			assetManager.Free();
 			m_Renderer.Deinit();
 
-	        for (int i = 0; i < FRAME_OVERLAP; i++)
-	            m_RenderData[i].Free();
+			for (int i = 0; i < FRAME_OVERLAP; i++)
+				m_RenderData[i].Free();
 		}
 	};
 }

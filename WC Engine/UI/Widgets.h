@@ -2,7 +2,13 @@
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <imgui/misc/cpp/imgui_stdlib.h>
+#include <imguizmo/ImGuizmo.h>
+
 #include <string>
+#include <filesystem>
+#include <vector>
+#include <unordered_map>
 //#include <imgui/imgui_widgets.cpp>
 //#include <Windows.h> // Needed for file attributes
 
@@ -10,317 +16,306 @@ namespace gui = ImGui;
 
 namespace wc
 {
-    namespace conv
-    {
-        glm::vec2 ImVec2ToGlm(const ImVec2& v)
-        {
-            return glm::vec2(v.x, v.y);
-        }
+	namespace conv
+	{
+		glm::vec2 ImVec2ToGlm(const ImVec2& v)
+		{
+			return glm::vec2(v.x, v.y);
+		}
 
-        ImVec2 GlmToImVec2(const glm::vec2& v)
-        {
-            return ImVec2(v.x, v.y);
-        }
+		ImVec2 GlmToImVec2(const glm::vec2& v)
+		{
+			return ImVec2(v.x, v.y);
+		}
 
-        glm::vec4 ImVec4ToGlm(const ImVec4& v)
-        {
-            return glm::vec4(v.x, v.y, v.z, v.w);
-        }
+		glm::vec4 ImVec4ToGlm(const ImVec4& v)
+		{
+			return glm::vec4(v.x, v.y, v.z, v.w);
+		}
 
-        ImVec4 GlmToImVec4(const glm::vec4& v)
-        {
-            return ImVec4(v.x, v.y, v.z, v.w);
-        }
-    }
+		ImVec4 GlmToImVec4(const glm::vec4& v)
+		{
+			return ImVec4(v.x, v.y, v.z, v.w);
+		}
+	}
 
 	namespace ui
 	{
 
-	    //Center Window
-	    //if left on false, no need for ImGuiWindowFlags_NoMove
-        inline void CenterNextWindow(bool once = false)
-        {
-	        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), once ? ImGuiCond_Once : ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        }
+		//Center Window
+		//if left on false, no need for ImGuiWindowFlags_NoMove
+		inline void CenterNextWindow(bool once = false)
+		{
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), once ? ImGuiCond_Once : ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		}
 
-	    const std::unordered_map<std::string, std::string> fileTypeExt =
-	    {
-	        {".*", "All"},
-            {".", "Folder"},
-            {".png", "Image"},
-            {".wav", "WAVE"},
-            {".mp3", "mp3"},
-            {".scene", "Scene"},
-            {".script", "Script"},
-            {".shader", "Shader"},
-            {".font", "Font"}
-	    };
+		const std::unordered_map<std::string, std::string> fileTypeExt =
+		{
+			{".*", "All"},
+			{".", "Folder"},
+			{".png", "Image"},
+			{".wav", "WAVE"},
+			{".mp3", "mp3"},
+			{".scene", "Scene"},
+			{".script", "Script"},
+			{".shader", "Shader"},
+			{".font", "Font"}
+		};
 
-        // FileDialog - A simple file dialog for opening files or selecting directories
-	    // filters: [.* - All] [. - Folder] [.png - Image] [.wav - Audio] [.scene - Scene] [.script - Script] [.shader - Shader] [.font - Font]
-	    // Only way to return a Directory(Folder) is to use the "." filter
-        std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
-        {
-            //bool showPopup = true; for close button X on the window
-            static std::filesystem::path currentPath;
-            static std::vector<std::filesystem::path> disks;
-            static std::string selectedPath;
-            std::string finalPath;
-            static std::vector<std::filesystem::directory_entry> fileEntries;
+		// FileDialog - A simple file dialog for opening files or selecting directories
+		// Only way to return a Directory(Folder) is to use the "." filter
+		std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
+		{
+			//bool showPopup = true; for close button X on the window
+			static std::filesystem::path currentPath;
+			static std::vector<std::filesystem::path> disks;
+			static std::string selectedPath;
+			std::string finalPath;
+			static std::vector<std::filesystem::directory_entry> fileEntries;
 
-            if (ImGui::BeginPopupModal(name))
-            {
-                // Initialize disks
-                if (disks.empty())
-                {
-                    for (char drive = 'A'; drive <= 'Z'; ++drive)
-                    {
-                        std::filesystem::path drive_path = std::string(1, drive) + ":\\";
-                        std::error_code ec;
-                        if (std::filesystem::exists(drive_path, ec))
-                        {
-                            disks.push_back(drive_path);
-                        }
-                    }
+			if (ImGui::BeginPopupModal(name))
+			{
+				// Initialize disks
+				if (disks.empty())
+				{
+					for (char drive = 'A'; drive <= 'Z'; ++drive)
+					{
+						std::filesystem::path drive_path = std::string(1, drive) + ":\\";
+						std::error_code ec;
+						if (std::filesystem::exists(drive_path, ec))
+						{
+							disks.push_back(drive_path);
+						}
+					}
 
-                    // TODO - fix this so we load the start path
-                    if (startPath.empty())currentPath = disks[0];
-                    else currentPath = startPath;
-                }
+					// TODO - fix this so we load the start path
+					if (startPath.empty())currentPath = disks[0];
+					else currentPath = startPath;
+				}
 
-                // Navigation controls
-                ImGui::BeginDisabled(currentPath == currentPath.root_path());
-                if (ImGui::ArrowButton("##back", ImGuiDir_Left))
-                {
-                    if (currentPath.has_parent_path())
-                        currentPath = currentPath.parent_path();
-                    else
-                        currentPath = currentPath.root_path();
-                    fileEntries.clear();
-                }
-                ImGui::EndDisabled();
+				// Navigation controls
+				ImGui::BeginDisabled(currentPath == currentPath.root_path());
+				if (ImGui::ArrowButton("##back", ImGuiDir_Left))
+				{
+					if (currentPath.has_parent_path())
+						currentPath = currentPath.parent_path();
+					else
+						currentPath = currentPath.root_path();
+					fileEntries.clear();
+				}
+				ImGui::EndDisabled();
 
-                ImGui::SameLine();
-                float comboWidth = std::max(ImGui::CalcTextSize(currentPath.string().c_str()).x + 50, 300.0f);
-                ImGui::SetWindowSize(ImVec2(ImGui::GetItemRectSize().x + comboWidth + ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 3, 0));
-                ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Refresh").x - ImGui::GetStyle().FramePadding.x * 2);
-                if (ImGui::BeginCombo("##disks", currentPath.string().c_str()))
-                {
-                    for (const auto& disk : disks)
-                    {
-                        if (ImGui::Selectable(disk.string().c_str()))
-                        {
-                            currentPath = disk;
-                            fileEntries.clear();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
+				ImGui::SameLine();
+				float comboWidth = std::max(ImGui::CalcTextSize(currentPath.string().c_str()).x + 50, 300.0f);
+				ImGui::SetWindowSize(ImVec2(ImGui::GetItemRectSize().x + comboWidth + ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 3, 0));
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Refresh").x - ImGui::GetStyle().FramePadding.x * 2);
+				if (ImGui::BeginCombo("##disks", currentPath.string().c_str()))
+				{
+					for (const auto& disk : disks)
+					{
+						if (ImGui::Selectable(disk.string().c_str()))
+						{
+							currentPath = disk;
+							fileEntries.clear();
+						}
+					}
+					ImGui::EndCombo();
+				}
 
-                // Refresh button
-                ImGui::SameLine();
-                if (ImGui::Button("Refresh"))
-                {
-                    fileEntries.clear();
-                    std::error_code ec;
-                    std::filesystem::directory_iterator(currentPath, ec); // Force refresh
-                }
+				// Refresh button
+				ImGui::SameLine();
+				if (ImGui::Button("Refresh"))
+				{
+					fileEntries.clear();
+					std::error_code ec;
+					std::filesystem::directory_iterator(currentPath, ec); // Force refresh
+				}
 
-                // File list
-                if (ImGui::BeginChild("##file_list", ImVec2(0,  300.0f), true))
-                {
-                    try
-                    {
-                        // Refresh directory contents if empty
-                        if (fileEntries.empty())
-                        {
-                            std::error_code ec;
-                            auto dir_iter = std::filesystem::directory_iterator(currentPath, ec);
-                            if (ec)
-                            {
-                                ImGui::TextColored(ImVec4(1,0,0,1), "Error: %s", ec.message().c_str());
-                            }
-                            else
-                            {
-                                for (const auto& entry : dir_iter)
-                                {
-                                    try
-                                    {
-                                        // Skip hidden/system files using attributes
-                                        //TODO - add for other systems
-                                        #ifdef _WIN32
-                                        DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
-                                        if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
-                                            continue;
-                                        #endif
+				// File list
+				if (ImGui::BeginChild("##file_list", ImVec2(0, 300.0f), true))
+				{
+					try
+					{
+						// Refresh directory contents if empty
+						if (fileEntries.empty())
+						{
+							std::error_code ec;
+							auto dir_iter = std::filesystem::directory_iterator(currentPath, ec);
+							if (ec)
+							{
+								ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", ec.message().c_str());
+							}
+							else
+							{
+								for (const auto& entry : dir_iter)
+								{
+									try
+									{
+										// Skip hidden/system files using attributes
+										//TODO - add for other systems
+#ifdef _WIN32
+										DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
+										if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+											continue;
+#endif
 
-                                        // Skip reserved system files
-                                        if (entry.path().filename().string()[0] == '$')
-                                            continue;
+										// Skip reserved system files
+										if (entry.path().filename().string()[0] == '$')
+											continue;
 
-                                        fileEntries.push_back(entry);
-                                    }
-                                    catch (...)
-                                    {
-                                        // Skip problematic entries
-                                        continue;
-                                    }
-                                }
+										fileEntries.push_back(entry);
+									}
+									catch (...)
+									{
+										// Skip problematic entries
+										continue;
+									}
+								}
 
-                                // Sort directories first (case-insensitive)
-                                std::sort(fileEntries.begin(), fileEntries.end(),
-                                    [](const auto& a, const auto& b) {
-                                        std::string a_name = a.path().filename().string();
-                                        std::string b_name = b.path().filename().string();
-                                        std::transform(a_name.begin(), a_name.end(), a_name.begin(), ::tolower);
-                                        std::transform(b_name.begin(), b_name.end(), b_name.begin(), ::tolower);
+								// Sort directories first (case-insensitive)
+								std::sort(fileEntries.begin(), fileEntries.end(),
+									[](const auto& a, const auto& b) {
+										std::string a_name = a.path().filename().string();
+										std::string b_name = b.path().filename().string();
+										std::transform(a_name.begin(), a_name.end(), a_name.begin(), ::tolower);
+										std::transform(b_name.begin(), b_name.end(), b_name.begin(), ::tolower);
 
-                                        if (a.is_directory() == b.is_directory())
-                                            return a_name < b_name;
-                                        return a.is_directory() > b.is_directory();
-                                    });
-                            }
-                        }
+										if (a.is_directory() == b.is_directory())
+											return a_name < b_name;
+										return a.is_directory() > b.is_directory();
+									});
+							}
+						}
 
-                        // Display entries
-                        for (const auto& entry : fileEntries)
-                        {
-                            const bool isDirectory = entry.is_directory();
-                            std::string filename = entry.path().filename().string();
+						// Display entries
+						for (const auto& entry : fileEntries)
+						{
+							const bool isDirectory = entry.is_directory();
+							std::string filename = entry.path().filename().string();
 
-                            // File type filtering (case-insensitive)
-                            if (!isDirectory && !filter.empty() && filter != ".*")
-                            {
-                                std::string target_ext = filter;
-                                std::transform(target_ext.begin(), target_ext.end(), target_ext.begin(), ::tolower);
+							// File type filtering (case-insensitive)
+							if (!isDirectory && !filter.empty() && filter != ".*")
+							{
+								std::string target_ext = filter;
+								std::transform(target_ext.begin(), target_ext.end(), target_ext.begin(), ::tolower);
 
-                                std::string entry_ext = entry.path().extension().string();
-                                std::transform(entry_ext.begin(), entry_ext.end(), entry_ext.begin(), ::tolower);
+								std::string entry_ext = entry.path().extension().string();
+								std::transform(entry_ext.begin(), entry_ext.end(), entry_ext.begin(), ::tolower);
 
-                                if (entry_ext != target_ext)
-                                    continue;
-                            }
+								if (entry_ext != target_ext)
+									continue;
+							}
 
-                            // Display as tree node
-                            ImGui::PushID(filename.c_str());
+							// Display as tree node
+							ImGui::PushID(filename.c_str());
 
-                            // Set tree node flags
-                            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
-                                                      ImGuiTreeNodeFlags_NoTreePushOnOpen |
-                                                      ImGuiTreeNodeFlags_OpenOnArrow;
+							// Set tree node flags
+							ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
+								ImGuiTreeNodeFlags_NoTreePushOnOpen |
+								ImGuiTreeNodeFlags_OpenOnArrow;
 
-                            if (!isDirectory) {
-                                flags |= ImGuiTreeNodeFlags_Leaf;
-                            }
+							if (!isDirectory)
+								flags |= ImGuiTreeNodeFlags_Leaf;
 
-                            if (selectedPath == entry.path().string())
-                            {
-                                flags |= ImGuiTreeNodeFlags_Selected;
-                            }
 
-                            // Display tree node (returns true if clicked, but doesn't actually open)
-                            ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
+							if (selectedPath == entry.path().string())
+								flags |= ImGuiTreeNodeFlags_Selected;
 
-                            // Handle single click
-                            if (ImGui::IsItemClicked())
-                            {
-                                if (isDirectory)
-                                {
-                                    if (filter == ".")
-                                    {
-                                        selectedPath = entry.path().string();
-                                    }
-                                    else
-                                    {
-                                        currentPath = entry.path();
-                                        fileEntries.clear();
-                                    }
-                                }
-                                else
-                                {
-                                    selectedPath = entry.path().string();
-                                }
-                            }
+							ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
 
-                            // Handle double-click
-                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-                            {
-                                if (isDirectory)
-                                {
-                                    currentPath = entry.path();
-                                    fileEntries.clear();
-                                }
-                                else
-                                {
-                                    selectedPath = entry.path().string();
-                                }
-                            }
+							if (ImGui::IsItemClicked())
+							{
+								if (isDirectory)
+								{
+									if (filter == ".")
+										selectedPath = entry.path().string();
+									else
+									{
+										currentPath = entry.path();
+										fileEntries.clear();
+									}
+								}
+								else
+									selectedPath = entry.path().string();
+							}
 
-                            ImGui::PopID();
-                        }
-                    }
-                    catch (const std::exception& e)
-                    {
-                        ImGui::TextColored(ImVec4(1,0,0,1), "Error: %s", e.what());
-                    }
-                }
-                ImGui::EndChild();
+							// Handle double-click
+							if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+							{
+								if (isDirectory)
+								{
+									currentPath = entry.path();
+									fileEntries.clear();
+								}
+								else
+									selectedPath = entry.path().string();
+							}
 
-                // Selected file path
-                ImGui::SetNextItemWidth(std::max(ImGui::CalcTextSize(selectedPath.c_str()).x + ImGui::GetStyle().FramePadding.x * 2, 300.0f));
-                ImGui::Text("Selected:"); ImGui::SameLine();
-                auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-                ImGui::InputText("##SelectedFile", &selectedFileName, ImGuiInputTextFlags_ReadOnly);
+							ImGui::PopID();
+						}
+					}
+					catch (const std::exception& e)
+					{
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", e.what());
+					}
+				}
+				ImGui::EndChild();
 
-                 // Filter text
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(ImGui::CalcTextSize(filter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
-                auto filterText = filter + " " + fileTypeExt.at(filter);
-                ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
+				// Selected file path
+				ImGui::SetNextItemWidth(std::max(ImGui::CalcTextSize(selectedPath.c_str()).x + ImGui::GetStyle().FramePadding.x * 2, 300.0f));
+				ImGui::Text("Selected:"); ImGui::SameLine();
+				auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
+				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+				ImGui::InputText("##SelectedFile", &selectedFileName, ImGuiInputTextFlags_ReadOnly);
 
-                // Action buttons
-                ImGui::BeginDisabled(selectedPath.empty());
-                if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
-                {
-                    finalPath = selectedPath;
-                    selectedPath.clear();
-                    currentPath = disks[0];
-                    disks.clear();
-                    fileEntries.clear();
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndDisabled();
+				// Filter text
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(ImGui::CalcTextSize(filter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
+				auto filterText = filter + " " + fileTypeExt.at(filter);
+				ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
 
-                ImGui::SameLine();
-                ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2);
-                if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
-                {
-                    selectedPath.clear();
-                    currentPath = disks[0];
-                    disks.clear();
-                    fileEntries.clear();
-                    ImGui::CloseCurrentPopup();
-                }
+				// Action buttons
+				ImGui::BeginDisabled(selectedPath.empty());
+				if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
+				{
+					finalPath = selectedPath;
+					selectedPath.clear();
+					currentPath = disks[0];
+					disks.clear();
+					fileEntries.clear();
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndDisabled();
 
-                ImGui::EndPopup();
-            }
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Cancel").x - ImGui::GetStyle().FramePadding.x * 2);
+				if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+				{
+					selectedPath.clear();
+					currentPath = disks[0];
+					disks.clear();
+					fileEntries.clear();
+					ImGui::CloseCurrentPopup();
+				}
 
-            return finalPath;
-        }
+				ImGui::EndPopup();
+			}
 
-	    void ApplyHue(ImGuiStyle& style, float hue)
-	    {
-	        for (int i = 0; i < ImGuiCol_COUNT; i++)
-	        {
-	            ImVec4& col = style.Colors[i];
+			return finalPath;
+		}
 
-	            float h, s, v;
-	            ImGui::ColorConvertRGBtoHSV(col.x, col.y, col.z, h, s, v);
-	            h = hue;
-	            ImGui::ColorConvertHSVtoRGB(h, s, v, col.x, col.y, col.z);
-	        }
-	    }
+		void ApplyHue(ImGuiStyle& style, float hue)
+		{
+			for (int i = 0; i < ImGuiCol_COUNT; i++)
+			{
+				ImVec4& col = style.Colors[i];
+
+				float h, s, v;
+				ImGui::ColorConvertRGBtoHSV(col.x, col.y, col.z, h, s, v);
+				h = hue;
+				ImGui::ColorConvertHSVtoRGB(h, s, v, col.x, col.y, col.z);
+			}
+		}
 
 		ImVec2 ImConv(glm::vec2 v) { return ImVec2(v.x, v.y); }
 
@@ -355,7 +350,7 @@ namespace wc
 			colors[ImGuiCol_Header] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
 			colors[ImGuiCol_HeaderHovered] = ImVec4(0.00f, 0.00f, 0.00f, 0.36f);
 			colors[ImGuiCol_HeaderActive] = ImVec4(0.20f, 0.22f, 0.23f, 0.33f);
-            colors[ImGuiCol_Separator] = ImVec4(0.33f, 0.33f, 0.33f, 0.59f);
+			colors[ImGuiCol_Separator] = ImVec4(0.33f, 0.33f, 0.33f, 0.59f);
 			colors[ImGuiCol_SeparatorHovered] = ImVec4(0.44f, 0.44f, 0.44f, 0.29f);
 			colors[ImGuiCol_SeparatorActive] = ImVec4(1.000f, 0.000f, 0.000f, 0.500f);
 			colors[ImGuiCol_ResizeGrip] = ImVec4(0.28f, 0.28f, 0.28f, 0.29f);
@@ -366,7 +361,7 @@ namespace wc
 			colors[ImGuiCol_TabActive] = ImVec4(0.20f, 0.20f, 0.20f, 0.36f);
 			colors[ImGuiCol_TabUnfocused] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
 			colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
-            colors[ImGuiCol_DockingPreview] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
+			colors[ImGuiCol_DockingPreview] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
 			colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.36f);
 			colors[ImGuiCol_PlotLines] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
 			colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
@@ -441,165 +436,165 @@ namespace wc
 			}
 		}
 
-	    //IMGUI include, dont USE!
-	    static bool IsRootOfOpenMenuSet()
-{
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    if ((g.OpenPopupStack.Size <= g.BeginPopupStack.Size) || (window->Flags & ImGuiWindowFlags_ChildMenu))
-        return false;
+		//IMGUI include, dont USE!
+		static bool IsRootOfOpenMenuSet()
+		{
+			ImGuiContext& g = *GImGui;
+			ImGuiWindow* window = g.CurrentWindow;
+			if ((g.OpenPopupStack.Size <= g.BeginPopupStack.Size) || (window->Flags & ImGuiWindowFlags_ChildMenu))
+				return false;
 
-    // Initially we used 'upper_popup->OpenParentId == window->IDStack.back()' to differentiate multiple menu sets from each others
-    // (e.g. inside menu bar vs loose menu items) based on parent ID.
-    // This would however prevent the use of e.g. PushID() user code submitting menus.
-    // Previously this worked between popup and a first child menu because the first child menu always had the _ChildWindow flag,
-    // making hovering on parent popup possible while first child menu was focused - but this was generally a bug with other side effects.
-    // Instead we don't treat Popup specifically (in order to consistently support menu features in them), maybe the first child menu of a Popup
-    // doesn't have the _ChildWindow flag, and we rely on this IsRootOfOpenMenuSet() check to allow hovering between root window/popup and first child menu.
-    // In the end, lack of ID check made it so we could no longer differentiate between separate menu sets. To compensate for that, we at least check parent window nav layer.
-    // This fixes the most common case of menu opening on hover when moving between window content and menu bar. Multiple different menu sets in same nav layer would still
-    // open on hover, but that should be a lesser problem, because if such menus are close in proximity in window content then it won't feel weird and if they are far apart
-    // it likely won't be a problem anyone runs into.
-    const ImGuiPopupData* upper_popup = &g.OpenPopupStack[g.BeginPopupStack.Size];
-    if (window->DC.NavLayerCurrent != upper_popup->ParentNavLayer)
-        return false;
-    return upper_popup->Window && (upper_popup->Window->Flags & ImGuiWindowFlags_ChildMenu) && ImGui::IsWindowChildOf(upper_popup->Window, window, true, false);
-}
+			// Initially we used 'upper_popup->OpenParentId == window->IDStack.back()' to differentiate multiple menu sets from each others
+			// (e.g. inside menu bar vs loose menu items) based on parent ID.
+			// This would however prevent the use of e.g. PushID() user code submitting menus.
+			// Previously this worked between popup and a first child menu because the first child menu always had the _ChildWindow flag,
+			// making hovering on parent popup possible while first child menu was focused - but this was generally a bug with other side effects.
+			// Instead we don't treat Popup specifically (in order to consistently support menu features in them), maybe the first child menu of a Popup
+			// doesn't have the _ChildWindow flag, and we rely on this IsRootOfOpenMenuSet() check to allow hovering between root window/popup and first child menu.
+			// In the end, lack of ID check made it so we could no longer differentiate between separate menu sets. To compensate for that, we at least check parent window nav layer.
+			// This fixes the most common case of menu opening on hover when moving between window content and menu bar. Multiple different menu sets in same nav layer would still
+			// open on hover, but that should be a lesser problem, because if such menus are close in proximity in window content then it won't feel weird and if they are far apart
+			// it likely won't be a problem anyone runs into.
+			const ImGuiPopupData* upper_popup = &g.OpenPopupStack[g.BeginPopupStack.Size];
+			if (window->DC.NavLayerCurrent != upper_popup->ParentNavLayer)
+				return false;
+			return upper_popup->Window && (upper_popup->Window->Flags & ImGuiWindowFlags_ChildMenu) && ImGui::IsWindowChildOf(upper_popup->Window, window, true, false);
+		}
 
-        inline bool MenuItemButton(const char* label, const char* shortcut = nullptr, bool closePopupOnClick = true, const char* icon = nullptr, bool selected = false, bool enabled = true)
-        {
-            ImGuiWindow* window = ImGui::GetCurrentWindow();
-            if (window->SkipItems)
-                return false;
+		inline bool MenuItemButton(const char* label, const char* shortcut = nullptr, bool closePopupOnClick = true, const char* icon = nullptr, bool selected = false, bool enabled = true)
+		{
+			ImGuiWindow* window = ImGui::GetCurrentWindow();
+			if (window->SkipItems)
+				return false;
 
-            ImGuiContext& g = *GImGui;
-            ImGuiStyle& style = g.Style;
-            ImVec2 imPos = window->DC.CursorPos;
-            ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
+			ImGuiContext& g = *GImGui;
+			ImGuiStyle& style = g.Style;
+			ImVec2 imPos = window->DC.CursorPos;
+			ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
 
-            // See BeginMenuEx() for comments about this.
-            const bool menuset_is_open = IsRootOfOpenMenuSet();
-            if (menuset_is_open)
-                ImGui::PushItemFlag(ImGuiItemFlags_NoWindowHoverableCheck, true);
+			// See BeginMenuEx() for comments about this.
+			const bool menuset_is_open = IsRootOfOpenMenuSet();
+			if (menuset_is_open)
+				ImGui::PushItemFlag(ImGuiItemFlags_NoWindowHoverableCheck, true);
 
-            // We've been using the equivalent of ImGuiSelectableFlags_SetNavIdOnHover on all Selectable() since early Nav system days (commit 43ee5d73),
-            // but I am unsure whether this should be kept at all. For now moved it to be an opt-in feature used by menus only.
-            bool pressed;
-                    ImGui::PushID(label);
-            if (!enabled)
-                ImGui::BeginDisabled();
+			// We've been using the equivalent of ImGuiSelectableFlags_SetNavIdOnHover on all Selectable() since early Nav system days (commit 43ee5d73),
+			// but I am unsure whether this should be kept at all. For now moved it to be an opt-in feature used by menus only.
+			bool pressed;
+			ImGui::PushID(label);
+			if (!enabled)
+				ImGui::BeginDisabled();
 
-            // We use ImGuiSelectableFlags_NoSetKeyOwner to allow down on one menu item, move, up on another.
-            const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SelectOnRelease | ImGuiSelectableFlags_NoSetKeyOwner | ImGuiSelectableFlags_SetNavIdOnHover | closePopupOnClick ? ImGuiSelectableFlags_DontClosePopups : 0;
-            const ImGuiMenuColumns* offsets = &window->DC.MenuColumns;
-            if (window->DC.LayoutType == ImGuiLayoutType_Horizontal)
-            {
-                // Mimic the exact layout spacing of BeginMenu() to allow MenuItem() inside a menu bar, which is a little misleading but may be useful
-                // Note that in this situation: we don't render the shortcut, we render a highlight instead of the selected tick mark.
-                float w = label_size.x;
-                window->DC.CursorPos.x += IM_TRUNC(style.ItemSpacing.x * 0.5f);
-                ImVec2 text_pos(window->DC.CursorPos.x + offsets->OffsetLabel, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
-                ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, style.ItemSpacing.x * 2.0f);
-                pressed = ImGui::Selectable("", selected, selectable_flags, ImVec2(w, 0.0f));
-                ImGui::PopStyleVar();
-                if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_Visible)
-                    ImGui::RenderText(text_pos, label);
-                window->DC.CursorPos.x += IM_TRUNC(style.ItemSpacing.x * (-1.0f + 0.5f)); // -1 spacing to compensate the spacing added when Selectable() did a SameLine(). It would also work to call SameLine() ourselves after the PopStyleVar().
-            }
-            else
-            {
-                // Menu item inside a vertical menu
-                // (In a typical menu window where all items are BeginMenu() or MenuItem() calls, extra_w will always be 0.0f.
-                //  Only when they are other items sticking out we're going to add spacing, yet only register minimum width into the layout system.
-                float icon_w = (icon && icon[0]) ? ImGui::CalcTextSize(icon, NULL).x : 0.0f;
-                float shortcut_w = (shortcut && shortcut[0]) ? ImGui::CalcTextSize(shortcut, NULL).x : 0.0f;
-                float checkmark_w = IM_TRUNC(g.FontSize * 1.20f);
-                float min_w = window->DC.MenuColumns.DeclColumns(icon_w, label_size.x, shortcut_w, checkmark_w); // Feedback for next frame
-                float stretch_w = ImMax(0.0f, ImGui::GetContentRegionAvail().x - min_w);
-                pressed = ImGui::Selectable("", false, selectable_flags | ImGuiSelectableFlags_SpanAvailWidth, ImVec2(min_w, label_size.y));
-                if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_Visible)
-                {
-                    ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetLabel, imPos.y), label);
-                    if (icon_w > 0.0f)
-                        ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetIcon, imPos.y), icon);
-                    if (shortcut_w > 0.0f)
-                    {
-                        ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
-                        ImGui::LogSetNextTextDecoration("(", ")");
-                        ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetShortcut + stretch_w, imPos.y), shortcut, NULL, false);
-                        ImGui::PopStyleColor();
-                    }
-                    if (selected)
-                        ImGui::RenderCheckMark(window->DrawList, ImVec2(offsets->OffsetMark + stretch_w + g.FontSize * 0.40f + imPos.x, g.FontSize * 0.134f * 0.5f + imPos.y), ImGui::GetColorU32(ImGuiCol_Text), g.FontSize * 0.866f);
-                }
-            }
-            IMGUI_TEST_ENGINE_ITEM_INFO(g.LastItemData.ID, label, g.LastItemData.StatusFlags | ImGuiItemStatusFlags_Checkable | (selected ? ImGuiItemStatusFlags_Checked : 0));
-            if (!enabled)
-                ImGui::EndDisabled();
-            ImGui::PopID();
-            if (menuset_is_open)
-                ImGui::PopItemFlag();
+			// We use ImGuiSelectableFlags_NoSetKeyOwner to allow down on one menu item, move, up on another.
+			const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SelectOnRelease | ImGuiSelectableFlags_NoSetKeyOwner | ImGuiSelectableFlags_SetNavIdOnHover | closePopupOnClick ? ImGuiSelectableFlags_DontClosePopups : 0;
+			const ImGuiMenuColumns* offsets = &window->DC.MenuColumns;
+			if (window->DC.LayoutType == ImGuiLayoutType_Horizontal)
+			{
+				// Mimic the exact layout spacing of BeginMenu() to allow MenuItem() inside a menu bar, which is a little misleading but may be useful
+				// Note that in this situation: we don't render the shortcut, we render a highlight instead of the selected tick mark.
+				float w = label_size.x;
+				window->DC.CursorPos.x += IM_TRUNC(style.ItemSpacing.x * 0.5f);
+				ImVec2 text_pos(window->DC.CursorPos.x + offsets->OffsetLabel, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
+				ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, style.ItemSpacing.x * 2.0f);
+				pressed = ImGui::Selectable("", selected, selectable_flags, ImVec2(w, 0.0f));
+				ImGui::PopStyleVar();
+				if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_Visible)
+					ImGui::RenderText(text_pos, label);
+				window->DC.CursorPos.x += IM_TRUNC(style.ItemSpacing.x * (-1.0f + 0.5f)); // -1 spacing to compensate the spacing added when Selectable() did a SameLine(). It would also work to call SameLine() ourselves after the PopStyleVar().
+			}
+			else
+			{
+				// Menu item inside a vertical menu
+				// (In a typical menu window where all items are BeginMenu() or MenuItem() calls, extra_w will always be 0.0f.
+				//  Only when they are other items sticking out we're going to add spacing, yet only register minimum width into the layout system.
+				float icon_w = (icon && icon[0]) ? ImGui::CalcTextSize(icon, NULL).x : 0.0f;
+				float shortcut_w = (shortcut && shortcut[0]) ? ImGui::CalcTextSize(shortcut, NULL).x : 0.0f;
+				float checkmark_w = IM_TRUNC(g.FontSize * 1.20f);
+				float min_w = window->DC.MenuColumns.DeclColumns(icon_w, label_size.x, shortcut_w, checkmark_w); // Feedback for next frame
+				float stretch_w = ImMax(0.0f, ImGui::GetContentRegionAvail().x - min_w);
+				pressed = ImGui::Selectable("", false, selectable_flags | ImGuiSelectableFlags_SpanAvailWidth, ImVec2(min_w, label_size.y));
+				if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_Visible)
+				{
+					ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetLabel, imPos.y), label);
+					if (icon_w > 0.0f)
+						ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetIcon, imPos.y), icon);
+					if (shortcut_w > 0.0f)
+					{
+						ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+						ImGui::LogSetNextTextDecoration("(", ")");
+						ImGui::RenderText(ImVec2(imPos.x + offsets->OffsetShortcut + stretch_w, imPos.y), shortcut, NULL, false);
+						ImGui::PopStyleColor();
+					}
+					if (selected)
+						ImGui::RenderCheckMark(window->DrawList, ImVec2(offsets->OffsetMark + stretch_w + g.FontSize * 0.40f + imPos.x, g.FontSize * 0.134f * 0.5f + imPos.y), ImGui::GetColorU32(ImGuiCol_Text), g.FontSize * 0.866f);
+				}
+			}
+			IMGUI_TEST_ENGINE_ITEM_INFO(g.LastItemData.ID, label, g.LastItemData.StatusFlags | ImGuiItemStatusFlags_Checkable | (selected ? ImGuiItemStatusFlags_Checked : 0));
+			if (!enabled)
+				ImGui::EndDisabled();
+			ImGui::PopID();
+			if (menuset_is_open)
+				ImGui::PopItemFlag();
 
-            return pressed;
-        }
+			return pressed;
+		}
 
-	    inline bool MatchPayloadType(const char* type)
-        {
-            if (type == nullptr) return ImGui::IsDragDropActive();
-            return ImGui::IsDragDropActive() && strcmp(ImGui::GetDragDropPayload()->DataType, type) == 0;
-        }
+		inline bool MatchPayloadType(const char* type)
+		{
+			if (type == nullptr) return ImGui::IsDragDropActive();
+			return ImGui::IsDragDropActive() && strcmp(ImGui::GetDragDropPayload()->DataType, type) == 0;
+		}
 
-        inline void DrawBgRows(float itemSpacing = -1.f)
-        {
-            if (itemSpacing > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacing);
+		inline void DrawBgRows(float itemSpacing = -1.f)
+		{
+			if (itemSpacing > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacing);
 
-            ImGuiWindow* window = ImGui::GetCurrentWindow();
-            if (window->SkipItems)
-                return;
+			ImGuiWindow* window = ImGui::GetCurrentWindow();
+			if (window->SkipItems)
+				return;
 
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImGuiStyle& style = ImGui::GetStyle();
+			ImDrawList* draw_list = ImGui::GetWindowDrawList();
+			ImGuiStyle& style = ImGui::GetStyle();
 
-            const float scroll_y = ImGui::GetScrollY();
-            const float window_height = ImGui::GetWindowHeight();
+			const float scroll_y = ImGui::GetScrollY();
+			const float window_height = ImGui::GetWindowHeight();
 
-            const float row_height = style.ItemSpacing.y + ImGui::GetTextLineHeight();
+			const float row_height = style.ItemSpacing.y + ImGui::GetTextLineHeight();
 
-            const int row_start = static_cast<int>(scroll_y / row_height);
-            const int row_count = static_cast<int>((scroll_y + window_height) / row_height) - row_start + 1;
+			const int row_start = static_cast<int>(scroll_y / row_height);
+			const int row_count = static_cast<int>((scroll_y + window_height) / row_height) - row_start + 1;
 
-            const float collOffset = 1.3f;
-            const ImU32 color_even = ImGui::GetColorU32(style.Colors[ImGuiCol_WindowBg]);
-            const ImU32 color_odd = ImGui::GetColorU32({style.Colors[ImGuiCol_WindowBg].x * collOffset, style.Colors[ImGuiCol_WindowBg].y * collOffset, style.Colors[ImGuiCol_WindowBg].z * collOffset, style.Colors[ImGuiCol_WindowBg].w});
+			const float collOffset = 1.3f;
+			const ImU32 color_even = ImGui::GetColorU32(style.Colors[ImGuiCol_WindowBg]);
+			const ImU32 color_odd = ImGui::GetColorU32({ style.Colors[ImGuiCol_WindowBg].x * collOffset, style.Colors[ImGuiCol_WindowBg].y * collOffset, style.Colors[ImGuiCol_WindowBg].z * collOffset, style.Colors[ImGuiCol_WindowBg].w });
 
-            // Get starting position of the window's content area
-            const ImVec2 win_pos = ImVec2(window->Pos.x, window->Pos.y - style.ItemSpacing.y * 0.5f);
-            const ImVec2 clip_rect_min = {win_pos.x, win_pos.y};
-            const ImVec2 clip_rect_max = {win_pos.x + window->Size.x, win_pos.y + window_height};
+			// Get starting position of the window's content area
+			const ImVec2 win_pos = ImVec2(window->Pos.x, window->Pos.y - style.ItemSpacing.y * 0.5f);
+			const ImVec2 clip_rect_min = { win_pos.x, win_pos.y };
+			const ImVec2 clip_rect_max = { win_pos.x + window->Size.x, win_pos.y + window_height };
 
-            // Clip drawing to the visible area
-            draw_list->PushClipRect(clip_rect_min, clip_rect_max, true);
+			// Clip drawing to the visible area
+			draw_list->PushClipRect(clip_rect_min, clip_rect_max, true);
 
-            for (int row = row_start; row < row_start + row_count; row++)
-            {
-                // Alternate colors
-                const ImU32 col = (row % 2 == 0) ? color_even : color_odd;
+			for (int row = row_start; row < row_start + row_count; row++)
+			{
+				// Alternate colors
+				const ImU32 col = (row % 2 == 0) ? color_even : color_odd;
 
-                // Calculate row position
-                const float y1 = win_pos.y + (row * row_height) - scroll_y;
-                const float y2 = y1 + row_height;
+				// Calculate row position
+				const float y1 = win_pos.y + (row * row_height) - scroll_y;
+				const float y2 = y1 + row_height;
 
-                // Draw the row background
-                draw_list->AddRectFilled(
-                    ImVec2(win_pos.x, y1),
-                    ImVec2(win_pos.x + window->Size.x, y2),
-                    col
-                );
-            }
+				// Draw the row background
+				draw_list->AddRectFilled(
+					ImVec2(win_pos.x, y1),
+					ImVec2(win_pos.x + window->Size.x, y2),
+					col
+				);
+			}
 
-            draw_list->PopClipRect();
-            gui::PopStyleVar();
-        }
+			draw_list->PopClipRect();
+			gui::PopStyleVar();
+		}
 
 		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
 		{
@@ -607,7 +602,7 @@ namespace wc
 			const float buttonWidth = 20.0f;
 
 			// Calculate the available width for the input fields
-            float inputWidth = (gui::CalcItemWidth() - buttonWidth * 2 - ImGui::GetStyle().ItemSpacing.x) / 2;
+			float inputWidth = (gui::CalcItemWidth() - buttonWidth * 2 - ImGui::GetStyle().ItemSpacing.x) / 2;
 
 			// Draw colored button for "X"
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
@@ -649,70 +644,70 @@ namespace wc
 			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
 		}
 
-	    bool DragButton3(const char* txt, glm::vec3& v) // Changed to bool return type
-        {
-            // Define a fixed width for the buttons
-            const float buttonWidth = 20.0f;
+		bool DragButton3(const char* txt, glm::vec3& v) // Changed to bool return type
+		{
+			// Define a fixed width for the buttons
+			const float buttonWidth = 20.0f;
 
-            // Calculate the available width for the input fields
-            float inputWidth = (gui::CalcItemWidth() - buttonWidth * 3 - ImGui::GetStyle().ItemSpacing.x * 2) / 3;
+			// Calculate the available width for the input fields
+			float inputWidth = (gui::CalcItemWidth() - buttonWidth * 3 - ImGui::GetStyle().ItemSpacing.x * 2) / 3;
 
-            // Draw colored button for "X"
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.6f)); // Red color
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 0.75f)); // Red color
-            if (ImGui::Button((std::string("X##X") + txt).c_str(), ImVec2(buttonWidth, 0)))
-            {
-                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.x -= 1.0f; }
-                else { v.x += 1.0f; }
-            }
-            ImGui::PopStyleColor(3);
-            ImGui::SameLine(0, 0);
+			// Draw colored button for "X"
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 0.5f)); // Red color
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.6f)); // Red color
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 0.75f)); // Red color
+			if (ImGui::Button((std::string("X##X") + txt).c_str(), ImVec2(buttonWidth, 0)))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.x -= 1.0f; }
+				else { v.x += 1.0f; }
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine(0, 0);
 
-            ImGui::SetNextItemWidth(inputWidth);
-            ImGui::DragFloat((std::string("##X") + txt).c_str(), &v.x, 0.1f);
+			ImGui::SetNextItemWidth(inputWidth);
+			ImGui::DragFloat((std::string("##X") + txt).c_str(), &v.x, 0.1f);
 
-            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 
-            // Draw colored button for "Y"
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 0.5f)); // Green color
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 1.0f, 0.0f, 0.6f)); // Green color
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.0f, 0.75f)); // Green color
-            if (ImGui::Button((std::string("Y##Y") + txt).c_str(), ImVec2(buttonWidth, 0)))
-            {
-                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.y -= 1.0f; }
-                else { v.y += 1.0f; }
-            }
-            ImGui::PopStyleColor(3);
-            ImGui::SameLine(0, 0);
+			// Draw colored button for "Y"
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 0.5f)); // Green color
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 1.0f, 0.0f, 0.6f)); // Green color
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 1.0f, 0.0f, 0.75f)); // Green color
+			if (ImGui::Button((std::string("Y##Y") + txt).c_str(), ImVec2(buttonWidth, 0)))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.y -= 1.0f; }
+				else { v.y += 1.0f; }
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine(0, 0);
 
-            ImGui::SetNextItemWidth(inputWidth);
-            ImGui::DragFloat((std::string("##Y") + txt).c_str(), &v.y, 0.1f);
+			ImGui::SetNextItemWidth(inputWidth);
+			ImGui::DragFloat((std::string("##Y") + txt).c_str(), &v.y, 0.1f);
 
-            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 
-            // Draw colored button for "Z"
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 1.0f, 0.5f)); // Blue color
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 1.0f, 0.6f)); // Blue color
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 1.0f, 0.75f)); // Blue color
-            if (ImGui::Button((std::string("Z##Z") + txt).c_str(), ImVec2(buttonWidth, 0)))
-            {
-                if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.z -= 1.0f; }
-                else { v.z += 1.0f; }
-            }
-            ImGui::PopStyleColor(3);
-            ImGui::SameLine(0, 0);
+			// Draw colored button for "Z"
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 1.0f, 0.5f)); // Blue color
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 1.0f, 0.6f)); // Blue color
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 1.0f, 0.75f)); // Blue color
+			if (ImGui::Button((std::string("Z##Z") + txt).c_str(), ImVec2(buttonWidth, 0)))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) { v.z -= 1.0f; }
+				else { v.z += 1.0f; }
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine(0, 0);
 
-            ImGui::SetNextItemWidth(inputWidth);
-            ImGui::DragFloat((std::string("##Z") + txt).c_str(), &v.z, 0.1f);
+			ImGui::SetNextItemWidth(inputWidth);
+			ImGui::DragFloat((std::string("##Z") + txt).c_str(), &v.z, 0.1f);
 
-            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text(txt);
+			ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text(txt);
 
-            // Return true if any of the values were modified
-            return ImGui::IsItemEdited();
-        }
+			// Return true if any of the values were modified
+			return ImGui::IsItemEdited();
+		}
 
 		void Separator()
 		{

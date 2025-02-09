@@ -62,7 +62,7 @@ namespace vk::SyncContext
 		}
 
 		m_TimelineSemaphore.Create("SyncContext::m_TimelineSemaphore");
-	}	
+	}
 
 	inline void UpdateFrame()
 	{
@@ -80,7 +80,7 @@ namespace vk::SyncContext
 		const uint64_t waitValue = m_TimelineValue;
 		const uint64_t signalValue = ++m_TimelineValue;
 
-		VkTimelineSemaphoreSubmitInfo timelineInfo = { 
+		VkTimelineSemaphoreSubmitInfo timelineInfo = {
 			.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
 			.waitSemaphoreValueCount = 1,
 			.pWaitSemaphoreValues = &waitValue,
@@ -88,7 +88,7 @@ namespace vk::SyncContext
 			.pSignalSemaphoreValues = &signalValue,
 		};
 
-		VkSubmitInfo submitInfo = { 
+		VkSubmitInfo submitInfo = {
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.pNext = &timelineInfo,
 			.waitSemaphoreCount = 1,
@@ -106,8 +106,8 @@ namespace vk::SyncContext
 
 	inline void ImmediateSubmit(std::function<void(VkCommandBuffer)>&& function) // @TODO: revisit if this is suitable for a inline
 	{
-		VkCommandBufferBeginInfo begInfo = { 
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 
+		VkCommandBufferBeginInfo begInfo = {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 		};
 
@@ -117,7 +117,7 @@ namespace vk::SyncContext
 
 		vkEndCommandBuffer(UploadCommandBuffer);
 
-		VkSubmitInfo submit = { 
+		VkSubmitInfo submit = {
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.commandBufferCount = 1,
 			.pCommandBuffers = &UploadCommandBuffer,
@@ -129,7 +129,7 @@ namespace vk::SyncContext
 		ImmediateFence.Reset();
 
 		vkResetCommandBuffer(UploadCommandBuffer, 0);
-	}	
+	}
 
 	inline void Destroy()
 	{

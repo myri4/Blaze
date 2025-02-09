@@ -35,7 +35,7 @@ namespace wc
 		CameraType type = CameraType::Orthographic;
 		// uint32_t target
 		// Effects UI...
-	};	
+	};
 
 	struct SpriteRendererComponent
 	{
@@ -97,7 +97,7 @@ namespace wc
 
 			return bodyDef;
 		}
-	};	
+	};
 
 	struct PhysicsMaterial
 	{

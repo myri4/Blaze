@@ -325,7 +325,7 @@ namespace VulkanContext
 		}
 #endif
 
-		VkApplicationInfo appInfo = { 
+		VkApplicationInfo appInfo = {
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName = "WC Application",
 			.applicationVersion = VK_MAKE_API_VERSION(0, 1, 2, 0),
@@ -568,7 +568,7 @@ namespace VulkanContext
 
 			if (supportedFeatures.independentBlend)
 				deviceFeatures.independentBlend = true;
-			else 
+			else
 				WC_CORE_WARN("Independent blend feature is not supported")
 
 			VkPhysicalDeviceVulkan12Features features12 = {

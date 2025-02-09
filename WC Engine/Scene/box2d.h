@@ -16,7 +16,7 @@ namespace wc
 
 		operator b2WorldId& () { return id; }
 		operator const b2WorldId& () const { return id; }
-		//operator bool() const { return id != b2_nullBodyId; }
+		operator bool() const { return IsValid(); }
 
 		/// Create a world for rigid body simulation. A world contains bodies, shapes, and constraints. You make create
 		///	up to 128 worlds. Each world is completely independent and may be simulated in parallel.
@@ -155,9 +155,9 @@ namespace wc
 
 		/// Get the gravity vector
 		inline auto GetGravity() const
-		{ 
+		{
 			b2Vec2 g = b2World_GetGravity(id);
-			return glm::vec2(g.x, g.y); 
+			return glm::vec2(g.x, g.y);
 		}
 
 		/// Apply a radial explosion

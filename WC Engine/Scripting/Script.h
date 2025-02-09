@@ -55,8 +55,8 @@ namespace blaze
 	private:
 		lua_State* L = nullptr;
 
-		void Pop(int n = 1)	{ lua_pop(L, n); }
-		void NewTable()	{ lua_newtable(L); }
+		void Pop(int n = 1) { lua_pop(L, n); }
+		void NewTable() { lua_newtable(L); }
 		//void NewUserData(const std::string& s) { lua_newtable(L, s.c_str()); }
 
 		auto IsString(int n = -1) { return lua_isstring(L, n); }
@@ -102,7 +102,7 @@ namespace blaze
 		auto Call(int nargs, int nresults) { return lua_call(L, nargs, nresults); }
 
 		template<typename T>
-		void PushValue(T value) 
+		void PushValue(T value)
 		{
 			if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>)
 				PushInt(value);
@@ -136,7 +136,7 @@ namespace blaze
 
 			GetGlobal("_G");
 			lua_pushnil(L);  /* first key */
-			while (lua_next(L, -2) != 0) 
+			while (lua_next(L, -2) != 0)
 			{
 				/* uses 'key' (at index -2) and 'value' (at index -1) */
 				std::string value;
@@ -146,7 +146,7 @@ namespace blaze
 				}
 				else if (IsNumber())
 					value = std::format("{}", ToNumber());
-				
+
 				WC_CORE_INFO("{}: {}", value, ToString(-2));
 				/* removes 'value'; keeps 'key' for next iteration */
 				lua_pop(L, 1);
@@ -172,14 +172,14 @@ namespace blaze
 
 			if (Load(bytecode, bytecodeSize, filePath) != LUA_OK)
 				WC_ERROR(std::string(bytecode, bytecodeSize));
-			
+
 			free(bytecode);
 		}
 
 		template<typename T>
 		void SetVariable(const std::string& name, const T& value)
 		{
-			PushValue(value); 
+			PushValue(value);
 			SetGlobal(name);
 		}
 
