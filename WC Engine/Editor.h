@@ -935,9 +935,8 @@ namespace wc
 			{
 				if (m_SelectedEntity != flecs::entity::null())
 				{
-					std::string nameBuffer = m_SelectedEntity.name().c_str(); // Buffer to hold the entity's name
+					std::string nameBuffer = m_SelectedEntity.name().c_str();
 
-				    // Input name
 				    if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 				    {
 				        if (!nameBuffer.empty())
@@ -987,33 +986,26 @@ namespace wc
 
 					if (showAddComponent)
 					{
-						// Calculate clamp
 						{
-							// Calculate the desired position for the popup
 							ImVec2 popupPos = gui::GetItemRectMin();
 							popupPos.y = gui::GetItemRectMax().y + 5;
-							ImVec2 popupSize = { 200, 150 }; // Desired size of the popup
+							ImVec2 popupSize = { 200, 150 };
 
-							// Get the view port's boundaries
 							const ImGuiViewport* viewport = gui::GetWindowViewport();
 							ImVec2 viewportMin = viewport->Pos;
 							ImVec2 viewportMax = { viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
 
-							// Adjust the position to ensure the popup doesn't go outside the viewport
 							popupPos.x = std::clamp(popupPos.x, viewportMin.x, viewportMax.x - popupSize.x);
 							popupPos.y = std::clamp(popupPos.y, viewportMin.y, viewportMax.y - popupSize.y);
 
-							// Set the position and size of the popup
 							gui::SetNextWindowPos(popupPos);
 							gui::SetNextWindowSize(popupSize, ImGuiCond_Once);
 						}
 
-						// Begin the popup window
 						if (gui::Begin("Add##Component", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar))
 						{
 							if (!gui::IsWindowFocused()) showAddComponent = false;
 
-							//Replace with an arrow button
 							if (menu != None && gui::ArrowButton("Back", ImGuiDir_Left))
 								menu = None;
 
@@ -1087,8 +1079,6 @@ namespace wc
                             auto& realRotation = const_cast<float&>(component.Rotation);
                             auto rotation = glm::degrees(realRotation);
 
-                            //ui::DragButton2("Position", component.Translation);
-                            //gui::DragFloat3("Position", glm::value_ptr(component.Translation));
                             ui::DragButton3("Position", component.Translation);
                             ui::DragButton2("Scale", component.Scale);
                             ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
@@ -1131,15 +1121,13 @@ namespace wc
 				                ui::CenterNextWindow();
 				                if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
 				                {
-				                    PhysicsMaterial newMaterial;
-
 				                    static std::string name;
 				                    gui::InputText("Name", &name);
 				                    const float widgetSize = gui::GetItemRectSize().x;
 
 				                    if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 				                    {
-				                        m_Scene.Materials[name] = newMaterial;
+				                        m_Scene.Materials[name] = PhysicsMaterial();
 				                        name = "";
 				                        gui::CloseCurrentPopup();
 				                    }
@@ -1467,7 +1455,6 @@ namespace wc
 						gui::TableNextRow();
 						gui::TableSetColumnIndex(0);
 
-						// Display directories in a scrollable child window
 						gui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
 						displayDirectory(assetsPath);
 						gui::EndChild();
@@ -1486,7 +1473,6 @@ namespace wc
 							{
 							    if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
-							    // Drop target for directories
 							    if (gui::BeginDragDropTarget())
 							    {
 							        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
@@ -1543,7 +1529,6 @@ namespace wc
 								            gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
 								            if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
 
-								            // Drag source for directories
 								            if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 								            {
 								                std::string path = entry.path().string();
@@ -1552,7 +1537,6 @@ namespace wc
 								                gui::EndDragDropSource();
 								            }
 
-								            // Drop target for directories
 								            if (gui::BeginDragDropTarget())
 								            {
 								                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
@@ -1708,7 +1692,7 @@ namespace wc
 	        {
 	            // Draw background if docked, if not, only tint
 	            ImGuiDockNode* dockNode = gui::GetWindowDockNode();
-	            if (dockNode == nullptr) // Window is floating
+	            if (!dockNode) // Window is floating
 	            {
 	                gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y}, IM_COL32(20, 20, 20, 60));
 	            }
@@ -2212,7 +2196,7 @@ namespace wc
 			            {
 			                ui::Separator();
 
-			                static bool openSceneNamePopup = false; // New persistent flag
+			                static bool openSceneNamePopup = false;
 			                if (ui::MenuItemButton("New", "CTRL + N", false))
                                 gui::OpenPopup("New Scene");
 
@@ -2240,14 +2224,18 @@ namespace wc
 			                    gui::BeginDisabled(sceneName.empty());
 			                    if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
 			                    {
-			                        WC_CORE_INFO("Implement new scene creation");
+									m_Scene.Destroy();
+									m_ScenePath = newSceneSavePath + '\\' + sceneName + ".scene";
+									WC_CORE_INFO(m_ScenePath);
+
+
 			                        sceneName = "newScene";
 			                        newSceneSavePath.clear();
 			                        openSceneNamePopup = false;
 			                        gui::CloseCurrentPopup();
 			                    }
 			                    gui::EndDisabled();
-			                    if (sceneName.empty()) gui::SetItemTooltip("Project name cannot be empty!");
+			                    if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
 
 			                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 			                    if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
@@ -2314,23 +2302,23 @@ namespace wc
 			                {
 			                    // TODO - Add more themes / custom themes / save themes
 			                    static const char* themes[] = { "SoDark", "Classic", "Dark", "Light" };
-			                    static int currentTheme = 0; // Default to SoDark
+			                    static int currentTheme = 0;
 			                    static float hue = 0.0f;
 
 			                    if (gui::Combo("Select Theme", &currentTheme, themes, IM_ARRAYSIZE(themes)))
 			                    {
 			                        switch (currentTheme)
 			                        {
-			                            case 0: // SoDark
+			                            case 0:
 			                                gui::GetStyle() = ui::SoDark(hue);
 			                            break;
-			                            case 1: // Classic
+			                            case 1:
 			                                gui::StyleColorsClassic();
 			                            break;
-			                            case 2: // Dark
+			                            case 2:
 			                                gui::StyleColorsDark();
 			                            break;
-			                            case 3: // Light
+			                            case 3:
 			                                gui::StyleColorsLight();
 			                            break;
 			                        }

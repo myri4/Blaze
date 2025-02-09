@@ -135,6 +135,12 @@ namespace wc
 			m_PhysicsWorld.Destroy();
 		}
 
+		void Destroy()
+		{
+			if (m_PhysicsWorld.IsValid()) m_PhysicsWorld.Destroy();
+			DeleteAllEntities();
+		}
+
 		void UpdatePhysics()
 		{
 		    m_PhysicsWorld.SetGravity(m_PhysicsWorldData.Gravity);
@@ -476,9 +482,7 @@ namespace wc
 
 	    void DeleteAllEntities()
 		{
-		    m_World.each([](flecs::entity entity, EntityTag) {
-                entity.destruct();
-                });
+			m_World.reset();
 			m_EntityOrder.clear();
 		}
 

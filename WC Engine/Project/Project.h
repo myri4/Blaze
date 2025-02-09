@@ -86,20 +86,20 @@ namespace wc::Project
         }
     
         name = pName;
-        rootPath = filepath + "/" + pName + BLAZE_EXTENSION;
+        rootPath = filepath + "\\" + pName + BLAZE_EXTENSION;
         AddProjectToList();
-        std::string assetDir = rootPath + "/Assets";
+        std::string assetDir = rootPath + "\\Assets";
         std::filesystem::create_directory(rootPath);
-        std::filesystem::create_directory(rootPath + "/Scenes");
+        std::filesystem::create_directory(rootPath + "\\Scenes");
         std::filesystem::create_directory(assetDir);
-        std::filesystem::create_directory(assetDir + "/Scripts");
-        std::filesystem::create_directory(assetDir + "/Textures");
-        std::filesystem::create_directory(assetDir + "/Audio");
-        std::filesystem::create_directory(assetDir + "/Fonts");
-        std::filesystem::create_directory(assetDir + "/Shaders");
-        std::filesystem::create_directory(assetDir + "/Entities");
+        std::filesystem::create_directory(assetDir + "\\Scripts");
+        std::filesystem::create_directory(assetDir + "\\Textures");
+        std::filesystem::create_directory(assetDir + "\\Audio");
+        std::filesystem::create_directory(assetDir + "\\Fonts");
+        std::filesystem::create_directory(assetDir + "\\Shaders");
+        std::filesystem::create_directory(assetDir + "\\Entities");
     
-        WC_CORE_INFO("Create Successful -> Created project: {0} at {1}", pName, filepath);
+        WC_CORE_INFO("Create Successful -> Created project: {} at {}", pName, filepath);
     }
     
     inline bool Load(const std::string& filepath)

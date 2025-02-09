@@ -157,7 +157,7 @@ namespace wc
 				GenerateDescriptor(m_Buffers[2].imageViews[currentMip], m_Buffers[0].imageViews[0]);
 		}
 
-		void Execute(CommandEncoder& cmd, float Threshold = 0.8f, float Knee = 0.6f)
+		void Execute(CommandEncoder& cmd, float Threshold = 1.f, float Knee = 0.6f)
 		{
 			cmd.BindShader(m_Shader);
 			uint32_t counter = 0;
