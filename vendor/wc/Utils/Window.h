@@ -330,6 +330,7 @@ namespace wc
         }
 
 		void SetResizeCallback(GLFWwindowsizefun func) { glfwSetWindowSizeCallback(m_Window, func);	}
+        void SetFramebufferResizeCallback(GLFWframebuffersizefun func) { glfwSetFramebufferSizeCallback(m_Window, func); }
 
         void SetFocus(bool focus = true) { glfwWindowHint(GLFW_FOCUSED, focus); }
 

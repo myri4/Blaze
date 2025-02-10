@@ -49,7 +49,7 @@ namespace vk
 		wc::FPtr<vk::ImageView> imageViews;
 		wc::FPtr<VkFramebuffer> Framebuffers;
 
-
+		VkExtent2D extent;
 
 		bool Create(const wc::Window& window) 
 		{
@@ -59,10 +59,10 @@ namespace vk
 				return false;
 			}
 			surface.Query();
-			return Create(window.GetFramebufferExtent(), window.GetSize(), window.VSync);
+			return Create(window.GetFramebufferExtent(), window.VSync);
 		}
 
-		bool Create(VkExtent2D windowExtent, glm::uvec2 windowSize, bool VSync, bool hasClear = true)
+		bool Create(VkExtent2D windowExtent, bool VSync, bool hasClear = true)
 		{
 			VkSurfaceFormatKHR surfaceFormat = surface.formats[0];
 			for (const auto& availableFormat : surface.formats)
@@ -81,7 +81,6 @@ namespace vk
 						break;
 					}
 
-			VkExtent2D extent;
 			if (surface.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 				extent = surface.capabilities.currentExtent;
 			else
@@ -220,8 +219,8 @@ namespace vk
 				.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass = RenderPass,
 				.attachmentCount = 1,
-				.width = windowSize.x,
-				.height = windowSize.y,
+				.width = extent.width,
+				.height = extent.height,
 				.layers = 1,
 			};
 

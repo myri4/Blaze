@@ -1991,17 +1991,11 @@ namespace wc
 	        gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
 	        gui::SetCursorPosX(gui::GetWindowSize().x - (buttonSize + gui::GetStyle().FramePadding.x * 2) * 3);
 	        if (gui::ImageButton("collapse", t_Collapse, {buttonSize, buttonSize}))
-	        {
-	            //TODO - FIX: Crashes
-	            //Globals.window.Minimize();
-	        }
+	            Globals.window.Minimize();
 
 	        gui::SameLine(0, 0);
 	        if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-	        {
-	            //TODO - FIX: Crashes
-	            //Globals.window.SetMaximized(!Globals.window.IsMaximized());
-	        }
+	            Globals.window.SetMaximized(!Globals.window.IsMaximized());
 
 	        gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
 	        gui::SameLine(0, 0);

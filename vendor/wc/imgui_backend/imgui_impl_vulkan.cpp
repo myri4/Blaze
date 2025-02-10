@@ -52,7 +52,7 @@ struct ImGui_ImplVulkanH_Window
 		Height = height;
 
 		Swapchain.surface.Query();
-		Swapchain.Create(VkExtent2D{ width, height }, { width, height }, false, ClearEnable);
+		Swapchain.Create(VkExtent2D{ width, height }, false, ClearEnable);
 		AllocSyncs();
 	}
 

@@ -72,16 +72,15 @@ namespace wc
 			.Width = 1280,
 			.Height = 720,
 			.Name = "Editor",
-			.StartMode = WindowMode::Maximized,
+			.StartMode = WindowMode::Normal,
 			.VSync = false,
 			.Resizeable = true,
 			.Decorated = false,
 		};
 		Globals.window.Create(windowInfo);
-		Globals.window.SetResizeCallback([](GLFWwindow* window, int w, int h)
+		Globals.window.SetFramebufferResizeCallback([](GLFWwindow* window, int w, int h)
 			{
 				reinterpret_cast<wc::Window*>(window)->resized = true;
-				Resize(); // @TODO: Probably should remove this in the future
 			});
 		swapchain.Create(Globals.window);
 
@@ -129,7 +128,7 @@ namespace wc
 
 			VkResult result = swapchain.AcquireNextImage(swapchainImageIndex, vk::SyncContext::GetImageAvaibleSemaphore());
 
-			if (result == VK_ERROR_OUT_OF_DATE_KHR)
+			if (result == VK_ERROR_OUT_OF_DATE_KHR || Globals.window.resized)
 			{
 				Resize();
 				return;
@@ -170,7 +169,7 @@ namespace wc
 
 				.renderPass = swapchain.RenderPass,
 				.framebuffer = swapchain.Framebuffers[swapchainImageIndex],
-				.renderArea.extent = extent,
+				.renderArea.extent = swapchain.extent,
 				.clearValueCount = 1,
 				.pClearValues = &clearValue,
 			};
@@ -216,13 +215,13 @@ namespace wc
 
 			VkResult presentationResult = vkQueuePresentKHR(vk::SyncContext::GetPresentQueue(), &presentInfo);
 
-			if (presentationResult == VK_ERROR_OUT_OF_DATE_KHR || presentationResult == VK_SUBOPTIMAL_KHR || Globals.window.resized)
+			if (presentationResult == VK_ERROR_OUT_OF_DATE_KHR || presentationResult == VK_SUBOPTIMAL_KHR)
 			{
 				Resize();
 			}
 			else if (presentationResult != VK_SUCCESS)
 			{
-				WC_CORE_ERROR("Presentation result: {}", magic_enum::enum_name(presentationResult));
+				WC_CORE_ERROR("Presentation result: {}, code: {}", magic_enum::enum_name(presentationResult), (int)presentationResult);
 			}
 
 			vk::SyncContext::UpdateFrame();
