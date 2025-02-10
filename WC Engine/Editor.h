@@ -139,6 +139,7 @@ namespace wc
 		Texture t_Play;
 		Texture t_Simulate;
 		Texture t_Stop;
+	    Texture t_Add;
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
@@ -197,6 +198,7 @@ namespace wc
 			t_Play.Load("assets/textures/menu/play.png");
 			t_Simulate.Load("assets/textures/menu/simulate.png");
 			t_Stop.Load("assets/textures/menu/stop.png");
+			t_Add.Load("assets/textures/menu/add.png");
 
 			m_PhysicsDebugDraw = {
 				DrawPolygonFcn,
@@ -831,7 +833,9 @@ namespace wc
 					if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)) { entityFilter = filterBuff; }
 
 					gui::BeginDisabled(buttonDnD);
+				    gui::PushStyleColor(ImGuiCol_Button, gui::GetStyleColorVec4(ImGuiCol_CheckMark));
 					if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
+				    gui::PopStyleColor();
 					gui::EndDisabled();
 
 					if (buttonDnD && gui::BeginDragDropTarget())
@@ -867,7 +871,9 @@ namespace wc
 					gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
 					static std::string name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
-					gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
+				    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+				    gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll);
+
 					const float widgetSize = gui::GetItemRectSize().x;
 
 					gui::BeginDisabled(name.empty());
@@ -930,7 +936,8 @@ namespace wc
 				{
 					std::string nameBuffer = m_SelectedEntity.name().c_str();
 
-					if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
+				    gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::GetStyle().ItemSpacing.x * 2 - gui::CalcTextSize("Add Component(?)").x - gui::GetStyle().FramePadding.x * 2);
+					if (gui::InputText("##Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 					{
 						if (!nameBuffer.empty())
 						{
@@ -955,15 +962,12 @@ namespace wc
 							}
 						}
 					}
-					ui::HelpMarker("Press ENTER or Deselect to confirm");
-					static bool showAddComponent = false;
+				    const float widgetSize = gui::GetItemRectSize().y;
 					static enum { None, Transform, Render, Rigid } menu = None;
-					if (gui::Button("Add Component", { gui::CalcItemWidth(), 0 }))
-					{
-						showAddComponent = true;
-						menu = None;
-					}
-
+					static bool showAddComponent = false;
+				    //TODO - add icon
+				    gui::SameLine();  if (gui::Button("Add Component")) {showAddComponent = true; menu = None;}
+					ui::HelpMarker("Press ENTER or Deselect to confirm Name change");
 					auto ItemAutoClose = [](const char* label, bool disabled) -> bool
 						{
 							if (gui::MenuItem(label, nullptr, nullptr, !disabled))
@@ -1127,7 +1131,7 @@ namespace wc
 								if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
 								{
 									gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-									if (gui::Button("New Material", { gui::GetContentRegionAvail().x, 0 }))
+									if (gui::Button("New Material##Button", { gui::GetContentRegionAvail().x, 0 }))
 										gui::OpenPopup("Create Material##popup");
 									gui::PopStyleColor();
 
@@ -1135,6 +1139,7 @@ namespace wc
 									if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
 									{
 										static std::string name;
+									    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 										gui::InputText("Name", &name);
 										const float widgetSize = gui::GetItemRectSize().x;
 
@@ -1191,11 +1196,10 @@ namespace wc
 								ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
 								gui::EndGroup();
 								gui::EndDisabled();
-								if (currentMaterialName == "Default")
-									gui::SetItemTooltip("Cannot edit Default material values");
+
+						        if (currentMaterialName == "Default") gui::SetItemTooltip("Cannot edit Default material values");
 
 								material = curMaterial;
-
 							};
 
 						EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
@@ -2004,7 +2008,7 @@ namespace wc
 			}
 		}
 
-	    void WindowButtons()
+	    void WindowButtons() const
         {
 	        // Buttons
 	        gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
@@ -2127,6 +2131,7 @@ namespace wc
 					if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 					{
 						static std::string projName = "Untitled";
+					    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 						gui::InputText("Project Name", &projName);
 						const float widgetWidth = gui::GetItemRectSize().x;
 
@@ -2282,8 +2287,7 @@ namespace wc
 							gui::SeparatorText("Scene");
 
 							static bool openSceneNamePopup = false;
-							if (ui::MenuItemButton("New", "CTRL + N", false))
-								gui::OpenPopup("New Scene");
+							if (ui::MenuItemButton("New", "CTRL + N", false)) gui::OpenPopup("New Scene");
 
 							std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
 							static std::string newSceneSavePath;
@@ -2303,6 +2307,7 @@ namespace wc
 							if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							{
 								static std::string sceneName = "newScene";
+							    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 								gui::InputText("Scene Name", &sceneName);
 								const float widgetWidth = gui::GetItemRectSize().x;
 
@@ -2462,6 +2467,7 @@ namespace wc
 			t_Play.Destroy();
 			t_Simulate.Destroy();
 			t_Stop.Destroy();
+			t_Add.Destroy();
 
 			assetManager.Free();
 			m_Renderer.Deinit();

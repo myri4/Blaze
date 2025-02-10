@@ -272,7 +272,7 @@ namespace wc
                 for (auto& edge : edgeHover) edge &= canResize;
 
                 // resize
-                if (!resize.active && ImGui::IsMouseClicked(0)) {
+                if (!Globals.window.IsMaximized() && !resize.active && ImGui::IsMouseClicked(0)) {
                     for (int i = 0; i < 4; i++) {
                         if (edgeHover[i]) {
                             resize.active = true;
@@ -316,7 +316,7 @@ namespace wc
 
                 // Update cursor
                 ImGuiMouseCursor cursor = ImGuiMouseCursor_Arrow;
-                if (resize.active || canResize) {
+                if (!Globals.window.IsMaximized() && (resize.active || canResize)) {
                     const bool horizontal = edgeHover[LEFT] || edgeHover[RIGHT] || resize.edges[LEFT] || resize.edges[RIGHT];
                     const bool vertical = edgeHover[TOP] || edgeHover[BOTTOM] || resize.edges[TOP] || resize.edges[BOTTOM];
 

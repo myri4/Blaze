@@ -37,6 +37,11 @@ namespace wc
 		{
 			return ImVec4(v.x, v.y, v.z, v.w);
 		}
+
+	    ImVec4 GlmToImVec4(const ImVec4& v, const float offset)
+		{
+		    return ImVec4(v.x + offset, v.y + offset, v.z + offset, v.w + offset);
+		}
 	}
 
 	namespace ui
@@ -547,8 +552,7 @@ namespace wc
 			if (itemSpacingY > -1) gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, itemSpacingY);
 
 			ImGuiWindow* window = ImGui::GetCurrentWindow();
-			if (window->SkipItems)
-				return;
+			if (window->SkipItems) return;
 
 			ImDrawList* draw_list = ImGui::GetWindowDrawList();
 			ImGuiStyle& style = ImGui::GetStyle();
