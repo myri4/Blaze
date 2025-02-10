@@ -579,6 +579,53 @@ namespace wc
 
 			if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 			{
+                auto popup = [&](flecs::entity entity) -> void
+                    {
+                    // Display the popup menu
+                    if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
+                    {
+                        gui::Text("%s", entity.name().c_str());
+                        gui::Separator();
+
+                        if (gui::MenuItem("Clone"))
+                        {
+                            WC_CORE_INFO("Implement Clone");
+                            gui::CloseCurrentPopup();
+                        }
+
+                        if (gui::MenuItem("Export"))
+                        {
+                            WC_CORE_INFO("Implement Export");
+                            gui::CloseCurrentPopup();
+                        }
+
+                        if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
+                        {
+                            //auto parent = entity.parent();
+                            m_Scene.RemoveChild(entity);
+                        }
+
+                        if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
+                        {
+                            if (gui::MenuItem("Set Child of Selected"))
+                                m_Scene.SetChild(m_SelectedEntity, entity);
+                        }
+
+                        gui::Separator();
+
+                        gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+                        if (gui::MenuItem("Delete"))
+                        {
+                            m_Scene.KillEntity(entity);
+                            m_SelectedEntity = flecs::entity::null();
+                            gui::CloseCurrentPopup();
+                        }
+                        gui::PopStyleColor();
+
+                        gui::EndPopup();
+                    }
+                    };
+
 				// Reorder
 				auto separator = [&](flecs::entity entity) -> void
 					{
@@ -640,21 +687,6 @@ namespace wc
 
 				auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 					{
-						if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
-						{
-							if (gui::IsItemHovered())
-							{
-								WC_INFO("Hovered {}", entity.name().c_str());
-								gui::OpenPopup(std::to_string(entity.id()).c_str());
-							}
-							// TODO - ask if this is needed and fix it
-							/*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
-							{
-								WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
-								gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
-							}*/
-						}
-
 						const bool is_selected = (m_SelectedEntity == entity);
 
 						std::vector<flecs::entity> children;
@@ -701,6 +733,16 @@ namespace wc
 						// Render the entity
 						bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 
+				        if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+				        {
+				            if (gui::IsItemHovered())
+				            {
+				                WC_INFO("Hovered {}", entity.name().c_str());
+				                gui::OpenPopup(std::to_string(entity.id()).c_str());
+				            }
+				        }
+				        popup(entity);
+
 						// Handle selection on click
 						if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
 
@@ -732,51 +774,6 @@ namespace wc
 							gui::EndDragDropTarget();
 						}
 
-						// Display the popup menu
-						if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
-						{
-							gui::Text("%s", entity.name().c_str());
-							gui::Separator();
-
-							if (gui::MenuItem("Clone"))
-							{
-								WC_CORE_INFO("Implement Clone");
-								gui::CloseCurrentPopup();
-							}
-
-							if (gui::MenuItem("Export"))
-							{
-								WC_CORE_INFO("Implement Export");
-								gui::CloseCurrentPopup();
-							}
-
-							if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-							{
-								//auto parent = entity.parent();
-								m_Scene.RemoveChild(entity);
-							}
-
-							if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
-							{
-								if (gui::MenuItem("Set Child of Selected"))
-									m_Scene.SetChild(m_SelectedEntity, entity);
-							}
-
-							gui::Separator();
-
-							gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-							if (gui::MenuItem("Delete"))
-							{
-								m_Scene.KillEntity(entity);
-								m_SelectedEntity = flecs::entity::null();
-								gui::CloseCurrentPopup();
-							}
-							gui::PopStyleColor();
-
-							gui::EndPopup();
-						}
-
-
 						// If the node is open, recursively display children
 						if (is_open)
 						{
@@ -801,6 +798,17 @@ namespace wc
 					if (rootEntity) displayEntity(rootEntity, displayEntity);
 				}
 				gui::PopStyleVar();
+
+			    // TODO - ask if this is needed and fix it
+			    if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+			    {
+			        if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+			        {
+			            WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
+			            gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+			        }
+			    }
+			    popup(m_SelectedEntity);
 			}
 			gui::EndChild();
 		}
