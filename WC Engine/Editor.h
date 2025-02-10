@@ -139,6 +139,7 @@ namespace wc
 		Texture t_Play;
 		Texture t_Simulate;
 		Texture t_Stop;
+	    Texture t_Add;
 
 		glm::vec2 WindowPos;
 		glm::vec2 RenderSize;
@@ -197,6 +198,7 @@ namespace wc
 			t_Play.Load("assets/textures/menu/play.png");
 			t_Simulate.Load("assets/textures/menu/simulate.png");
 			t_Stop.Load("assets/textures/menu/stop.png");
+			t_Add.Load("assets/textures/menu/add.png");
 
 			m_PhysicsDebugDraw = {
 				DrawPolygonFcn,
@@ -579,6 +581,53 @@ namespace wc
 
 			if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 			{
+                auto popup = [&](flecs::entity entity) -> void
+                    {
+                    // Display the popup menu
+                    if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
+                    {
+                        gui::Text("%s", entity.name().c_str());
+                        gui::Separator();
+
+                        if (gui::MenuItem("Clone"))
+                        {
+                            WC_CORE_INFO("Implement Clone");
+                            gui::CloseCurrentPopup();
+                        }
+
+                        if (gui::MenuItem("Export"))
+                        {
+                            WC_CORE_INFO("Implement Export");
+                            gui::CloseCurrentPopup();
+                        }
+
+                        if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
+                        {
+                            //auto parent = entity.parent();
+                            m_Scene.RemoveChild(entity);
+                        }
+
+                        if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
+                        {
+                            if (gui::MenuItem("Set Child of Selected"))
+                                m_Scene.SetChild(m_SelectedEntity, entity);
+                        }
+
+                        gui::Separator();
+
+                        gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+                        if (gui::MenuItem("Delete"))
+                        {
+                            m_Scene.KillEntity(entity);
+                            m_SelectedEntity = flecs::entity::null();
+                            gui::CloseCurrentPopup();
+                        }
+                        gui::PopStyleColor();
+
+                        gui::EndPopup();
+                    }
+                    };
+
 				// Reorder
 				auto separator = [&](flecs::entity entity) -> void
 					{
@@ -640,21 +689,6 @@ namespace wc
 
 				auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 					{
-						if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
-						{
-							if (gui::IsItemHovered())
-							{
-								WC_INFO("Hovered {}", entity.name().c_str());
-								gui::OpenPopup(std::to_string(entity.id()).c_str());
-							}
-							// TODO - ask if this is needed and fix it
-							/*if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
-							{
-								WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
-								gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
-							}*/
-						}
-
 						const bool is_selected = (m_SelectedEntity == entity);
 
 						std::vector<flecs::entity> children;
@@ -701,6 +735,16 @@ namespace wc
 						// Render the entity
 						bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 
+				        if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+				        {
+				            if (gui::IsItemHovered())
+				            {
+				                WC_INFO("Hovered {}", entity.name().c_str());
+				                gui::OpenPopup(std::to_string(entity.id()).c_str());
+				            }
+				        }
+				        popup(entity);
+
 						// Handle selection on click
 						if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
 
@@ -732,51 +776,6 @@ namespace wc
 							gui::EndDragDropTarget();
 						}
 
-						// Display the popup menu
-						if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
-						{
-							gui::Text("%s", entity.name().c_str());
-							gui::Separator();
-
-							if (gui::MenuItem("Clone"))
-							{
-								WC_CORE_INFO("Implement Clone");
-								gui::CloseCurrentPopup();
-							}
-
-							if (gui::MenuItem("Export"))
-							{
-								WC_CORE_INFO("Implement Export");
-								gui::CloseCurrentPopup();
-							}
-
-							if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-							{
-								//auto parent = entity.parent();
-								m_Scene.RemoveChild(entity);
-							}
-
-							if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
-							{
-								if (gui::MenuItem("Set Child of Selected"))
-									m_Scene.SetChild(m_SelectedEntity, entity);
-							}
-
-							gui::Separator();
-
-							gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-							if (gui::MenuItem("Delete"))
-							{
-								m_Scene.KillEntity(entity);
-								m_SelectedEntity = flecs::entity::null();
-								gui::CloseCurrentPopup();
-							}
-							gui::PopStyleColor();
-
-							gui::EndPopup();
-						}
-
-
 						// If the node is open, recursively display children
 						if (is_open)
 						{
@@ -801,6 +800,17 @@ namespace wc
 					if (rootEntity) displayEntity(rootEntity, displayEntity);
 				}
 				gui::PopStyleVar();
+
+			    // TODO - ask if this is needed and fix it
+			    if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+			    {
+			        if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+			        {
+			            WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
+			            gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+			        }
+			    }
+			    popup(m_SelectedEntity);
 			}
 			gui::EndChild();
 		}
@@ -823,7 +833,9 @@ namespace wc
 					if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)) { entityFilter = filterBuff; }
 
 					gui::BeginDisabled(buttonDnD);
+				    gui::PushStyleColor(ImGuiCol_Button, gui::GetStyleColorVec4(ImGuiCol_CheckMark));
 					if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
+				    gui::PopStyleColor();
 					gui::EndDisabled();
 
 					if (buttonDnD && gui::BeginDragDropTarget())
@@ -859,7 +871,9 @@ namespace wc
 					gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
 					static std::string name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
-					gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal);
+				    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+				    gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll);
+
 					const float widgetSize = gui::GetItemRectSize().x;
 
 					gui::BeginDisabled(name.empty());
@@ -922,7 +936,8 @@ namespace wc
 				{
 					std::string nameBuffer = m_SelectedEntity.name().c_str();
 
-					if (gui::InputText("Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
+				    gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::GetStyle().ItemSpacing.x * 2 - gui::CalcTextSize("Add Component(?)").x - gui::GetStyle().FramePadding.x * 2);
+					if (gui::InputText("##Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 					{
 						if (!nameBuffer.empty())
 						{
@@ -947,15 +962,12 @@ namespace wc
 							}
 						}
 					}
-					ui::HelpMarker("Press ENTER or Deselect to confirm");
-					static bool showAddComponent = false;
+				    const float widgetSize = gui::GetItemRectSize().y;
 					static enum { None, Transform, Render, Rigid } menu = None;
-					if (gui::Button("Add Component", { gui::CalcItemWidth(), 0 }))
-					{
-						showAddComponent = true;
-						menu = None;
-					}
-
+					static bool showAddComponent = false;
+				    //TODO - add icon
+				    gui::SameLine();  if (gui::Button("Add Component")) {showAddComponent = true; menu = None;}
+					ui::HelpMarker("Press ENTER or Deselect to confirm Name change");
 					auto ItemAutoClose = [](const char* label, bool disabled) -> bool
 						{
 							if (gui::MenuItem(label, nullptr, nullptr, !disabled))
@@ -1070,10 +1082,30 @@ namespace wc
 							realRotation = glm::radians(rotation);
 							});
 
-						EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component) {
+						EditComponent<SpriteRendererComponent>("Sprite Renderer", [](auto& component)
+						{
 							gui::ColorEdit4("color", glm::value_ptr(component.Color));
 							gui::Button("Texture");
-							});
+
+						    if (ui::MatchPayloadType("DND_PATH"))
+						    {
+						        std::filesystem::path path = static_cast<const char*>(gui::GetDragDropPayload()->Data);
+						        if (path.extension() == ".png" || path.extension() == ".jpg" || path.extension() == ".jpeg" ||
+						            path.extension() == ".bmp" || path.extension() == ".tga")
+						        {
+						            if (gui::BeginDragDropTarget())
+						            {
+						                if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+						                {
+						                    const char* payloadPath = static_cast<const char*>(payload->Data);
+
+						                    // component.Texture = Texture2D::Load(payloadPath);
+						                }
+						                gui::EndDragDropTarget();
+						            }
+						        }
+                            }
+						});
 
 						EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
 							ui::Slider("Thickness", component.Thickness, 0.0f, 1.0f);
@@ -1099,7 +1131,7 @@ namespace wc
 								if (gui::BeginCombo("Materials", currentMaterialName.c_str()))
 								{
 									gui::PushStyleColor(ImGuiCol_FrameBg, gui::GetStyle().Colors[ImGuiCol_PopupBg]);
-									if (gui::Button("New Material", { gui::GetContentRegionAvail().x, 0 }))
+									if (gui::Button("New Material##Button", { gui::GetContentRegionAvail().x, 0 }))
 										gui::OpenPopup("Create Material##popup");
 									gui::PopStyleColor();
 
@@ -1107,6 +1139,7 @@ namespace wc
 									if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
 									{
 										static std::string name;
+									    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 										gui::InputText("Name", &name);
 										const float widgetSize = gui::GetItemRectSize().x;
 
@@ -1163,11 +1196,10 @@ namespace wc
 								ui::Checkbox("Update Body Mass", curMaterial.UpdateBodyMass);
 								gui::EndGroup();
 								gui::EndDisabled();
-								if (currentMaterialName == "Default")
-									gui::SetItemTooltip("Cannot edit Default material values");
+
+						        if (currentMaterialName == "Default") gui::SetItemTooltip("Cannot edit Default material values");
 
 								material = curMaterial;
-
 							};
 
 						EditComponent<RigidBodyComponent>("Rigid Body", [](auto& component) {
@@ -1446,6 +1478,7 @@ namespace wc
 
 						gui::TableSetColumnIndex(1);
 
+					    //show icons
 						if (gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
 						{
 							if (selectedFolderPath == assetsPath)
@@ -1975,7 +2008,7 @@ namespace wc
 			}
 		}
 
-	    void WindowButtons()
+	    void WindowButtons() const
         {
 	        // Buttons
 	        gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
@@ -2092,11 +2125,12 @@ namespace wc
 					if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 					{
 						static std::string projName = "Untitled";
+					    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 						gui::InputText("Project Name", &projName);
 						const float widgetWidth = gui::GetItemRectSize().x;
 
 						gui::BeginDisabled(projName.empty());
-						if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+						if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 						{
 							if (Project::ExistListProject(projName))
 							{
@@ -2113,8 +2147,8 @@ namespace wc
 						gui::EndDisabled();
 						if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
 
-						gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-						if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+						gui::SameLine(widgetWidth - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+						if (gui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
 						{
 							projName = "Untitled";
 							newProjectSavePath.clear();
@@ -2126,7 +2160,7 @@ namespace wc
 						if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 						{
 							gui::Text("Project with this name already exists!");
-							if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+							if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 							gui::EndPopup();
 						}
 
@@ -2177,21 +2211,20 @@ namespace wc
 							if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							{
 								gui::Text("Are you sure you want to delete this project?");
-								if (gui::Button("Yes##Delete") || gui::IsKeyPressed(ImGuiKey_Enter))
+								if (gui::Button("Yes##Delete", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 								{
 									Project::Delete(project);
 									gui::CloseCurrentPopup();
 								}
 
-								gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::CalcTextSize("No").x - gui::GetStyle().FramePadding.x);
-								if (gui::Button("No##Delete") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+								gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+								if (gui::Button("No##Delete", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
 
 								gui::EndPopup();
 							}
 						}
 					}
 					gui::EndChild();
-
 				}
 				else
 				{
@@ -2248,8 +2281,7 @@ namespace wc
 							gui::SeparatorText("Scene");
 
 							static bool openSceneNamePopup = false;
-							if (ui::MenuItemButton("New", "CTRL + N", false))
-								gui::OpenPopup("New Scene");
+							if (ui::MenuItemButton("New", "CTRL + N", false)) gui::OpenPopup("New Scene");
 
 							std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
 							static std::string newSceneSavePath;
@@ -2269,11 +2301,12 @@ namespace wc
 							if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 							{
 								static std::string sceneName = "newScene";
+							    if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 								gui::InputText("Scene Name", &sceneName);
 								const float widgetWidth = gui::GetItemRectSize().x;
 
 								gui::BeginDisabled(sceneName.empty());
-								if (gui::Button("OK") || gui::IsKeyPressed(ImGuiKey_Enter))
+								if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 								{
 									m_Scene.Destroy();
 									m_ScenePath = newSceneSavePath + '\\' + sceneName + ".scene";
@@ -2287,8 +2320,8 @@ namespace wc
 								gui::EndDisabled();
 								if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
 
-								gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-								if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+								gui::SameLine(widgetWidth - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+								if (gui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
 								{
 									sceneName = "newScene";
 									newSceneSavePath.clear();
@@ -2428,6 +2461,7 @@ namespace wc
 			t_Play.Destroy();
 			t_Simulate.Destroy();
 			t_Stop.Destroy();
+			t_Add.Destroy();
 
 			assetManager.Free();
 			m_Renderer.Deinit();
