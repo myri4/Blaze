@@ -93,7 +93,6 @@ namespace wc
 						}
 					}
 
-					// TODO - fix this so we load the start path
 					if (startPath.empty())currentPath = disks[0];
 					else currentPath = startPath;
 				}
@@ -604,6 +603,14 @@ namespace wc
 		    bool result = ImGui::BeginMenu(label);
 		    gui::PopFont();
 		    return result;
+		}
+
+	    //Pop font(3) is needed
+	    inline void PushButtonColor(const ImVec4 color, const float hoverOffset = 0.8f, const float activeOffset = 0.9f)
+		{
+		    gui::PushStyleColor(ImGuiCol_Button, color);
+		    gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x * hoverOffset, color.y * hoverOffset, color.z * hoverOffset, color.w));
+		    gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x * activeOffset, color.y * activeOffset, color.z * activeOffset, color.w));
 		}
 
 		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func

@@ -6,16 +6,25 @@
 
 namespace wc
 {
+    struct AppFont
+    {
+        ImFont* Regular = nullptr;
+        ImFont* Bold = nullptr;
+        ImFont* Italic = nullptr;
+        ImFont* Thin = nullptr;
+        ImFont* Big = nullptr;
+        ImFont* Small = nullptr;
+        ImFont* Menu = nullptr;
+        // ADD OTHER IF NEEDED
+    };
+
 	struct GlobalVariables
 	{
 		Window window; // @TODO: maybe rename to main window
 
 		// Change size if needed
-		ImFont* fontDefault = nullptr;
-		ImFont* fontBig = nullptr;
-	    ImFont* fontMenu = nullptr;
-		//ImFont* fontSmall = nullptr;
-		//ImFont* fontBold = nullptr;
+        AppFont f_Display = {};
+	    AppFont f_Default = {};
 
 		Clock deltaTimer;
 		float deltaTime = 0.f;

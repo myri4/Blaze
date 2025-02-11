@@ -801,7 +801,6 @@ namespace wc
 				}
 				gui::PopStyleVar();
 
-			    // TODO - ask if this is needed and fix it
 			    if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 			    {
 			        if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
@@ -829,13 +828,17 @@ namespace wc
 					bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
 					//WC_INFO("1: {}", gui::IsDragDropActive());
 					gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
+				    gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
+				    gui::PushFont(Globals.f_Display.Bold);
 					gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
 					if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)) { entityFilter = filterBuff; }
 
 					gui::BeginDisabled(buttonDnD);
-				    gui::PushStyleColor(ImGuiCol_Button, gui::GetStyleColorVec4(ImGuiCol_CheckMark));
-					if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
-				    gui::PopStyleColor();
+				    ui::PushButtonColor(gui::GetStyle().Colors[ImGuiCol_CheckMark]);
+				    if (gui::Button(buttonDnD ? "Remove Parent" : "Add Entity")) showPopup = true;
+                    gui::PopFont();
+				    gui::PopStyleVar();
+				    gui::PopStyleColor(3);
 					gui::EndDisabled();
 
 					if (buttonDnD && gui::BeginDragDropTarget())
@@ -2017,7 +2020,7 @@ namespace wc
 	        gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 
 	        //get frame height gets font size
-	        gui::PushFont(Globals.fontMenu);
+	        gui::PushFont(Globals.f_Default.Menu);
 	        float buttonSize = gui::GetFrameHeightWithSpacing() - 16;
 	        gui::PopFont();
 
@@ -2032,13 +2035,42 @@ namespace wc
 
 	        gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
 	        gui::SameLine(0, 0);
-	        if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
+		    static bool showCloseWarn = false;
+		    if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
 	        {
-	            Globals.window.Close();
+	            if (Project::Exists())
+                {
+                    showCloseWarn = true;
+                }
+                else
+                {
+                    Globals.window.Close();
+                }
 	        }
-
+		    if (showCloseWarn)
+		    {
+		        gui::OpenPopup("Close Project Warning");
+		        showCloseWarn = false;
+		    }
 	        ImGui::PopStyleColor(4);
-	        ImGui::PopStyleVar(2); // 2
+	        ImGui::PopStyleVar(2);
+		    ui::CenterNextWindow();
+		    if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
+		    {
+		        gui::Text("Are you sure you want to EXIT?");
+		        gui::Text("!Unsaved changes will be lost!");
+		        if (gui::Button("Close", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
+		        {
+		            Globals.window.Close();
+		            gui::CloseCurrentPopup();
+		        }
+		        gui::SameLine(gui::CalcTextSize("!Unsaved changes will be lost!").x - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+		        if (gui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
+		        {
+		            gui::CloseCurrentPopup();
+		        }
+		        gui::EndPopup();
+		    }
 
             // Drag when hovering tab bar
             //TODO - Maybe Reposition this
@@ -2099,7 +2131,7 @@ namespace wc
 
 					static bool openProjNamePopup = false; // New persistent flag
 
-					gui::PushFont(Globals.fontBig);
+					gui::PushFont(Globals.f_Default.Big);
 					if (gui::Button("New Project"))
 					{
 						gui::OpenPopup("New Project");
@@ -2169,7 +2201,7 @@ namespace wc
 
 					gui::SameLine();
 
-					gui::PushFont(Globals.fontBig);
+					gui::PushFont(Globals.f_Default.Big);
 					if (gui::Button("Open Project"))
 					{
 						gui::OpenPopup("Open Project");
@@ -2187,7 +2219,7 @@ namespace wc
 					{
 						for (auto project : Project::savedProjectPaths)
 						{
-							gui::PushFont(Globals.fontBig);
+							gui::PushFont(Globals.f_Default.Big);
 							std::filesystem::path path = project;
 							if (std::filesystem::exists(path))
 							{
@@ -2246,7 +2278,7 @@ namespace wc
 							//WC_CORE_INFO("Empty space on main menu bar is hovered)"
 						}
 
-					    if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.fontMenu))
+					    if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.f_Default.Menu))
 						{
 							if (gui::MenuItem("Change", "CTRL + P")) Project::Clear();
 
@@ -2276,7 +2308,7 @@ namespace wc
 
 						gui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 
-			            if (ui::BeginMenuFt("File", Globals.fontMenu))
+			            if (ui::BeginMenuFt("File", Globals.f_Default.Menu))
 			            {
 							gui::SeparatorText("Scene");
 
@@ -2309,7 +2341,7 @@ namespace wc
 								if (gui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 								{
 									m_Scene.Destroy();
-									m_ScenePath = newSceneSavePath + '\\' + sceneName + ".scene";
+									m_ScenePath = newSceneSavePath + '/' + sceneName + ".scene";
 									m_SelectedEntity = flecs::entity::null();
 
 									sceneName = "newScene";
@@ -2370,7 +2402,7 @@ namespace wc
 							gui::EndMenu();
 						}
 
-					    if (ui::BeginMenuFt("View", Globals.fontMenu))
+					    if (ui::BeginMenuFt("View", Globals.f_Default.Menu))
                         {
 							gui::MenuItem("Editor", nullptr, &showEditor);
 							gui::MenuItem("Scene properties", nullptr, &showSceneProperties);

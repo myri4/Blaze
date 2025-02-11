@@ -94,10 +94,29 @@ namespace wc
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.IniFilename = "assets/imgui.ini"; // TODO - remove and find alternative
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		/*//OLD FONTS
 		Globals.fontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 17.f);
 		Globals.fontBig = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 30.f);
-	    Globals.fontMenu = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 20.f);
-		io.FontDefault = Globals.fontDefault;
+	    Globals.fontMenu = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-Regular.ttf", 20.f);*/
+
+	    // Default font -> Poppins
+	    Globals.f_Default.Regular = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Regular.ttf", 17.f);
+	    Globals.f_Default.Bold = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Bold.ttf", 17.f);
+	    Globals.f_Default.Italic = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Italic.ttf", 17.f);
+	    Globals.f_Default.Thin = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Thin.ttf", 17.f);
+	    Globals.f_Default.Big = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Regular.ttf", 30.f);
+	    Globals.f_Default.Small = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Regular.ttf", 14.f);
+	    Globals.f_Default.Menu = io.Fonts->AddFontFromFileTTF("assets/fonts/Poppins/Poppins-Regular.ttf", 20.f);
+
+	    // Display font -> Neptune
+	    Globals.f_Display.Regular = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Regular.ttf", 17.f);
+	    Globals.f_Display.Bold = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Bold.ttf", 17.f);
+	    Globals.f_Display.Thin = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Thin.ttf", 17.f);
+	    Globals.f_Display.Big = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Regular.ttf", 30.f);
+	    Globals.f_Display.Small = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Regular.ttf", 14.f);
+	    Globals.f_Display.Menu = io.Fonts->AddFontFromFileTTF("assets/fonts/SeedSans/SeedSans-Regular.ttf", 20.f);
+
+		io.FontDefault = Globals.f_Default.Regular;
 
 		ImGui_ImplGlfw_Init(Globals.window, false);
 
@@ -237,8 +256,8 @@ namespace wc
 
 		    // Resize window
 			{
-			    // one struct for the operations
-                struct ResizeState {
+			    constexpr glm::ivec2 minWindowSize{100, 100}; // Define your minimum size her
+			    struct ResizeState {
                     bool active = false;
                     bool edges[4] = {}; // [left, right, top, bottom]
                     glm::ivec2 initialPos;
@@ -247,17 +266,17 @@ namespace wc
                 };
                 static ResizeState resize;
 
-			    // get window variables
+                // get window variables
                 auto& window = Globals.window;
                 const auto mousePos = window.GetCursorPos();
                 const auto windowSize = window.GetSize();
                 const auto windowPos = window.GetPosition();
                 constexpr int borderSize = 5;
 
-			    // calculate global mouse position
+                // calculate global mouse position
                 const glm::ivec2 globalMousePos = windowPos + mousePos;
 
-			    //calculate edges
+                // calculate edges
                 enum Edges { LEFT = 0, RIGHT, TOP, BOTTOM };
                 bool edgeHover[4] = {
                     (mousePos.x >= -borderSize) && (mousePos.x <= borderSize),
@@ -270,17 +289,20 @@ namespace wc
                 const bool canResize = window.HasFocus() && !resize.active;
                 for (auto& edge : edgeHover) edge &= canResize;
 
-                // resize
+                // resize initiation
                 if (!Globals.window.IsMaximized() && !resize.active && ImGui::IsMouseClicked(0)) {
+                    bool anyEdge = false;
                     for (int i = 0; i < 4; i++) {
                         if (edgeHover[i]) {
-                            resize.active = true;
                             resize.edges[i] = true;
-                            resize.initialPos = windowPos;
-                            resize.initialSize = windowSize;
-                            resize.initialMouseGlobal = globalMousePos;
-                            break;
+                            anyEdge = true;
                         }
+                    }
+                    if (anyEdge) {
+                        resize.active = true;
+                        resize.initialPos = windowPos;
+                        resize.initialSize = windowSize;
+                        resize.initialMouseGlobal = globalMousePos;
                     }
                 }
 
@@ -291,20 +313,20 @@ namespace wc
 
                         // Horizontal
                         if (resize.edges[LEFT]) {
-                            window.SetPosition({ resize.initialPos.x + delta.x, resize.initialPos.y });
-                            window.SetSize({ resize.initialSize.x - delta.x, windowSize.y });
+                            window.SetPosition({ resize.initialPos.x + delta.x, window.GetPosition().y });
+                            window.SetSize({ std::max(resize.initialSize.x - delta.x, minWindowSize.x), window.GetSize().y });
                         }
                         else if (resize.edges[RIGHT]) {
-                            window.SetSize({ resize.initialSize.x + delta.x, windowSize.y });
+                            window.SetSize({ std::max(resize.initialSize.x + delta.x, minWindowSize.x), window.GetSize().y });
                         }
 
                         // Vertical
                         if (resize.edges[TOP]) {
-                            window.SetPosition({ resize.initialPos.x, resize.initialPos.y + delta.y });
-                            window.SetSize({ windowSize.x, resize.initialSize.y - delta.y });
+                            window.SetPosition({ window.GetPosition().x, resize.initialPos.y + delta.y });
+                            window.SetSize({ window.GetSize().x, std::max(resize.initialSize.y - delta.y, minWindowSize.y) });
                         }
                         else if (resize.edges[BOTTOM]) {
-                            window.SetSize({ windowSize.x, resize.initialSize.y + delta.y });
+                            window.SetSize({ window.GetSize().x, std::max(resize.initialSize.y + delta.y, minWindowSize.y) });
                         }
                     }
 
@@ -316,13 +338,43 @@ namespace wc
                 // Update cursor
                 ImGuiMouseCursor cursor = ImGuiMouseCursor_Arrow;
                 if (!Globals.window.IsMaximized() && (resize.active || canResize)) {
-                    const bool horizontal = edgeHover[LEFT] || edgeHover[RIGHT] || resize.edges[LEFT] || resize.edges[RIGHT];
-                    const bool vertical = edgeHover[TOP] || edgeHover[BOTTOM] || resize.edges[TOP] || resize.edges[BOTTOM];
+                    bool horizontalHover = edgeHover[LEFT] || edgeHover[RIGHT];
+                    bool verticalHover = edgeHover[TOP] || edgeHover[BOTTOM];
+                    bool horizontalActive = resize.edges[LEFT] || resize.edges[RIGHT];
+                    bool verticalActive = resize.edges[TOP] || resize.edges[BOTTOM];
 
-                    if (horizontal) cursor = ImGuiMouseCursor_ResizeEW;
-                    else if (vertical) cursor = ImGuiMouseCursor_ResizeNS;
+                    bool isCorner = false;
+                    ImGuiMouseCursor cornerCursor = ImGuiMouseCursor_Arrow;
+
+                    if (resize.active) {
+                        if ((resize.edges[LEFT] && resize.edges[TOP]) || (resize.edges[RIGHT] && resize.edges[BOTTOM])) {
+                            isCorner = true;
+                            cornerCursor = ImGuiMouseCursor_ResizeNWSE;
+                        }
+                        else if ((resize.edges[RIGHT] && resize.edges[TOP]) || (resize.edges[LEFT] && resize.edges[BOTTOM])) {
+                            isCorner = true;
+                            cornerCursor = ImGuiMouseCursor_ResizeNESW;
+                        }
+                    } else {
+                        if ((edgeHover[LEFT] && edgeHover[TOP]) || (edgeHover[RIGHT] && edgeHover[BOTTOM])) {
+                            isCorner = true;
+                            cornerCursor = ImGuiMouseCursor_ResizeNWSE;
+                        }
+                        else if ((edgeHover[RIGHT] && edgeHover[TOP]) || (edgeHover[LEFT] && edgeHover[BOTTOM])) {
+                            isCorner = true;
+                            cornerCursor = ImGuiMouseCursor_ResizeNESW;
+                        }
+                    }
+
+                    if (isCorner) {
+                        cursor = cornerCursor;
+                    } else if (horizontalHover || horizontalActive) {
+                        cursor = ImGuiMouseCursor_ResizeEW;
+                    } else if (verticalHover || verticalActive) {
+                        cursor = ImGuiMouseCursor_ResizeNS;
+                    }
                 }
-                if (!gui::IsAnyItemHovered())gui::SetMouseCursor(cursor);
+                if (!gui::IsAnyItemHovered()) gui::SetMouseCursor(cursor);
             }
 
 			if (Globals.window.HasFocus()) editor.Input();
