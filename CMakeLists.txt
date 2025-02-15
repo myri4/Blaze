@@ -37,6 +37,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIRECTORY}"
 )
 
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    
+    add_compile_definitions(
+        $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>
+        $<$<CONFIG:Release>:_ITERATOR_DEBUG_LEVEL=0>
+    )
+endif()
+
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 
 find_package(Vulkan REQUIRED)
@@ -53,7 +62,12 @@ add_subdirectory("vendor/flecs")
 add_subdirectory("vendor/luau")
 
 set(FREETYPE_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/vendor/freetype/include")
-set(FREETYPE_LIBRARY ${CMAKE_BINARY_DIR}/vendor/freetype/freetype.lib)
+#set(FREETYPE_LIBRARY ${CMAKE_BINARY_DIR}/vendor/freetype/freetyped.lib)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(FREETYPE_LIBRARY "${CMAKE_BINARY_DIR}/vendor/freetype/freetyped.lib")
+else()
+    set(FREETYPE_LIBRARY "${CMAKE_BINARY_DIR}/vendor/freetype/freetype.lib")
+endif()
 add_subdirectory("vendor/msdf-atlas-gen")
 
 # Find all shader files
@@ -105,6 +119,8 @@ msdf-atlas-gen::msdf-atlas-gen
 flecs::flecs_static
 Luau.VM
 Luau.Compiler
+"$<$<CONFIG:Debug>:$ENV{VULKAN_SDK}/Lib/spirv-cross-cored.lib>"
+"$<$<CONFIG:Release>:$ENV{VULKAN_SDK}/Lib/spirv-cross-core.lib>"
 )
 target_include_directories(${PROJECT_NAME} PUBLIC 
 "vendor/"

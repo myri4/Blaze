@@ -1,6 +1,8 @@
 #pragma once
+
 #include <yaml-cpp/yaml.h>
 #include <fstream>
+
 #include <glm/glm.hpp>
 
 #define YAML_LOAD_VAR(node, var) if (node[#var]) var = node[#var].as<decltype(var)>()
