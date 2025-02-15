@@ -45,71 +45,67 @@ namespace wc
 
 	struct RenderData
 	{
-	private:
-		vk::DBufferManager<Vertex, vk::DEVICE_ADDRESS> m_VertexBuffer;
-		vk::DBufferManager<uint32_t, vk::INDEX_BUFFER> m_IndexBuffer;
-		vk::DBufferManager<LineVertex, vk::DEVICE_ADDRESS> m_LineVertexBuffer;
-	public:
+		vk::DBufferManager<Vertex, vk::DEVICE_ADDRESS> VertexBuffer;
+		vk::DBufferManager<uint32_t, vk::INDEX_BUFFER> IndexBuffer;
+		vk::DBufferManager<LineVertex, vk::DEVICE_ADDRESS> LineVertexBuffer;
 
-		auto GetVertexBuffer() const { return m_VertexBuffer.GetBuffer(); }
-		auto GetIndexBuffer() const { return m_IndexBuffer.GetBuffer(); }
+		auto GetVertexBuffer() const { return VertexBuffer.GetBuffer(); }
+		auto GetIndexBuffer() const { return IndexBuffer.GetBuffer(); }
 
-		auto GetLineVertexBuffer() const { return m_LineVertexBuffer.GetBuffer(); }
+		auto GetLineVertexBuffer() const { return LineVertexBuffer.GetBuffer(); }
 
-		auto GetIndexCount() const { return m_IndexBuffer.GetSize(); }
-		auto GetVertexCount() const { return m_VertexBuffer.GetSize(); }
+		auto GetIndexCount() const { return IndexBuffer.GetSize(); }
+		auto GetVertexCount() const { return VertexBuffer.GetSize(); }
 
-		auto GetLineVertexCount() const { return m_LineVertexBuffer.GetSize(); }
+		auto GetLineVertexCount() const { return LineVertexBuffer.GetSize(); }
 
 		void UploadVertexData()
 		{
-			vk::SyncContext::ImmediateSubmit([this](VkCommandBuffer cmd) {
-				m_IndexBuffer.Update(cmd);
-				m_VertexBuffer.Update(cmd);
+			vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
+				IndexBuffer.Update(cmd);
+				VertexBuffer.Update(cmd);
+				IndexBuffer.GetBuffer().SetName("IndexBuffer");
+				VertexBuffer.GetBuffer().SetName("VertexBuffer");
 				});
 		}
 
 		void UploadLineVertexData()
 		{
-			vk::SyncContext::ImmediateSubmit([this](VkCommandBuffer cmd) {
-				m_LineVertexBuffer.Update(cmd);
+			vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
+				LineVertexBuffer.Update(cmd);
 				});
-		}
-
-		void Allocate()
-		{
 		}
 
 		void Reset()
 		{
-			m_IndexBuffer.Reset();
-			m_VertexBuffer.Reset();
-			m_LineVertexBuffer.Reset();
+			IndexBuffer.Reset();
+			VertexBuffer.Reset();
+			LineVertexBuffer.Reset();
 		}
 
 		void Free()
 		{
-			m_VertexBuffer.Free();
-			m_IndexBuffer.Free();
-			m_LineVertexBuffer.Free();
+			VertexBuffer.Free();
+			IndexBuffer.Free();
+			LineVertexBuffer.Free();
 		}
 
 		void DrawQuad(const glm::mat4& transform, uint32_t texID, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
 		{
-			auto vertCount = m_VertexBuffer.GetSize();
+			auto vertCount = VertexBuffer.GetSize();
 
-			m_VertexBuffer.Push({transform * glm::vec4( 0.5f,  0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4(-0.5f,  0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4( 0.5f, -0.5f, 0.f, 1.f), { 1.f, 1.f }, texID, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4( 0.5f,  0.5f, 0.f, 1.f), { 1.f, 0.f }, texID, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4(-0.5f,  0.5f, 0.f, 1.f), { 0.f, 0.f }, texID, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4(-0.5f, -0.5f, 0.f, 1.f), { 0.f, 1.f }, texID, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4( 0.5f, -0.5f, 0.f, 1.f), { 1.f, 1.f }, texID, color, entityID});
 
-			m_IndexBuffer.Push(0 + vertCount);
-			m_IndexBuffer.Push(1 + vertCount);
-			m_IndexBuffer.Push(2 + vertCount);
+			IndexBuffer.Push(0 + vertCount);
+			IndexBuffer.Push(1 + vertCount);
+			IndexBuffer.Push(2 + vertCount);
 
-			m_IndexBuffer.Push(2 + vertCount);
-			m_IndexBuffer.Push(3 + vertCount);
-			m_IndexBuffer.Push(0 + vertCount);
+			IndexBuffer.Push(2 + vertCount);
+			IndexBuffer.Push(3 + vertCount);
+			IndexBuffer.Push(0 + vertCount);
 		}
 
 		void DrawLineQuad(const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
@@ -153,32 +149,32 @@ namespace wc
 
 		void DrawTriangle(glm::vec2 v1, glm::vec2 v2, glm::vec2 v3, uint32_t texID, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
 		{
-			auto vertCount = m_VertexBuffer.GetSize();
-			m_VertexBuffer.Push({glm::vec4(v1, 0.f, 1.f), { 1.f, 0.f }, texID, color, entityID});
-			m_VertexBuffer.Push({glm::vec4(v2, 0.f, 1.f), { 0.f, 0.f }, texID, color, entityID});
-			m_VertexBuffer.Push({glm::vec4(v3, 0.f, 1.f), { 0.f, 1.f }, texID, color, entityID});
+			auto vertCount = VertexBuffer.GetSize();
+			VertexBuffer.Push({glm::vec4(v1, 0.f, 1.f), { 1.f, 0.f }, texID, color, entityID});
+			VertexBuffer.Push({glm::vec4(v2, 0.f, 1.f), { 0.f, 0.f }, texID, color, entityID});
+			VertexBuffer.Push({glm::vec4(v3, 0.f, 1.f), { 0.f, 1.f }, texID, color, entityID});
 
-			m_IndexBuffer.Push(0 + vertCount);
-			m_IndexBuffer.Push(1 + vertCount);
-			m_IndexBuffer.Push(2 + vertCount);
+			IndexBuffer.Push(0 + vertCount);
+			IndexBuffer.Push(1 + vertCount);
+			IndexBuffer.Push(2 + vertCount);
 		}
 
 		void DrawCircle(const glm::mat4& transform, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
 		{
-			auto vertCount = m_VertexBuffer.GetSize();
+			auto vertCount = VertexBuffer.GetSize();
 
-			m_VertexBuffer.Push({transform * glm::vec4( 1.f, 1.f, 0.f, 1.f),  {  1.f, 1.f }, thickness, fade, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4(-1.f, 1.f, 0.f, 1.f),  { -1.f, 1.f }, thickness, fade, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4(-1.f, -1.f, 0.f, 1.f), { -1.f,-1.f }, thickness, fade, color, entityID});
-			m_VertexBuffer.Push({transform * glm::vec4( 1.f, -1.f, 0.f, 1.f), {  1.f,-1.f }, thickness, fade, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4( 1.f, 1.f, 0.f, 1.f),  {  1.f, 1.f }, thickness, fade, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4(-1.f, 1.f, 0.f, 1.f),  { -1.f, 1.f }, thickness, fade, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4(-1.f, -1.f, 0.f, 1.f), { -1.f,-1.f }, thickness, fade, color, entityID});
+			VertexBuffer.Push({transform * glm::vec4( 1.f, -1.f, 0.f, 1.f), {  1.f,-1.f }, thickness, fade, color, entityID});
 
-			m_IndexBuffer.Push(0 + vertCount);
-			m_IndexBuffer.Push(1 + vertCount);
-			m_IndexBuffer.Push(2 + vertCount);
+			IndexBuffer.Push(0 + vertCount);
+			IndexBuffer.Push(1 + vertCount);
+			IndexBuffer.Push(2 + vertCount);
 
-			m_IndexBuffer.Push(2 + vertCount);
-			m_IndexBuffer.Push(3 + vertCount);
-			m_IndexBuffer.Push(0 + vertCount);
+			IndexBuffer.Push(2 + vertCount);
+			IndexBuffer.Push(3 + vertCount);
+			IndexBuffer.Push(0 + vertCount);
 		}
 
 		void DrawCircle(glm::vec3 position, float radius, float thickness = 1.f, float fade = 0.05f, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
@@ -189,14 +185,14 @@ namespace wc
 
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& startColor, const glm::vec4& endColor, uint64_t entityID = 0)
 		{
-			m_LineVertexBuffer.Push({ glm::vec4(start, 1.f), startColor, entityID} );
-			m_LineVertexBuffer.Push({ glm::vec4(end, 1.f), endColor, entityID});
+			LineVertexBuffer.Push({ glm::vec4(start, 1.f), startColor, entityID} );
+			LineVertexBuffer.Push({ glm::vec4(end, 1.f), endColor, entityID});
 		}
 
 		//void DrawLines(const LineVertex* vertices, uint32_t count)
 		//{
-		//	memcpy(m_LineVertexBuffer + m_LineVertexBuffer.Counter * sizeof(LineVertex), vertices, count * sizeof(LineVertex));
-		//	m_LineVertexBuffer.Counter += count;
+		//	memcpy(LineVertexBuffer + LineVertexBuffer.Counter * sizeof(LineVertex), vertices, count * sizeof(LineVertex));
+		//	LineVertexBuffer.Counter += count;
 		//}
 
 		void DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec3& startColor, const glm::vec3& endColor, uint64_t entityID = 0) { DrawLine(start, end, glm::vec4(startColor, 1.f), glm::vec4(endColor, 1.f), entityID); }
@@ -235,11 +231,9 @@ namespace wc
 			}
 		}
 
-		void DrawString(const std::string& string, const Font& font, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.f), uint64_t entityID = 0)
+		void DrawString(const std::string& string, const Font& font, const glm::mat4& transform, const glm::vec4& color = glm::vec4(1.f), float lineSpacing = 0.f, float kerning = 0.f, uint64_t entityID = 0)
 		{
-			auto vertCount = m_VertexBuffer.GetSize();
-
-			const auto& fontGeometry = font.FontGeometry;
+			const auto& fontGeometry = font.Geometry;
 			const auto& metrics = fontGeometry.getMetrics();
 			uint32_t texID = font.TextureID;
 			auto& fontAtlas = font.Tex;
@@ -254,6 +248,8 @@ namespace wc
 
 			for (uint32_t i = 0; i < string.size(); i++)
 			{
+				auto vertCount = VertexBuffer.GetSize();
+
 				char character = string[i];
 
 				if (character == '\r')
@@ -262,7 +258,7 @@ namespace wc
 				if (character == '\n')
 				{
 					x = 0;
-					y -= fsScale * metrics.lineHeight + font.LineSpacing;
+					y -= fsScale * metrics.lineHeight + lineSpacing;
 					continue;
 				}
 
@@ -277,13 +273,13 @@ namespace wc
 						advance = dAdvance;
 					}
 
-					x += fsScale * advance + font.Kerning;
+					x += fsScale * advance + kerning;
 					continue;
 				}
 
 				if (character == '\t')
 				{
-					x += 4.f * (fsScale * spaceGlyphAdvance + font.Kerning);
+					x += 4.f * (fsScale * spaceGlyphAdvance + kerning);
 					continue;
 				}
 
@@ -320,16 +316,16 @@ namespace wc
 				for (uint32_t i = 0; i < 4; i++)
 				{
 					vertices[i].Thickness = -1.f;
-					m_VertexBuffer.Push(vertices[i]);
+					VertexBuffer.Push(vertices[i]);
 				}
 
-				m_IndexBuffer.Push(0 + vertCount);
-				m_IndexBuffer.Push(1 + vertCount);
-				m_IndexBuffer.Push(2 + vertCount);
+				IndexBuffer.Push(0 + vertCount);
+				IndexBuffer.Push(1 + vertCount);
+				IndexBuffer.Push(2 + vertCount);
 
-				m_IndexBuffer.Push(2 + vertCount);
-				m_IndexBuffer.Push(3 + vertCount);
-				m_IndexBuffer.Push(0 + vertCount);
+				IndexBuffer.Push(2 + vertCount);
+				IndexBuffer.Push(3 + vertCount);
+				IndexBuffer.Push(0 + vertCount);
 
 				if (i < string.size() - 1)
 				{
@@ -337,21 +333,21 @@ namespace wc
 					char nextCharacter = string[i + 1];
 					fontGeometry.getAdvance(advance, character, nextCharacter);
 
-					x += fsScale * advance + font.Kerning;
+					x += fsScale * advance + kerning;
 				}
 			}
 		}
 
-		void DrawString(const std::string& string, const Font& font, glm::vec2 position, glm::vec2 scale, float rotation, const glm::vec4& color = glm::vec4(1.f))
+		void DrawString(const std::string& string, const Font& font, glm::vec2 position, glm::vec2 scale, float rotation, const glm::vec4& color = glm::vec4(1.f), float lineSpacing = 0.f, float kerning = 0.f, uint64_t entityID = 0)
 		{
 			glm::mat4 transform = glm::translate(glm::mat4(1.f), { position.x, position.y, 0.f }) * glm::rotate(glm::mat4(1.f), rotation, { 0.f, 0.f, 1.f }) * glm::scale(glm::mat4(1.f), { scale.x, scale.y, 1.f });
-			DrawString(string, font, transform, color);
+			DrawString(string, font, transform, color, lineSpacing, kerning, entityID);
 		}
 
-		void DrawString(const std::string& string, const Font& font, glm::vec2 position, const glm::vec4& color = glm::vec4(1.f))
+		void DrawString(const std::string& string, const Font& font, glm::vec2 position, const glm::vec4& color = glm::vec4(1.f), float lineSpacing = 0.f, float kerning = 0.f, uint64_t entityID = 0)
 		{
 			glm::mat4 transform = glm::translate(glm::mat4(1.f), { position.x, position.y, 0.f });
-			DrawString(string, font, transform, color);
+			DrawString(string, font, transform, color, lineSpacing, kerning, entityID);
 		}
 	};
 }

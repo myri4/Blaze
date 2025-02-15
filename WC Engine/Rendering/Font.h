@@ -18,14 +18,12 @@ namespace wc
     struct Font
     {
         void Load(const std::string filepath, AssetManager& assetManager);
-        glm::vec2 CalculateTextSize(const std::string& text);
+        glm::vec2 CalculateTextSize(const std::string& string, float lineSpacing = 0.f, float kerning = 0.f);
 
-        float Kerning = 0.f;
-        float LineSpacing = 0.f;
         uint32_t TextureID = 0;
         Texture Tex;
-        msdf_atlas::FontGeometry FontGeometry;
-    private:
-        std::vector<msdf_atlas::GlyphGeometry> m_Glyphs;
+        msdf_atlas::FontGeometry Geometry;
+        
+        std::vector<msdf_atlas::GlyphGeometry> Glyphs;
     };
 }

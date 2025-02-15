@@ -13,6 +13,74 @@ namespace wc
 		float TimeStep = 1.f / 60.f;
 	};
 
+	inline std::unordered_map<std::string, uint32_t> PhysicsMaterialNames;
+	inline std::vector<PhysicsMaterial> PhysicsMaterials;
+	inline AssetManager assetManager;
+
+	inline void SavePhysicsMaterials(const std::string& filepath)
+	{
+		YAML::Node data;
+		for (auto& [name, id] : PhysicsMaterialNames)
+		{
+			if (name == "Default") continue;
+
+			YAML::Node material;
+			auto& physicsMat = PhysicsMaterials[id];
+			material["Density"] = physicsMat.Density;
+			material["Friction"] = physicsMat.Friction;
+			material["Restitution"] = physicsMat.Restitution;
+			material["RollingResistance"] = physicsMat.RollingResistance;
+
+			material["DebugColor"] = physicsMat.DebugColor;
+
+			material["Sensor"] = physicsMat.Sensor;
+			material["EnableContactEvents"] = physicsMat.EnableContactEvents;
+			material["EnableHitEvents"] = physicsMat.EnableHitEvents;
+			material["EnablePreSolveEvents"] = physicsMat.EnablePreSolveEvents;
+			material["InvokeContactCreation"] = physicsMat.InvokeContactCreation;
+			material["UpdateBodyMass"] = physicsMat.UpdateBodyMass;
+
+			data[name] = material;
+		}
+
+		YAMLUtils::SaveFile(filepath, data);
+	}
+
+	inline void LoadPhysicsMaterials(const std::string& filepath)
+	{
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("{} does not exist", filepath);
+			return;
+		}
+
+		YAML::Node data = YAML::LoadFile(filepath);
+		if (data)
+		{
+			for (const auto& materialPair : data)
+			{
+				std::string materialName = materialPair.first.as<std::string>();
+				const auto& materialData = materialPair.second;
+				PhysicsMaterial material;
+				material.Density = materialData["Density"].as<float>();
+				material.Friction = materialData["Friction"].as<float>();
+				material.Restitution = materialData["Restitution"].as<float>();
+				material.RollingResistance = materialData["RollingResistance"].as<float>();
+
+				material.DebugColor = materialData["DebugColor"].as<glm::vec4>();
+
+				material.Sensor = materialData["Sensor"].as<bool>();
+				material.EnableContactEvents = materialData["EnableContactEvents"].as<bool>();
+				material.EnableHitEvents = materialData["EnableHitEvents"].as<bool>();
+				material.EnablePreSolveEvents = materialData["EnablePreSolveEvents"].as<bool>();
+				material.InvokeContactCreation = materialData["InvokeContactCreation"].as<bool>();
+				material.UpdateBodyMass = materialData["UpdateBodyMass"].as<bool>();
+				PhysicsMaterials.push_back(material);
+				PhysicsMaterialNames[materialName] = PhysicsMaterials.size() - 1;
+			}
+		}
+	}
+
 	struct Scene
 	{
 		flecs::world EntityWorld;
@@ -24,7 +92,6 @@ namespace wc
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
 
-		std::unordered_map<std::string, PhysicsMaterial> Materials = { { "Default", {} } };
 
 		auto AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
 
@@ -131,7 +198,7 @@ namespace wc
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
 					bodyDef.rotation = b2MakeRot(pos.Rotation);
 					p.body.Create(PhysicsWorld, bodyDef);
-					collDef->Shape.CreatePolygonShape(p.body, collDef->Material.GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
+					collDef->Shape.CreatePolygonShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
 				}
 
 				if (entt.has<CircleCollider2DComponent>())
@@ -140,7 +207,7 @@ namespace wc
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
 					bodyDef.rotation = b2MakeRot(pos.Rotation);
 					p.body.Create(PhysicsWorld, bodyDef);
-					collDef->Shape.CreateCircleShape(p.body, collDef->Material.GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
+					collDef->Shape.CreateCircleShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
 				}
 				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
 				p.previousRotation = pos.Rotation;
@@ -211,7 +278,15 @@ namespace wc
 				auto component = entity.get_ref<TextRendererComponent>();
 				YAML::Node componentData;
 				componentData["Text"] = component->Text;
-				//componentData["Font"] = component->Font;		// @TODO: add support for serializing Font type
+				for (const auto& [name, fontID] : assetManager.FontCache) // ew, but there's no other way ig
+				{
+					if (fontID == component->FontID)
+					{
+						componentData["Font"] = name;
+						break;
+					}
+				}
+
 				componentData["Color"] = component->Color;
 				componentData["Kerning"] = component->Kerning;
 				componentData["LineSpacing"] = component->LineSpacing;
@@ -223,7 +298,16 @@ namespace wc
 				auto component = entity.get_ref<SpriteRendererComponent>();
 				YAML::Node componentData;
 				componentData["Color"] = component->Color;
-				componentData["Texture"] = component->Texture;  // @TODO: this should be in text form
+
+				for (const auto& [name, texID] : assetManager.TextureCache) // ew, but there's no other way ig
+				{
+					if (texID == component->Texture)
+					{
+						componentData["Texture"] = name;
+						break;
+					}
+				}
+
 				entityData["SpriteRendererComponent"] = componentData;
 			}
 
@@ -258,19 +342,15 @@ namespace wc
 				componentData["Offset"] = component->Offset;
 				componentData["Size"] = component->Size;
 
-				componentData["Density"] = component->Material.Density;
-				componentData["Friction"] = component->Material.Friction;
-				componentData["Restitution"] = component->Material.Restitution;
-				componentData["RollingResistance"] = component->Material.RollingResistance;
-
-				componentData["DebugColor"] = component->Material.DebugColor;
-
-				componentData["Sensor"] = component->Material.Sensor;
-				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
-				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
-				componentData["EnablePreSolveEvents"] = component->Material.EnablePreSolveEvents;
-				componentData["InvokeContactCreation"] = component->Material.InvokeContactCreation;
-				componentData["UpdateBodyMass"] = component->Material.UpdateBodyMass;
+				if (component->MaterialID != 0)
+					for (const auto& [name, matID] : PhysicsMaterialNames) // ew, but there's no other way ig
+					{
+						if (matID == component->MaterialID)
+						{
+							componentData["Material"] = name;
+							break;
+						}
+					}
 
 				entityData["BoxCollider2DComponent"] = componentData;
 			}
@@ -282,19 +362,15 @@ namespace wc
 				componentData["Offset"] = component->Offset;
 				componentData["Radius"] = component->Radius;
 
-				componentData["Density"] = component->Material.Density;
-				componentData["Friction"] = component->Material.Friction;
-				componentData["Restitution"] = component->Material.Restitution;
-				componentData["RollingResistance"] = component->Material.RollingResistance;
-
-				componentData["DebugColor"] = component->Material.DebugColor;
-
-				componentData["Sensor"] = component->Material.Sensor;
-				componentData["EnableContactEvents"] = component->Material.EnableContactEvents;
-				componentData["EnableHitEvents"] = component->Material.EnableHitEvents;
-				componentData["EnablePreSolveEvents"] = component->Material.EnablePreSolveEvents;
-				componentData["InvokeContactCreation"] = component->Material.InvokeContactCreation;
-				componentData["UpdateBodyMass"] = component->Material.UpdateBodyMass;
+				if (component->MaterialID != 0)
+					for (const auto& [name, matID] : PhysicsMaterialNames) // ew, but there's no other way ig
+					{
+						if (matID == component->MaterialID)
+						{
+							componentData["Material"] = name;
+							break;
+						}
+					}
 
 				entityData["CircleCollider2DComponent"] = componentData;
 			}
@@ -304,19 +380,6 @@ namespace wc
 		{
 			if (!parent.has<EntityOrderComponent>()) return;
 			YAML::Node childrenData;
-
-			for (const auto& name : parent.get_ref<EntityOrderComponent>()->EntityOrder)
-			{
-				auto child = EntityWorld.lookup(name.c_str());
-
-				YAML::Node childData;
-
-				SerializeEntity(child, childData);
-
-				SerializeChildEntity(child, childData);
-
-				childrenData.push_back(childData);
-			}
 
 			/*EntityWorld.query_builder<EntityTag>()
 			.with(flecs::ChildOf, parent)
@@ -329,6 +392,19 @@ namespace wc
 
 				childrenData.push_back(childData);
 			});*/
+
+			for (const auto& name : parent.get_ref<EntityOrderComponent>()->EntityOrder)
+			{
+				auto child = EntityWorld.lookup(name.c_str());
+
+				YAML::Node childData;
+
+				SerializeEntity(child, childData);
+
+				SerializeChildEntity(child, childData);
+
+				childrenData.push_back(childData);
+			}			
 
 			if (childrenData.size() != 0)
 				entityData["Children"] = childrenData;
@@ -377,57 +453,66 @@ namespace wc
 			}
 		}
 
-		void DeserializeEntity(flecs::entity& deserializedEntity, const YAML::Node& entity)
+		void DeserializeEntity(flecs::entity& entity, const YAML::Node& entityData)
 		{
-			std::string name = entity["Name"].as<std::string>();
-			std::string id = entity["ID"].as<std::string>();
+			std::string name = entityData["Name"].as<std::string>();
+			std::string id = entityData["ID"].as<std::string>();
 
 			WC_CORE_INFO("Deserialized entity with name = {}, ID = {}", name, id);
 
-			if (name == "null[5ws78@!12]") deserializedEntity = AddEntity("null");
-			else if (name != "null") deserializedEntity = AddEntity(name);
-			else deserializedEntity = AddEntity();
+			if (name == "null[5ws78@!12]") entity = AddEntity("null");
+			else if (name != "null") entity = AddEntity(name);
+			else entity = AddEntity();
 
-			auto transformComponent = entity["TransformComponent"];
+			auto transformComponent = entityData["TransformComponent"];
 			if (transformComponent)
 			{
-				deserializedEntity.set<TransformComponent>({
+				entity.set<TransformComponent>({
 					transformComponent["Translation"].as<glm::vec3>(),
 					transformComponent["Scale"].as<glm::vec2>(),
 					glm::radians(transformComponent["Rotation"].as<float>())
 					});
 			}
 
-			auto textRendererComponent = entity["TextRendererComponent"];
-			if (textRendererComponent)
 			{
-				deserializedEntity.set<TextRendererComponent>({
-					textRendererComponent["Text"].as<std::string>(),
-					//textRendererComponent["Font"].as<Font>(),					// @TODO: add support for deserializing Font type
-					//textRendererComponent["Color"].as<glm::vec4>()
-					});
+				auto componentData = entityData["TextRendererComponent"];
+				if (componentData)
+				{
+					TextRendererComponent component;
+					component.Text = componentData["Text"].as<std::string>();
+					component.Color = componentData["Color"].as<glm::vec4>();
+					component.Kerning = componentData["Kerning"].as<float>();
+					component.LineSpacing = componentData["LineSpacing"].as<float>();
+
+					if (componentData["Font"]) component.FontID = assetManager.LoadFont(componentData["Font"].as<std::string>());
+
+					entity.set<TextRendererComponent>(component);
+				}
 			}
 
-			auto spriteRendererComponent = entity["SpriteRendererComponent"];
-			if (spriteRendererComponent)
 			{
-				deserializedEntity.set<SpriteRendererComponent>({
-					spriteRendererComponent["Color"].as<glm::vec4>(),
-					spriteRendererComponent["Texture"].as<uint32_t>()
-					});
+				auto componentData = entityData["SpriteRendererComponent"];
+				if (componentData)
+				{
+					SpriteRendererComponent component;
+					component.Color = componentData["Color"].as<glm::vec4>();
+					component.Texture = assetManager.LoadTexture(componentData["Texture"].as<std::string>());
+
+					entity.set<SpriteRendererComponent>(component);
+				}
 			}
 
-			auto circleRendererComponent = entity["CircleRendererComponent"];
+			auto circleRendererComponent = entityData["CircleRendererComponent"];
 			if (circleRendererComponent)
 			{
-				deserializedEntity.set<CircleRendererComponent>({
+				entity.set<CircleRendererComponent>({
 					circleRendererComponent["Color"].as<glm::vec4>(),
 					circleRendererComponent["Thickness"].as<float>(),
 					circleRendererComponent["Fade"].as<float>()
 					});
 			}
 
-			auto rigidBodyComponent = entity["RigidBodyComponent"];
+			auto rigidBodyComponent = entityData["RigidBodyComponent"];
 			if (rigidBodyComponent)
 			{
 				RigidBodyComponent component = {
@@ -439,62 +524,36 @@ namespace wc
 					.LinearDamping = rigidBodyComponent["LinearDamping"].as<float>(),
 					.AngularDamping = rigidBodyComponent["AngularDamping"].as<float>(),
 				};
-				deserializedEntity.set<RigidBodyComponent>(component);
+				entity.set<RigidBodyComponent>(component);
 			}
 
 			{
-				auto componentData = entity["BoxCollider2DComponent"];
+				auto componentData = entityData["BoxCollider2DComponent"];
 				if (componentData)
 				{
 					BoxCollider2DComponent component;
 					component.Offset = componentData["Offset"].as<glm::vec2>();
 					component.Size = componentData["Size"].as<glm::vec2>();
+					if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
 
-					component.Material.Density = componentData["Density"].as<float>();
-					component.Material.Friction = componentData["Friction"].as<float>();
-					component.Material.Restitution = componentData["Restitution"].as<float>();
-					component.Material.RollingResistance = componentData["RollingResistance"].as<float>();
-
-					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
-
-					component.Material.Sensor = componentData["Sensor"].as<bool>();
-					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
-					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();
-					component.Material.EnablePreSolveEvents = componentData["EnablePreSolveEvents"].as<bool>();
-					component.Material.InvokeContactCreation = componentData["InvokeContactCreation"].as<bool>();
-					component.Material.UpdateBodyMass = componentData["UpdateBodyMass"].as<bool>();
-
-					deserializedEntity.set<BoxCollider2DComponent>(component);
+					entity.set<BoxCollider2DComponent>(component);
 				}
 			}
 
 			{
-				auto componentData = entity["CircleCollider2DComponent"];
+				auto componentData = entityData["CircleCollider2DComponent"];
 				if (componentData)
 				{
 					CircleCollider2DComponent component;
 					component.Offset = componentData["Offset"].as<glm::vec2>();
 					component.Radius = componentData["Radius"].as<float>();
+					if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
 
-					component.Material.Density = componentData["Density"].as<float>();
-					component.Material.Friction = componentData["Friction"].as<float>();
-					component.Material.Restitution = componentData["Restitution"].as<float>();
-					component.Material.RollingResistance = componentData["RollingResistance"].as<float>();
-
-					component.Material.DebugColor = componentData["DebugColor"].as<glm::vec4>();
-
-					component.Material.Sensor = componentData["Sensor"].as<bool>();
-					component.Material.EnableContactEvents = componentData["EnableContactEvents"].as<bool>();
-					component.Material.EnableHitEvents = componentData["EnableHitEvents"].as<bool>();
-					component.Material.EnablePreSolveEvents = componentData["EnablePreSolveEvents"].as<bool>();
-					component.Material.InvokeContactCreation = componentData["InvokeContactCreation"].as<bool>();
-					component.Material.UpdateBodyMass = componentData["UpdateBodyMass"].as<bool>();
-
-					deserializedEntity.set<CircleCollider2DComponent>(component);
+					entity.set<CircleCollider2DComponent>(component);
 				}
 			}
 
-			auto childEntities = entity["Children"];
+			auto childEntities = entityData["Children"];
 			if (childEntities)
 			{
 				for (const auto& child : childEntities)
@@ -503,7 +562,7 @@ namespace wc
 
 					DeserializeEntity(deserializedChildEntity, child);
 
-					SetChild(deserializedEntity, deserializedChildEntity);
+					SetChild(entity, deserializedChildEntity);
 				}
 			}
 		}

@@ -520,9 +520,10 @@ namespace wc
 
 			std::vector<VkDescriptorImageInfo> infos;
 			for (auto& image : assetManager.Textures)
-				infos.push_back({ image.GetSampler(), image.GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+				infos.emplace_back(image.GetSampler(), image.GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 			writer.BindImages(0, infos, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.Update();
 		}
 
 		void CreateScreen(glm::vec2 size)

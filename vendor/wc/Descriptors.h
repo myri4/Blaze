@@ -100,7 +100,7 @@ namespace vk
 
 			VkDescriptorPoolCreateInfo pool_info = { 
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-				.flags = 0,
+				.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
 				.maxSets = count,
 				.poolSizeCount = (uint32_t)sizes.size(),
 				.pPoolSizes = sizes.data(),
@@ -173,8 +173,8 @@ namespace vk
 
 				.dstSet = dstSet,
 				.dstBinding = binding,
-				.descriptorType = type,
 				.descriptorCount = (uint32_t)imageInfo.size(),
+				.descriptorType = type,
 				.pImageInfo = imageInfo.data(),
 			};
 

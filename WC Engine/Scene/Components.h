@@ -53,7 +53,7 @@ namespace wc
 	struct TextRendererComponent
 	{
 		std::string Text;
-		uint32_t FontID = 0;
+		uint32_t FontID = UINT32_MAX;
 		glm::vec4 Color = glm::vec4(1.f);
 		float Kerning = 0.f;
 		float LineSpacing = 0.f;
@@ -139,7 +139,7 @@ namespace wc
 		glm::vec2 Offset = glm::vec2(0.f);
 		glm::vec2 Size = glm::vec2(1.f);
 
-		PhysicsMaterial Material;
+		uint32_t MaterialID = 0; // @NOTE: This may need to be PhysMatID or something like that
 
 		b2Shape Shape;
 	};
@@ -149,7 +149,7 @@ namespace wc
 		glm::vec2 Offset = glm::vec2(0.f);
 		float Radius = 0.5f; // @TODO: if this is set to -1 derive the radius from other components
 
-		PhysicsMaterial Material;
+		uint32_t MaterialID = 0;
 
 		b2Shape Shape;
 	};

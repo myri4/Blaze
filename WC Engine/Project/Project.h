@@ -1,74 +1,72 @@
 #pragma once
 
 #include <filesystem>
-#include "../UI/Widgets.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_internal.h"
+#include <string>
+#include <vector>
+
 #include <wc/Utils/YAML.h>
 
-#define BLAZE_EXTENSION ".blz"
+#define BLAZE_EXTENSION ".blzproj"
 
-namespace wc::Project
+namespace Project
 {
-	std::string name = "";
-	std::string rootPath = "";
-	std::string firstScene = "";
-	std::vector<std::string> savedProjectPaths; // for manager
+	std::string name;
+	std::string rootPath;
+	std::string firstScene;
 
-	inline void SaveSavedProjects()
+	std::string texturePath;
+	std::string fontPath;
+	std::string soundPath;
+
+	std::string lightMaterialsPath;
+	std::string physicsMaterialsPath;
+	std::string soundMaterialsPath;
+
+	std::string scenesPath;
+	std::string scriptsPath;
+	std::string entitiesPath;
+
+	std::vector<std::string> savedProjectPaths; // @NOTE: This could just be std::set
+
+	bool AutoCleanUpOnExit = true; // If this flag is set, when exiting the application all materials and entities that are not used in any scenes will be deleted.
+
+	inline void AddProjectToList(const std::string& path)
 	{
-		YAML::Node data;
-		data["savedProjectPaths"] = savedProjectPaths;
-
-		YAMLUtils::SaveFile(std::filesystem::current_path().string() + "/SavedProjects.yaml", data);
+		if (std::find(savedProjectPaths.begin(), savedProjectPaths.end(), path) == savedProjectPaths.end())
+			savedProjectPaths.push_back(path);
 	}
 
-	inline void LoadSavedProjects()
-	{
-		std::string filepath = std::filesystem::current_path().string() + "/SavedProjects.yaml";
-		if (!std::filesystem::exists(filepath))
-		{
-			WC_CORE_ERROR("Save file at does not exist: {}", filepath);
-			return;
-		}
+	inline void RemoveProjectFromList(const std::string& filepath) { std::erase(savedProjectPaths, filepath); }
 
-		YAML::Node data = YAML::LoadFile(filepath);
-		for (auto each : data["savedProjectPaths"])
-		{
-			if (std::filesystem::exists(each.as<std::string>()))
-				savedProjectPaths.push_back(each.as<std::string>());
-			else
-			{
-				WC_CORE_WARN("Project path does not exist: {} ->> Deleting", each.as<std::string>());
-				std::erase(savedProjectPaths, each.as<std::string>());
-				SaveSavedProjects();
-			}
-		}
-	}
-
-	inline void AddProjectToList()
-	{
-		// add if doesnt exist
-		if (std::find(savedProjectPaths.begin(), savedProjectPaths.end(), rootPath) == savedProjectPaths.end())
-		{
-			savedProjectPaths.push_back(rootPath);
-			SaveSavedProjects();
-		}
-	}
-
-	inline void RemoveProjectFromList(const std::string& filepath)
-	{
-		std::erase(savedProjectPaths, filepath);
-		SaveSavedProjects();
-	}
-
-	//name without extension
 	inline bool ExistListProject(const std::string& pName)
 	{
 		for (auto& each : savedProjectPaths)
-			if (std::filesystem::path(each).filename().string() == pName + BLAZE_EXTENSION)
+			if (std::filesystem::path(each).filename().string() == pName)
 				return true;
+
 		return false;
+	}
+
+	inline bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + BLAZE_EXTENSION); }
+
+	inline void Save()
+	{
+		if (rootPath.empty()) return;
+
+		YAML::Node data;
+		YAML_SAVE_VAR(data, texturePath);
+		YAML_SAVE_VAR(data, fontPath);
+		YAML_SAVE_VAR(data, soundPath);
+
+		YAML_SAVE_VAR(data, lightMaterialsPath);
+		YAML_SAVE_VAR(data, physicsMaterialsPath);
+		YAML_SAVE_VAR(data, soundMaterialsPath);
+
+		YAML_SAVE_VAR(data, scenesPath);
+		YAML_SAVE_VAR(data, scriptsPath);
+		YAML_SAVE_VAR(data, entitiesPath);
+
+		YAMLUtils::SaveFile(rootPath + "\\settings" + BLAZE_EXTENSION, data);
 	}
 
 	inline void Create(const std::string& filepath, const std::string& pName)
@@ -79,72 +77,76 @@ namespace wc::Project
 			return;
 		}
 
-		if (filepath.find(BLAZE_EXTENSION) != std::string::npos)
-		{
-			WC_CORE_WARN("Project path cannot have .blz extension: {}", filepath);
-			return;
-		}
-
 		name = pName;
-		rootPath = filepath + "\\" + pName + BLAZE_EXTENSION;
-		AddProjectToList();
+		rootPath = filepath + "\\" + pName; // @TODO: I think the '\\' are OS specific
+
+		texturePath = rootPath + "\\Textures";
+		fontPath = rootPath + "\\Fonts";
+		soundPath = rootPath + "\\Sounds";
+
+		lightMaterialsPath = rootPath + "\\Light Materials";
+		physicsMaterialsPath = rootPath + "\\Physics Materials";
+		soundMaterialsPath = rootPath + "\\Sound Materials";
+
+		scenesPath = rootPath + "\\Scenes";
+		scriptsPath = rootPath + "\\Scripts";
+		entitiesPath = rootPath + "\\Entities";
+
+		AddProjectToList(rootPath);
 		std::string assetDir = rootPath + "\\Assets";
 		std::filesystem::create_directory(rootPath);
-		std::filesystem::create_directory(rootPath + "\\Scenes");
-		std::filesystem::create_directory(assetDir);
-		std::filesystem::create_directory(assetDir + "\\Scripts");
-		std::filesystem::create_directory(assetDir + "\\Textures");
-		std::filesystem::create_directory(assetDir + "\\Audio");
-		std::filesystem::create_directory(assetDir + "\\Fonts");
-		std::filesystem::create_directory(assetDir + "\\Shaders");
-		std::filesystem::create_directory(assetDir + "\\Entities");
 
-		WC_CORE_INFO("Create Successful -> Created project: {} at {}", pName, filepath);
+		std::filesystem::create_directory(texturePath);
+		std::filesystem::create_directory(fontPath);
+		std::filesystem::create_directory(soundPath);
+
+		std::filesystem::create_directory(lightMaterialsPath);
+		std::filesystem::create_directory(physicsMaterialsPath);
+		std::filesystem::create_directory(soundMaterialsPath);
+
+		std::filesystem::create_directory(scenesPath);
+		std::filesystem::create_directory(scriptsPath);
+		std::filesystem::create_directory(entitiesPath);
+
+		Save();
 	}
 
 	inline bool Load(const std::string& filepath)
 	{
 		if (!std::filesystem::exists(filepath))
 		{
-			WC_CORE_ERROR("{} does not exist.", filepath);
+			WC_CORE_ERROR("{} does not exist", filepath);
 			return false;
 		}
 
-		if (!std::filesystem::is_directory(filepath))
+		if (!IsProject(filepath))
 		{
-			WC_CORE_ERROR("{} is not a directory.", filepath);
-			return false;
-		}
-
-		if (std::filesystem::path(filepath).extension().string() != BLAZE_EXTENSION)
-		{
-			WC_CORE_ERROR("{} is not a .blz file.", filepath);
+			WC_CORE_ERROR("{} is not a Blaze project", filepath);
 			return false;
 		}
 
 		name = std::filesystem::path(filepath).stem().string();
 		rootPath = filepath;
-		AddProjectToList();
-		WC_CORE_INFO("Opened project: {} at {}", name, filepath);
+		AddProjectToList(rootPath);
 
 		return true;
 	}
 
-	inline void Clear()
+	inline void Reset()
 	{
 		name = "";
 		rootPath = "";
 		firstScene = "";
 	}
 
-	inline void Delete(const std::string& filepath)
+	inline void Delete(const std::string& filepath) // @TODO: This function should accept project index from savedProjectPaths
 	{
 		if (std::filesystem::exists(filepath))
 		{
 			if (std::filesystem::path(filepath).extension().string() == BLAZE_EXTENSION)
 			{
 				RemoveProjectFromList(filepath);
-				Clear();
+				Reset();
 				std::filesystem::remove_all(filepath);
 				WC_CORE_INFO("Deleted project: {}", filepath);
 			}

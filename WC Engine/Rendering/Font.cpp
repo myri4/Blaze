@@ -30,9 +30,8 @@ namespace wc
                 charset.add(c);
         }
 
-        //double fontScale = 1.f;
-        FontGeometry = msdf_atlas::FontGeometry(&m_Glyphs);
-        //int glyphsLoaded = FontGeometry.loadCharset(font, fontScale, charset);
+        Geometry = msdf_atlas::FontGeometry(&Glyphs);
+        Geometry.loadCharset(font, 1.0, charset);
 
 
         double emSize = 40.0;
@@ -43,7 +42,7 @@ namespace wc
         atlasPacker.setMiterLimit(1.0);
         atlasPacker.setPadding(0);
         atlasPacker.setScale(emSize);
-        //int remaining = atlasPacker.pack(m_Glyphs.data(), (int)m_Glyphs.size());
+        atlasPacker.pack(Glyphs.data(), (int)Glyphs.size());
 
 
         int width, height;
@@ -60,16 +59,16 @@ namespace wc
         bool expensiveColoring = false;
         if (expensiveColoring)
         {
-            msdf_atlas::Workload([&glyphs = m_Glyphs, &coloringSeed](int i, int threadNo) -> bool {
+            msdf_atlas::Workload([&glyphs = Glyphs, &coloringSeed](int i, int threadNo) -> bool {
                 unsigned long long glyphSeed = (LCG_MULTIPLIER * (coloringSeed ^ i) + LCG_INCREMENT) * !!coloringSeed;
                 glyphs[i].edgeColoring(msdfgen::edgeColoringInkTrap, DEFAULT_ANGLE_THRESHOLD, glyphSeed);
                 return true;
-                }, m_Glyphs.size()).finish(THREAD_COUNT);
+                }, Glyphs.size()).finish(THREAD_COUNT);
         }
         else
         {
             unsigned long long glyphSeed = coloringSeed;
-            for (msdf_atlas::GlyphGeometry& glyph : m_Glyphs)
+            for (msdf_atlas::GlyphGeometry& glyph : Glyphs)
             {
                 glyphSeed *= LCG_MULTIPLIER;
                 glyph.edgeColoring(msdfgen::edgeColoringInkTrap, DEFAULT_ANGLE_THRESHOLD, glyphSeed);
@@ -83,7 +82,7 @@ namespace wc
         msdf_atlas::ImmediateAtlasGenerator<float, 3, msdf_atlas::msdfGenerator, msdf_atlas::BitmapAtlasStorage<uint8_t, 3>> generator(width, height);
         generator.setAttributes(attributes);
         generator.setThreadCount(8);
-        generator.generate(m_Glyphs.data(), (int)m_Glyphs.size());
+        generator.generate(Glyphs.data(), (int)Glyphs.size());
 
         auto bitmap = (msdfgen::BitmapConstRef<uint8_t, 3>)generator.atlasStorage();
         auto bytes_per_scanline = bitmap.width * 3;
@@ -108,9 +107,9 @@ namespace wc
         deinitializeFreetype(ft);
     }
 
-    glm::vec2 Font::CalculateTextSize(const std::string& string)
+    glm::vec2 Font::CalculateTextSize(const std::string& string, float lineSpacing, float kerning)
     {
-		const auto& fontGeometry = FontGeometry;
+		const auto& fontGeometry = Geometry;
 		const auto& metrics = fontGeometry.getMetrics();
 
 		glm::dvec2 begin = glm::dvec2(0.0), end = glm::dvec2(0.0);
@@ -131,7 +130,7 @@ namespace wc
 			if (character == '\n')
 			{
 				x = 0;
-				y -= fsScale * metrics.lineHeight + LineSpacing;
+				y -= fsScale * metrics.lineHeight + lineSpacing;
 				continue;
 			}
 
@@ -146,13 +145,13 @@ namespace wc
 					advance = dAdvance;
 				}
 
-				x += fsScale * advance + Kerning;
+				x += fsScale * advance + kerning;
 				continue;
 			}
 
 			if (character == '\t')
 			{
-				x += 4.0 * (fsScale * spaceGlyphAdvance + Kerning);
+				x += 4.0 * (fsScale * spaceGlyphAdvance + kerning);
 				continue;
 			}
 
@@ -181,7 +180,7 @@ namespace wc
 				char nextCharacter = string[i + 1];
 				fontGeometry.getAdvance(advance, character, nextCharacter);
 
-				x += fsScale * advance + Kerning;
+				x += fsScale * advance + kerning;
 			}
 		}
 		return end - begin;
