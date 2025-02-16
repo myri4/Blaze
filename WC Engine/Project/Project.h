@@ -6,7 +6,7 @@
 
 #include <wc/Utils/YAML.h>
 
-#define BLAZE_EXTENSION ".blzproj"
+#define PROJECT_SETTINGS_EXTENSION ".blzproj"
 
 namespace Project
 {
@@ -47,7 +47,7 @@ namespace Project
 		return false;
 	}
 
-	inline bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + BLAZE_EXTENSION); }
+	inline bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + PROJECT_SETTINGS_EXTENSION); }
 
 	inline void Save()
 	{
@@ -66,7 +66,7 @@ namespace Project
 		YAML_SAVE_VAR(data, scriptsPath);
 		YAML_SAVE_VAR(data, entitiesPath);
 
-		YAMLUtils::SaveFile(rootPath + "\\settings" + BLAZE_EXTENSION, data);
+		YAMLUtils::SaveFile(rootPath + "\\settings" + PROJECT_SETTINGS_EXTENSION, data);
 	}
 
 	inline void Create(const std::string& filepath, const std::string& pName)
@@ -143,7 +143,7 @@ namespace Project
 	{
 		if (std::filesystem::exists(filepath))
 		{
-			if (std::filesystem::path(filepath).extension().string() == BLAZE_EXTENSION)
+			if (IsProject(filepath))
 			{
 				RemoveProjectFromList(filepath);
 				Reset();

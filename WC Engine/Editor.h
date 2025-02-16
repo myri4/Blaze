@@ -612,7 +612,7 @@ struct Editor
 					// Display the popup menu
 			        // @NOTE: change this if you change theme default
 			        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
-					if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
+					if (gui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoSavedSettings))
 					{
 						gui::Text("%s", entity.name().c_str());
 						gui::Separator();
@@ -898,7 +898,7 @@ struct Editor
 
 			ui::CenterNextWindow();
 		    gui::PopStyleVar();
-			if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 			{
 				ImVec2 center = gui::GetMainViewport()->GetCenter();
 				ImVec2 windowSize = gui::GetWindowSize();
@@ -934,7 +934,7 @@ struct Editor
 				}
 
 				ui::CenterNextWindow();
-				if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
+				if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
 				{
 					gui::Text("Name already exists!");
 
@@ -1092,7 +1092,7 @@ struct Editor
 				}
 
 				ui::CenterNextWindow();
-				if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+				if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 				{
 					gui::Text("Name already exists!");
 					if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
@@ -1199,7 +1199,7 @@ struct Editor
 								gui::PopStyleColor();
 
 								ui::CenterNextWindow();
-								if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
+								if (gui::BeginPopupModal("Create Material##popup", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings))
 								{
 									static std::string name;
 									if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
@@ -1382,405 +1382,564 @@ struct Editor
 	}
 
 	void UI_Assets()
-	{
-		auto assetsPath = std::filesystem::path(Project::rootPath);
-		static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
-		static std::filesystem::path selectedFolderPath = assetsPath;
-		static std::vector<std::filesystem::path> openedFiles;
-		static std::unordered_set<std::string> openedFileNames;
-	    static bool showFolders = true;
-		static bool showIcons = true;
-		static bool previewAsset = true;
+    {
+        auto assetsPath = std::filesystem::path(Project::rootPath);
+        static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
+        static std::filesystem::path selectedFolderPath = assetsPath;
+        static std::vector<std::filesystem::path> openedFiles;
+        static std::unordered_set<std::string> openedFileNames;
+        static bool showFolders = true;
+        static bool showIcons = true;
+        static bool previewAsset = true;
 
-		// reset variables every time root changes
-		static std::filesystem::path prevRootPath;
-		if (assetsPath != prevRootPath)
-		{
-			selectedFolderPath = assetsPath;
-			folderStates.clear();
-			openedFiles.clear();
-			openedFileNames.clear();
-			prevRootPath = assetsPath;
-		}
+        // reset variables every time root changes
+        static std::filesystem::path prevRootPath;
+        if (assetsPath != prevRootPath)
+        {
+            selectedFolderPath = assetsPath;
+            folderStates.clear();
+            openedFiles.clear();
+            openedFileNames.clear();
+            prevRootPath = assetsPath;
+        }
 
-		// Expand all helper func
-		std::function<void(const std::filesystem::path&, bool)> setFolderStatesRecursively =
-			[&](const std::filesystem::path& path, bool state) {
-			for (const auto& entry : std::filesystem::directory_iterator(path))
-			{
-				if (entry.is_directory())
-				{
-					folderStates[entry.path().string()] = state;
-					setFolderStatesRecursively(entry.path(), state);
-				}
-			}
-			};
+        // Expand all helper function
+        std::function<void(const std::filesystem::path&, bool)> setFolderStatesRecursively =
+            [&](const std::filesystem::path& path, bool state) {
+                for (const auto& entry : std::filesystem::directory_iterator(path))
+                {
+                    if (entry.is_directory())
+                    {
+                        folderStates[entry.path().string()] = state;
+                        setFolderStatesRecursively(entry.path(), state);
+                    }
+                }
+            };
 
-		if (gui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
-		{
-			if (gui::BeginMenuBar())
-			{
-				if (gui::MenuItem("Import"))
-					WC_INFO("TODO - Implement Import");
+        // Lambda to handle file double click logic
+        auto openFileOnDoubleClick = [&](const std::filesystem::path& filePath)
+        {
+            if (filePath.extension() != ".scene")
+            {
+                if (openedFileNames.insert(filePath.string()).second)
+                    openedFiles.push_back(filePath);
+            }
+            else
+            {
+                gui::OpenPopup(("Confirm##" + filePath.string()).c_str());
+            }
+        };
 
-			    if (gui::MenuItem("Open Path"))
-			        FileDialogs::OpenInFileExplorer(selectedFolderPath.string());
+	    auto openRightClick = [&](const std::string& file)
+	    {
+	        static bool showDeleteWarnPopup = false;
+	        std::filesystem::path filePath = file;
+	        if (gui::BeginPopup(("##RightClick" + file).c_str(), ImGuiWindowFlags_NoSavedSettings))
+            {
+                gui::Text(filePath.filename().string().c_str());
+	            gui::Separator();
+	            if (!is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
+	            else if (gui::MenuItem("Open in File Explorer")) FileDialogs::OpenInFileExplorer(file);
+	            if (ui::MenuItemButton("Rename")) gui::OpenPopup(("Rename##Rename" + file).c_str());
+	            if (is_directory(filePath)) if (ui::MenuItemButton("New File")) gui::OpenPopup(("New File##NewFile" + file).c_str());
+	            gui::PushStyleColor(ImGuiCol_HeaderHovered, { 1.f, 0.f, 0.f, 0.5f });
+	            if (ui::MenuItemButton("Delete")) gui::OpenPopup(("Delete Warning##DeleteWarn" + file).c_str());
+	            gui::PopStyleColor();
 
-				if (gui::BeginMenu("View##Assets"))
-				{
-				    gui::MenuItem("Show Folders", nullptr, &showFolders);
+	            ui::CenterNextWindow();
+	            if (gui::BeginPopupModal(("Delete Warning##DeleteWarn" + file).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+	            {
+	                gui::Text("Are you sure you want to delete %s?", filePath.filename().string().c_str());
+	                const float widgetWidth = gui::GetItemRectSize().x;
+                    if (gui::Button("Yes##DeleteWarn") || gui::IsKeyPressed(ImGuiKey_Enter))
+                    {
+                        std::error_code ec;
+                        std::filesystem::remove_all(filePath);
+                        if (ec) {WC_ERROR("Failed to delete file: {}", ec.message());}
+                        else
+                        {
+                            if (is_directory(filePath))
+                            {
+                                folderStates.erase(filePath.string());
+                            }
+                            else
+                            {
+                                openedFiles.erase(std::remove(openedFiles.begin(), openedFiles.end(), filePath), openedFiles.end());
+                                openedFileNames.erase(filePath.string());
+                            }
+                        }
+                        gui::CloseCurrentPopup();
+                    }
+                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+                    if (gui::Button("Cancel##DeleteWarn") || gui::IsKeyPressed(ImGuiKey_Escape))
+                        gui::CloseCurrentPopup();
 
-				    gui::MenuItem("Show Icons", nullptr, &showIcons);
+	                gui::EndPopup();
+	            }
 
-				    // TODO - make popup placement better
-					gui::MenuItem("Preview Assets", nullptr, &previewAsset);
+	            ui::CenterNextWindow();
+	            if (gui::BeginPopupModal(("Rename##Rename" + file).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+	            {
+	                static std::string newName = "#@#";
+	                if (newName == "#@#") newName = filePath.stem().string();
+	                if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+	                gui::InputText(filePath.extension().string().empty() ? "Folder" : filePath.extension().string().c_str(), &newName);
+	                const float widgetSize = gui::GetItemRectSize().x;
+	                gui::BeginDisabled(newName.empty());
+	                if (gui::Button("Rename") || gui::IsKeyPressed(ImGuiKey_Enter))
+                    {
+                        std::error_code ec;
+	                    std::filesystem::path newFilePath = filePath.parent_path() / (newName + filePath.extension().string());
+                        std::filesystem::rename(filePath, newFilePath, ec);
+                        if (ec) { WC_ERROR("Failed to rename file: {}", ec.message()); }
+                        else
+                        {
+                            //WC_INFO("Renaming: {}, is DIR: {}", newFilePath.string(), is_directory(newFilePath));
+                            if (is_directory(newFilePath))
+                            {
+                                folderStates.erase(newFilePath.string());
+                                folderStates[(newFilePath.parent_path() / newName).string()] = false;
+                            }
+                            else
+                            {
+                                if (openedFileNames.find(filePath.string()) != openedFileNames.end()) {
+                                    // Remove the old entry from both data structures
+                                    openedFiles.erase(std::remove(openedFiles.begin(), openedFiles.end(), filePath), openedFiles.end());
+                                    openedFileNames.erase(filePath.string());
 
-				    if (showFolders)
-				    {
-				        gui::Separator();
-					    if (gui::MenuItem("Collapse All"))
-						    setFolderStatesRecursively(assetsPath, false);
+                                    // Push back the renamed file's new path
+                                    openedFiles.push_back(newFilePath);
+                                    openedFileNames.insert(newFilePath.string());
+                                }
 
-					    if (gui::MenuItem("Expand All"))
-					        setFolderStatesRecursively(assetsPath, true);
-				    }
+                            }
+                            newName = "#@#";
+                        }
+                        gui::CloseCurrentPopup();
+                    }
+	                gui::EndDisabled();
+	                if (newName.empty()) gui::SetItemTooltip("Name cannot be empty");
+	                gui::SameLine(widgetSize - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+	                if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+	                {
+	                    newName = "#@#";
+	                    gui::CloseCurrentPopup();
+	                }
 
-					gui::EndMenu();
-				}
+	                gui::EndPopup();
+	            }
 
-				gui::EndMenuBar();
-			}
+                ui::CenterNextWindow();
+	            if (gui::BeginPopupModal(("New File##NewFile" + file).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+	            {
+	                static std::string newName = "New File";
+	                if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+	                gui::InputText("Name", &newName);
+	                const float widgetSize = gui::GetItemRectSize().x;
+	                gui::BeginDisabled(newName.empty());
+	                if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                {
+	                    std::error_code ec;
+	                    std::filesystem::path newFilePath = filePath / newName;
+	                    if (newFilePath.extension().string().empty()) {std::filesystem::create_directory(newFilePath, ec);}
+                        else
+                        {
+	                        std::ofstream newFile(newFilePath);
+	                        if (!newFile.is_open()){ WC_ERROR("Failed to create file: {}", ec.message());}
+	                        else
+	                        {
+	                            //OPEN FILE - IF NEEDED
+	                            //openedFiles.push_back(newFilePath);
+	                            //openedFileNames.insert(newFilePath.string());
+	                        }
+                        }
+	                    newName = "New File";
+	                    gui::CloseCurrentPopup();
+	                }
+	                gui::EndDisabled();
+	                if (newName.empty()) gui::SetItemTooltip("Name cannot be empty");
+	                gui::SameLine(widgetSize - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+	                if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
+	                {
+	                    newName = "New File";
+	                    gui::CloseCurrentPopup();
+	                }
+	                gui::EndPopup();
+	            }
 
-			std::function<void(const std::filesystem::path&)> displayDirectory = [&](const std::filesystem::path& path)
-				{
-					if (path != assetsPath) gui::Indent(20);
+	            gui::EndPopup();
+            }
+	    };
 
-					for (const auto& entry : std::filesystem::directory_iterator(path))
-					{
-						const auto& filenameStr = entry.path().filename().string();
-						const auto& fullPathStr = entry.path().string();
-						if (std::filesystem::exists(entry.path()))
-						{
-							if (entry.is_directory())
-							{
-								auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
-								bool& isOpen = it->second;
+        if (gui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
+        {
+            if (gui::BeginMenuBar())
+            {
+                if (gui::MenuItem("Import"))
+                    WC_INFO("TODO - Implement Import");
 
-								gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-								gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-								if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
-									isOpen = !isOpen;
+                if (gui::MenuItem("Open Path"))
+                    FileDialogs::OpenInFileExplorer(selectedFolderPath.string());
 
-								gui::PopStyleColor();
-								gui::PopStyleVar();
-								gui::SameLine();
+                if (gui::BeginMenu("View##Assets"))
+                {
+                    gui::MenuItem("Show Folders", nullptr, &showFolders);
+                    gui::MenuItem("Show Icons", nullptr, &showIcons);
+                    gui::MenuItem("Preview Assets", nullptr, &previewAsset);
 
-								if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
-									selectedFolderPath = entry.path();
+                    if (showFolders)
+                    {
+                        gui::Separator();
+                        if (gui::MenuItem("Collapse All"))
+                            setFolderStatesRecursively(assetsPath, false);
 
-								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-									isOpen = !isOpen;
+                        if (gui::MenuItem("Expand All"))
+                            setFolderStatesRecursively(assetsPath, true);
+                    }
 
-								if (isOpen)
-									displayDirectory(entry.path());
-							}
-							else
-							{
-								ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-								gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
-								if (gui::IsItemHovered())
-								{
-									if (previewAsset) gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
+                    gui::EndMenu();
+                }
 
-									if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-										if (entry.path().extension() != ".scene")
-										{
-											if (openedFileNames.insert(fullPathStr).second) openedFiles.push_back(entry.path());
-										}
-										else gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
+                gui::EndMenuBar();
+            }
 
-									gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
-									if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs))
-									{
-										gui::Text("Preview: %s", filenameStr.c_str());
-										gui::EndPopup();
-									}
-								}
+            // Recursive display for the folder tree (text view)
+            std::function<void(const std::filesystem::path&)> displayDirectory = [&](const std::filesystem::path& path)
+            {
+                if (path != assetsPath) gui::Indent(20);
 
-								ui::CenterNextWindow();
-								if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-								{
-									gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-									const float widgetWidth = gui::GetItemRectSize().x;
-									if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-									{
-										m_ScenePath = entry.path().string();
-										WC_INFO(m_ScenePath);
-										gui::CloseCurrentPopup();
-									}
-									gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-									if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
-										gui::CloseCurrentPopup();
+                for (const auto& entry : std::filesystem::directory_iterator(path))
+                {
+                    const auto& filenameStr = entry.path().filename().string();
+                    const auto& fullPathStr = entry.path().string();
+                    if (std::filesystem::exists(entry.path()))
+                    {
+                        if (entry.is_directory())
+                        {
+                            auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
+                            bool& isOpen = it->second;
 
-									gui::EndPopup();
-								}
-							}
-						}
-					}
+                            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+                            if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+                                isOpen = !isOpen;
 
-					if (path != assetsPath) gui::Unindent(20);
-				};
+                            gui::PopStyleColor();
+                            gui::PopStyleVar();
+                            gui::SameLine();
 
-		    std::function<void(const std::filesystem::path&)> displayDirectoryIcons = [&](const std::filesystem::path& path)
-		    {
-		        if (selectedFolderPath == assetsPath)
-				{
-					gui::BeginDisabled();
-					gui::ArrowButton("Back", ImGuiDir_Left);
-					gui::EndDisabled();
-				}
-				else
-				{
-					if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+                            if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+                                selectedFolderPath = entry.path();
 
-					if (gui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-						{
-							const char* payloadPath = static_cast<const char*>(payload->Data);
-							std::filesystem::path sourcePath(payloadPath);
+                            if (gui::IsItemHovered())
+                            {
+                                if (gui::IsMouseDoubleClicked(0))
+                                    isOpen = !isOpen;
 
-							try
-							{
-								std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
-							}
-							catch (const std::exception& e)
-							{
-								WC_ERROR(e.what());
-							}
-						}
-						gui::EndDragDropTarget();
-					}
-				}
+                                if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                    gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
+                            }
 
-				static std::string previewPath;
-				gui::SameLine();
-				//gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
-				gui::PushItemWidth(gui::GetContentRegionAvail().x);
-				gui::InputText("##PreviewPath", &previewPath, ImGuiInputTextFlags_ReadOnly);
-				gui::PopItemWidth();
-				if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
-				else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
+                            if (isOpen)
+                                displayDirectory(entry.path());
+                        }
+                        else
+                        {
+                            ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                            gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
+                            if (gui::IsItemHovered())
+                            {
+                                if (previewAsset)
+                                    gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-				gui::Separator();
+                                if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                                    openFileOnDoubleClick(entry.path());
 
-				constexpr float buttonSize = 70;
-				float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
-				int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
+                                if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                    gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
 
-				if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
+                                gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
+                                if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoSavedSettings))
+                                {
+                                    gui::Text("Preview: %s", filenameStr.c_str());
+                                    gui::EndPopup();
+                                }
+                            }
 
-				if (std::filesystem::exists(selectedFolderPath))
-				{
-					int i = 0;
-					for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
-					{
-						if (i > 0 && i % itemsPerRow != 0)
-							gui::SameLine();
+                            ui::CenterNextWindow();
+                            if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+                            {
+                                gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+                                const float widgetWidth = gui::GetItemRectSize().x;
+                                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+                                {
+                                    m_ScenePath = entry.path().string();
+                                    WC_INFO(m_ScenePath);
+                                    gui::CloseCurrentPopup();
+                                }
+                                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+                                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+                                    gui::CloseCurrentPopup();
 
-						if (std::filesystem::exists(entry.path()))
-						{
-							if (entry.is_directory())
-							{
-								gui::BeginGroup();
-								gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-								gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-								// TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
-								gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
-								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
+                                gui::EndPopup();
+                            }
+                        }
+                    }
+                    openRightClick(entry.path().string());
+                }
 
-								if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-								{
-									std::string path = entry.path().string();
-									gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-									gui::Text("Moving %s", entry.path().filename().string().c_str());
-									gui::EndDragDropSource();
-								}
+                if (path != assetsPath) gui::Unindent(20);
+            };
 
-								if (gui::BeginDragDropTarget())
-								{
-									if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-									{
-										const char* payloadPath = static_cast<const char*>(payload->Data);
-										std::filesystem::path sourcePath(payloadPath);
-										std::filesystem::path targetPath = entry.path() / sourcePath.filename();
+            // Display directory as icons (icon view)
+            std::function<void(const std::filesystem::path&)> displayDirectoryIcons = [&](const std::filesystem::path& path)
+            {
+                if (selectedFolderPath == assetsPath)
+                {
+                    gui::BeginDisabled();
+                    gui::ArrowButton("Back", ImGuiDir_Left);
+                    gui::EndDisabled();
+                }
+                else
+                {
+                    if (gui::ArrowButton("Back", ImGuiDir_Left))
+                        selectedFolderPath = selectedFolderPath.parent_path();
 
-										std::filesystem::rename(sourcePath, targetPath);
-									}
-									gui::EndDragDropTarget();
-								}
+                    if (gui::BeginDragDropTarget())
+                    {
+                        if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+                        {
+                            const char* payloadPath = static_cast<const char*>(payload->Data);
+                            std::filesystem::path sourcePath(payloadPath);
 
-								gui::PopStyleColor();
-								gui::PopStyleVar();
+                            try
+                            {
+                                std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
+                            }
+                            catch (const std::exception& e)
+                            {
+                                WC_ERROR(e.what());
+                            }
+                        }
+                        gui::EndDragDropTarget();
+                    }
+                }
 
-								std::string filename = entry.path().filename().string();
-								float wrapWidth = buttonSize; // Width for wrapping the text
+                static std::string previewPath;
+                gui::SameLine();
+                gui::PushItemWidth(gui::GetContentRegionAvail().x);
+                gui::InputText("##PreviewPath", &previewPath, ImGuiInputTextFlags_ReadOnly);
+                gui::PopItemWidth();
+                if (gui::IsItemHovered() || gui::IsItemActive())
+                    previewPath = assetsPath.string();
+                else
+                    previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
 
-								// Split the text into words
-								std::istringstream stream(filename);
-								std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
+                gui::Separator();
 
-								// Display each line centered
-								std::string currentLine;
-								float currentLineWidth = 0.0f;
-								gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
-								for (const auto& word : words)
-								{
-									ImVec2 wordSize = gui::CalcTextSize(word.c_str());
-									if (currentLineWidth + wordSize.x > wrapWidth)
-									{
-										// Push the current line and start a new one
-										gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-										gui::TextUnformatted(currentLine.c_str());
-										currentLine.clear();
-										currentLineWidth = 0.0f;
-									}
+                constexpr float buttonSize = 70;
+                float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
+                int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
+                if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
 
-									if (!currentLine.empty())
-									{
-										currentLine += " "; // Add a space before the next word
-										currentLineWidth += gui::CalcTextSize(" ").x;
-									}
-									currentLine += word;
-									currentLineWidth += wordSize.x;
-								}
+                if (std::filesystem::exists(selectedFolderPath))
+                {
+                    int i = 0;
+                    for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
+                    {
+                        if (i > 0 && i % itemsPerRow != 0)
+                            gui::SameLine();
 
-								// Add the last line if there's any remaining text
-								if (!currentLine.empty())
-								{
-									gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-									gui::TextUnformatted(currentLine.c_str());
-								}
-								gui::PopStyleVar(); // Restore item spacing for text
+                        if (std::filesystem::exists(entry.path()))
+                        {
+                            if (entry.is_directory())
+                            {
+                                gui::BeginGroup();
+                                gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+                                gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                                gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
+                                if (gui::IsItemHovered())
+                                {
+                                    if ( gui::IsMouseDoubleClicked(0))
+                                        selectedFolderPath = entry.path();
 
-								gui::EndGroup();
-							}
-							else
-							{
-								gui::BeginGroup();
-								gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-								gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-								gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
-								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-								{
-									if (entry.path().extension() != ".scene")
-									{
-										if (openedFileNames.insert(entry.path().string()).second)
-											openedFiles.push_back(entry.path());
-									}
-									else
-										gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
-								}
+                                    if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                        gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
+                                }
 
-								// Drag source for files
-								if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-								{
-									std::string path = entry.path().string();
-									gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-									gui::Text("Moving %s", entry.path().filename().string().c_str());
-									gui::EndDragDropSource();
-								}
+                                if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                                {
+                                    std::string path = entry.path().string();
+                                    gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+                                    gui::Text("Moving %s", entry.path().filename().string().c_str());
+                                    gui::EndDragDropSource();
+                                }
 
-								gui::PopStyleVar();
-								gui::PopStyleColor();
+                                if (gui::BeginDragDropTarget())
+                                {
+                                    if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+                                    {
+                                        const char* payloadPath = static_cast<const char*>(payload->Data);
+                                        std::filesystem::path sourcePath(payloadPath);
+                                        std::filesystem::path targetPath = entry.path() / sourcePath.filename();
+                                        std::filesystem::rename(sourcePath, targetPath);
+                                    }
+                                    gui::EndDragDropTarget();
+                                }
 
-								gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
-								gui::TextWrapped(entry.path().filename().string().c_str());
-								gui::PopTextWrapPos();
-								gui::EndGroup();
+                                gui::PopStyleColor();
+                                gui::PopStyleVar();
 
-								ui::CenterNextWindow();
-								if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
-								{
-									gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-									const float widgetWidth = gui::GetItemRectSize().x;
+                                std::string filename = entry.path().filename().string();
+                                float wrapWidth = buttonSize; // Width for wrapping the text
+                                std::istringstream stream(filename);
+                                std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
 
-									if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-									{
-										m_ScenePath = entry.path().string();
-										m_Scene.Load(m_ScenePath);
-										gui::CloseCurrentPopup();
-									}
+                                std::string currentLine;
+                                float currentLineWidth = 0.0f;
+                                gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 });
+                                for (const auto& word : words)
+                                {
+                                    ImVec2 wordSize = gui::CalcTextSize(word.c_str());
+                                    if (currentLineWidth + wordSize.x > wrapWidth)
+                                    {
+                                        gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+                                        gui::TextUnformatted(currentLine.c_str());
+                                        currentLine.clear();
+                                        currentLineWidth = 0.0f;
+                                    }
+                                    if (!currentLine.empty())
+                                    {
+                                        currentLine += " ";
+                                        currentLineWidth += gui::CalcTextSize(" ").x;
+                                    }
+                                    currentLine += word;
+                                    currentLineWidth += wordSize.x;
+                                }
+                                if (!currentLine.empty())
+                                {
+                                    gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+                                    gui::TextUnformatted(currentLine.c_str());
+                                }
+                                gui::PopStyleVar();
+                                gui::EndGroup();
+                            }
+                            else
+                            {
+                                gui::BeginGroup();
+                                gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+                                gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                                gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
+                                if (gui::IsItemHovered())
+                                {
+                                    if (gui::IsMouseDoubleClicked(0))
+                                        openFileOnDoubleClick(entry.path());
 
-									gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-									if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+                                    if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                        gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
+                                }
 
-									gui::EndPopup();
-								}
-							}
-						}
-						i++;
-					}
-				}
-		    };
+                                if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                                {
+                                    std::string path = entry.path().string();
+                                    gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+                                    gui::Text("Moving %s", entry.path().filename().string().c_str());
+                                    gui::EndDragDropSource();
+                                }
 
-		    if (showFolders && showIcons)
-		    {
-		        if (gui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
-		        {
-		            gui::TableNextRow();
-		            gui::TableSetColumnIndex(0);
+                                gui::PopStyleVar();
+                                gui::PopStyleColor();
 
-		            gui::BeginChild("FoldersChild##0", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-		            displayDirectory(assetsPath);
-		            gui::EndChild();
+                                gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
+                                gui::TextWrapped(entry.path().filename().string().c_str());
+                                gui::PopTextWrapPos();
+                                gui::EndGroup();
 
-		            gui::TableSetColumnIndex(1);
+                                ui::CenterNextWindow();
+                                if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+                                {
+                                    gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+                                    const float widgetWidth = gui::GetItemRectSize().x;
+                                    if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+                                    {
+                                        m_ScenePath = entry.path().string();
+                                        m_Scene.Load(m_ScenePath);
+                                        gui::CloseCurrentPopup();
+                                    }
+                                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+                                    if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+                                        gui::CloseCurrentPopup();
+                                    gui::EndPopup();
+                                }
+                            }
+                        }
+                        i++;
 
-		            gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
-		            displayDirectoryIcons(selectedFolderPath);
-		            gui::EndChild();
+                        openRightClick(entry.path().string());
+                    }
+                }
+            };
 
-		            gui::EndTable();
-		        }
-		    }
-		    else
-		    {
-		        if (showFolders)
-		        {
-		            gui::Spacing();
-		            gui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-		            displayDirectory(assetsPath);
-		            gui::EndChild();
-		        }
-		        else if (showIcons)
-		        {
-		            gui::Spacing();
-		            gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
-		            displayDirectoryIcons(selectedFolderPath);
-		            gui::EndChild();
-		        }
-		    }
-		}
-		gui::End();
+            if (showFolders && showIcons)
+            {
+                if (gui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+                {
+                    gui::TableNextRow();
 
-		// Handle opened files (tabs or whatever content needs to be displayed)
-		for (auto it = openedFiles.begin(); it != openedFiles.end();)
-		{
-			bool open = true;
-			if (gui::Begin(it->filename().string().c_str(), &open))
-				gui::Text("File: %s", it->string().c_str());
-			gui::End();
+                    gui::TableSetColumnIndex(0);
+                    gui::BeginChild("FoldersChild", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+                    displayDirectory(assetsPath);
+                    gui::EndChild();
 
-			if (!open)
-			{
-				openedFileNames.erase(it->string());
-				it = openedFiles.erase(it);
-			}
-			else
-				++it;
-		}
-	}
+                    gui::TableSetColumnIndex(1);
+                    gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
+                    displayDirectoryIcons(selectedFolderPath);
+                    gui::EndChild();
+
+                    gui::EndTable();
+                }
+            }
+            else
+            {
+                if (showFolders)
+                {
+                    gui::Spacing();
+                    gui::BeginChild("FoldersChild", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+                    displayDirectory(assetsPath);
+                    gui::EndChild();
+                }
+                else if (showIcons)
+                {
+                    gui::Spacing();
+                    gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
+                    displayDirectoryIcons(selectedFolderPath);
+                    gui::EndChild();
+                }
+            }
+
+            if (!gui::IsAnyItemHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right)) gui::OpenPopup(("##RightClick" + selectedFolderPath.string()).c_str());
+            openRightClick(selectedFolderPath.string());
+        }
+        gui::End();
+
+        // Handle opened files (e.g., as tabs or separate windows)
+        for (auto it = openedFiles.begin(); it != openedFiles.end();)
+        {
+            WC_CORE_INFO("Opened file: {}", it->string());
+            bool openFile = true;
+            if (gui::Begin(it->filename().string().c_str(), &openFile, ImGuiWindowFlags_NoSavedSettings))
+                gui::Text("File: %s", it->string().c_str());
+            gui::End();
+
+            if (!openFile)
+            {
+                openedFileNames.erase(it->string());
+                it = openedFiles.erase(it);
+            }
+            else
+                ++it;
+        }
+    }
 
 	void UI_DebugStats()
 	{
@@ -2126,7 +2285,7 @@ struct Editor
 		ImGui::PopStyleColor(4);
 		ImGui::PopStyleVar(2);
 		ui::CenterNextWindow();
-	    if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar))
+	    if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar))
 	    {
 	        gui::Text("Save Changes to [%s] before closing?", Project::name.c_str());
 	        float textSize = gui::CalcTextSize("Save Changes to [").x + gui::CalcTextSize(Project::name.c_str()).x + gui::CalcTextSize("] before closing?").x;
@@ -2233,7 +2392,7 @@ struct Editor
 				}
 
 				ui::CenterNextWindow();
-				if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+				if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 				{
 					static std::string projName = "Untitled";
 					if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
@@ -2268,7 +2427,7 @@ struct Editor
 					}
 
 					ui::CenterNextWindow();
-					if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+					if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 					{
 						gui::Text("Project with this name already exists!");
 						if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
@@ -2321,7 +2480,7 @@ struct Editor
 						gui::PopFont();
 
 						ui::CenterNextWindow();
-						if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+						if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 						{
 							gui::Text("Are you sure you want to delete this project?");
 							if (gui::Button("Yes##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
@@ -2363,7 +2522,7 @@ struct Editor
 					{
 						if (gui::MenuItem("Change", "CTRL + P")) Project::Reset();
 
-					    if (gui::MenuItem("Open in File Explorer", "CTRL + O"))
+					    if (gui::MenuItem("Open in File Explorer", "CTRL + L"))
 					    {
 					        FileDialogs::OpenInFileExplorer(Project::rootPath);
 					    }
@@ -2416,7 +2575,7 @@ struct Editor
 						}
 
 						ui::CenterNextWindow();
-						if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+						if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 						{
 							static std::string sceneName = "newScene";
 							if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
