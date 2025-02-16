@@ -119,9 +119,14 @@ msdf-atlas-gen::msdf-atlas-gen
 flecs::flecs_static
 Luau.VM
 Luau.Compiler
-"$<$<CONFIG:Debug>:$ENV{VULKAN_SDK}/Lib/spirv-cross-cored.lib>"
-"$<$<CONFIG:Release>:$ENV{VULKAN_SDK}/Lib/spirv-cross-core.lib>"
 )
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${PROJECT_NAME} $ENV{VULKAN_SDK}/Lib/spirv-cross-cored.lib)
+else()
+    target_link_libraries(${PROJECT_NAME} $ENV{VULKAN_SDK}/Lib/spirv-cross-core.lib)
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC 
 "vendor/"
 "vendor/box2d/include" # mad funny box2d
