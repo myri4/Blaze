@@ -18,27 +18,27 @@ namespace wc
 {
 	namespace conv
 	{
-		glm::vec2 ImVec2ToGlm(const ImVec2& v)
+	    inline glm::vec2 ImVec2ToGlm(const ImVec2& v)
 		{
 			return glm::vec2(v.x, v.y);
 		}
 
-		ImVec2 GlmToImVec2(const glm::vec2& v)
+		inline ImVec2 GlmToImVec2(const glm::vec2& v)
 		{
 			return ImVec2(v.x, v.y);
 		}
 
-		glm::vec4 ImVec4ToGlm(const ImVec4& v)
+		inline glm::vec4 ImVec4ToGlm(const ImVec4& v)
 		{
 			return glm::vec4(v.x, v.y, v.z, v.w);
 		}
 
-		ImVec4 GlmToImVec4(const glm::vec4& v)
+		inline ImVec4 GlmToImVec4(const glm::vec4& v)
 		{
 			return ImVec4(v.x, v.y, v.z, v.w);
 		}
 
-	    ImVec4 GlmToImVec4(const ImVec4& v, const float offset)
+	    inline ImVec4 GlmToImVec4(const ImVec4& v, const float offset)
 		{
 		    return ImVec4(v.x + offset, v.y + offset, v.z + offset, v.w + offset);
 		}
@@ -69,7 +69,7 @@ namespace wc
 
 		// FileDialog - A simple file dialog for opening files or selecting directories
 		// Only way to return a Directory(Folder) is to use the "." filter
-		std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
+		inline std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
 		{
 			//bool showPopup = true; for close button X on the window
 			static std::filesystem::path currentPath;
@@ -306,7 +306,7 @@ namespace wc
 			return finalPath;
 		}
 
-		void ApplyHue(ImGuiStyle& style, float hue)
+		inline void ApplyHue(ImGuiStyle& style, float hue)
 		{
 			for (int i = 0; i < ImGuiCol_COUNT; i++)
 			{
@@ -319,9 +319,9 @@ namespace wc
 			}
 		}
 
-		ImVec2 ImConv(glm::vec2 v) { return ImVec2(v.x, v.y); }
+		inline ImVec2 ImConv(glm::vec2 v) { return ImVec2(v.x, v.y); }
 
-		ImGuiStyle SoDark(float hue)
+		inline ImGuiStyle SoDark(float hue)
 		{
 			ImGuiStyle style;
 			ImVec4* colors = style.Colors;
@@ -410,7 +410,7 @@ namespace wc
 			return style;
 		}
 
-		static void RenderArrowIcon()
+		static void RenderArrowIcon(ImGuiDir dir, ImVec4 col = ImVec4(1, 1, 1, 1), float scale = 1.0f)
 		{
 			ImVec2 arrowPos = ImVec2(
 				ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::CalcTextSize(">").x,
@@ -420,8 +420,8 @@ namespace wc
 			ImGui::RenderArrow(
 				ImGui::GetWindowDrawList(),
 				arrowPos,
-				ImGui::GetColorU32(ImGuiCol_Text),
-				ImGuiDir_Right
+				ImGui::GetColorU32(col),
+				dir
 			);
 		}
 
@@ -613,7 +613,7 @@ namespace wc
 		    gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x * activeOffset, color.y * activeOffset, color.z * activeOffset, color.w));
 		}
 
-		void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
+		inline void DragButton2(const char* txt, glm::vec2& v) // make this a bool func
 		{
 			// Define a fixed width for the buttons
 			const float buttonWidth = 20.0f;
@@ -661,7 +661,7 @@ namespace wc
 			//HelpMarker("Pressing SHIFT makes the step for the buttons -1.0, instead of 1.0");
 		}
 
-		bool DragButton3(const char* txt, glm::vec3& v) // Changed to bool return type
+		inline bool DragButton3(const char* txt, glm::vec3& v) // Changed to bool return type
 		{
 			// Define a fixed width for the buttons
 			const float buttonWidth = 20.0f;
@@ -726,22 +726,22 @@ namespace wc
 			return ImGui::IsItemEdited();
 		}
 
-		void Separator()
+		inline void Separator()
 		{
 			ImGui::Separator();
 		}
 
-		void Separator(const std::string& label)
+		inline void Separator(const std::string& label)
 		{
 			ImGui::SeparatorText(label.c_str());
 		}
 
-		void Text(const std::string& text)
+		inline void Text(const std::string& text)
 		{
 			ImGui::TextUnformatted(text.c_str());
 		}
 
-		void HelpMarker(const std::string& desc)
+		inline void HelpMarker(const std::string& desc)
 		{
 			ImGui::TextDisabled("(?)");
 			if (ImGui::BeginItemTooltip())
@@ -753,122 +753,122 @@ namespace wc
 			}
 		}
 
-		bool Drag(const std::string& label, float& v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Drag(const std::string& label, float& v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalar(label.c_str(), ImGuiDataType_Float, &v, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag2(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Drag2(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Float, v, 2, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag3(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Drag3(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Float, v, 3, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag4(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Drag4(const std::string& label, float* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Float, v, 4, v_speed, &v_min, &v_max, format, flags);
 		}
 
 		//bool DragFloatRange2(const char* label, float* v_current_min, float* v_current_max, float v_speed = 1.0f, float v_min = 0.0f, float v_max = 0.0f, const char* format = "%.3f", const char* format_max = NULL, ImGuiSliderFlags flags = 0);
-		bool Drag(const std::string& label, int& v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
+		inline bool Drag(const std::string& label, int& v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalar(label.c_str(), ImGuiDataType_S32, &v, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag2(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
+		inline bool Drag2(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_S32, v, 2, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag3(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
+		inline bool Drag3(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_S32, v, 3, v_speed, &v_min, &v_max, format, flags);
 		}
 
-	    bool Drag4(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
+	    inline bool Drag4(const std::string& label, int* v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_S32, v, 4, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Drag(const std::string& label, uint32_t& v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
+		inline bool Drag(const std::string& label, uint32_t& v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalar(label.c_str(), ImGuiDataType_U32, &v, v_speed, &v_min, &v_max, format, flags);
 		}
 
-	    bool Drag2(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
+	    inline bool Drag2(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_U32, v, 2, v_speed, &v_min, &v_max, format, flags);
 		}
 
-	    bool Drag3(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
+	    inline bool Drag3(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_U32, v, 3, v_speed, &v_min, &v_max, format, flags);
 		}
 
-	    bool Drag4(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
+	    inline bool Drag4(const std::string& label, uint32_t* v, float v_speed = 1.f, uint32_t v_min = 0, uint32_t v_max = 0, const char* format = "%u", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_U32, v, 4, v_speed, &v_min, &v_max, format, flags);
 		}
 
-		bool Input(const std::string& label, float& v, float step = 0.f, float step_fast = 0.f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		inline bool Input(const std::string& label, float& v, float step = 0.f, float step_fast = 0.f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_Float, (void*)&v, (void*)(step > 0.0f ? &step : NULL), (void*)(step_fast > 0.0f ? &step_fast : NULL), format, flags);
 		}
 
-		bool Input2(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		inline bool Input2(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 2, NULL, NULL, format, flags);
 		}
 
-		bool Input3(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		inline bool Input3(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 3, NULL, NULL, format, flags);
 		}
 
-		bool Input4(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+		inline bool Input4(const std::string& label, float* v, const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_Float, v, 4, NULL, NULL, format, flags);
 		}
 
-		bool Input(const std::string& label, int& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
+		inline bool Input(const std::string& label, int& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
 		{
 			// Hexadecimal input provided as a convenience but the flag name is awkward. Typically you'd use InputText() to parse your own data, if you want to handle prefixes.
 			const char* format = (flags & ImGuiInputTextFlags_CharsHexadecimal) ? "%08X" : "%d";
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_S32, (void*)v, (void*)(step > 0 ? &step : NULL), (void*)(step_fast > 0 ? &step_fast : NULL), format, flags);
 		}
 
-		bool Input2(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		inline bool Input2(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 2, NULL, NULL, "%d", flags);
 		}
 
-		bool Input3(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		inline bool Input3(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 3, NULL, NULL, "%d", flags);
 		}
 
-		bool Input4(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
+		inline bool Input4(const std::string& label, int* v, ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalarN(label.c_str(), ImGuiDataType_S32, v, 4, NULL, NULL, "%d", flags);
 		}
 
-		bool InputUInt(const std::string& label, uint32_t& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
+		inline bool InputUInt(const std::string& label, uint32_t& v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0)
 		{
 			// Hexadecimal input provided as a convenience but the flag name is awkward. Typically you'd use InputText() to parse your own data, if you want to handle prefixes.
 			const char* format = (flags & ImGuiInputTextFlags_CharsHexadecimal) ? "%08X" : "%d";
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_U32, &v, (void*)(step > 0 ? &step : NULL), (void*)(step_fast > 0 ? &step_fast : NULL), format, flags);
 		}
 
-		bool InputDouble(const std::string& label, double& v, double step = 0.0, double step_fast = 0.0, const char* format = "%.6f", ImGuiInputTextFlags flags = 0)
+		inline bool InputDouble(const std::string& label, double& v, double step = 0.0, double step_fast = 0.0, const char* format = "%.6f", ImGuiInputTextFlags flags = 0)
 		{
 			return ImGui::InputScalar(label.c_str(), ImGuiDataType_Double, (void*)&v, (void*)(step > 0.0 ? &step : NULL), (void*)(step_fast > 0.0 ? &step_fast : NULL), format, flags);
 		}
 
-		bool Checkbox(const std::string& label, bool& v)
+		inline bool Checkbox(const std::string& label, bool& v)
 		{
 			return ImGui::Checkbox(label.c_str(), &v);
 		}
@@ -876,44 +876,44 @@ namespace wc
 		//bool DragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed = 1.0f, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
 		//bool DragScalarN(const char* label, ImGuiDataType data_type, void* p_data, int components, float v_speed = 1.0f, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
 
-		bool Slider(const std::string& label, float& v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider(const std::string& label, float& v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalar(label.c_str(), ImGuiDataType_Float, &v, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider2(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider2(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 2, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider3(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider3(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 3, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider4(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider4(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_Float, v, 4, &v_min, &v_max, format, flags);
 		}
 
 		//bool ImGui::SliderAngle(const char* label, float* v_rad, float v_degrees_min, float v_degrees_max, const char* format, ImGuiSliderFlags flags)
 
-		bool Slider(const std::string& label, int& v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider(const std::string& label, int& v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalar(label.c_str(), ImGuiDataType_S32, &v, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider2(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider2(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 2, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider3(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider3(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 3, &v_min, &v_max, format, flags);
 		}
 
-		bool Slider4(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		inline bool Slider4(const std::string& label, int* v, int v_min, int v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
 		{
 			return ImGui::SliderScalarN(label.c_str(), ImGuiDataType_S32, v, 4, &v_min, &v_max, format, flags);
 		}

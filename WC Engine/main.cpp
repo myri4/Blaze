@@ -67,7 +67,7 @@ bool InitApplication()
 		.Width = 1280,
 		.Height = 720,
 		.Name = "Editor",
-		.StartMode = WindowMode::Normal,
+		.StartMode = WindowMode::Maximized,
 		.VSync = false,
 		.Resizeable = true,
 		.Decorated = false,

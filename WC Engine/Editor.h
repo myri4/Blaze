@@ -150,7 +150,7 @@ struct Editor
 	bool showEntities = true;
 	bool showProperties = true;
 	bool showConsole = true;
-	bool showFileExplorer = true;
+	bool showAssets = true;
 	bool showDebugStats = false;
 	bool showStyleEditor = false;
 
@@ -610,6 +610,8 @@ struct Editor
 			auto popup = [&](flecs::entity entity) -> void
 				{
 					// Display the popup menu
+			        // @NOTE: change this if you change theme default
+			        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
 					if (gui::BeginPopup(std::to_string(entity.id()).c_str()))
 					{
 						gui::Text("%s", entity.name().c_str());
@@ -652,6 +654,7 @@ struct Editor
 
 						gui::EndPopup();
 					}
+			        gui::PopStyleVar();
 				};
 
 			// Reorder
@@ -843,6 +846,7 @@ struct Editor
 	void UI_Entities()
 	{
 		static bool showPopup = false;
+	    gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 		if (gui::Begin("Entities", &showEntities, ImGuiWindowFlags_MenuBar))
 		{
 			std::string entityFilter;
@@ -883,6 +887,7 @@ struct Editor
 				gui::EndMenuBar();
 			}
 
+		    gui::Spacing();
 			ShowEntities();
 
 			if (showPopup)
@@ -892,6 +897,7 @@ struct Editor
 			}
 
 			ui::CenterNextWindow();
+		    gui::PopStyleVar();
 			if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 			{
 				ImVec2 center = gui::GetMainViewport()->GetCenter();
@@ -899,7 +905,7 @@ struct Editor
 				ImVec2 windowPos = ImVec2(center.x - windowSize.x * 0.5f, center.y - windowSize.y * 0.5f);
 				gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
-				static std::string name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+				static std::string name = "Entity ";
 				if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 				gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll);
 
@@ -911,7 +917,7 @@ struct Editor
 					if (m_Scene.EntityWorld.lookup(name.c_str()) == flecs::entity::null())
 					{
 						m_SelectedEntity = m_Scene.AddEntity(name);
-						name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+						name = "Entity ";
 						gui::CloseCurrentPopup();
 					}
 					else gui::OpenPopup("WarnNameExists");
@@ -923,7 +929,7 @@ struct Editor
 				gui::SetCursorPosX(widgetSize);
 				if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 				{
-					name = "Entity " + std::to_string(m_Scene.EntityWorld.count<EntityTag>());
+					name = "Entity ";
 					gui::CloseCurrentPopup();
 				}
 
@@ -1054,9 +1060,9 @@ struct Editor
 						{
 						case None:
 						{
-							if (gui::MenuItem("Transform")) { menu = Transform; } ui::RenderArrowIcon();
-							if (gui::MenuItem("Render")) { menu = Render; } ui::RenderArrowIcon();
-							if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon();
+							if (gui::MenuItem("Transform")) { menu = Transform; } ui::RenderArrowIcon(ImGuiDir_Right);
+							if (gui::MenuItem("Render")) { menu = Render; } ui::RenderArrowIcon(ImGuiDir_Right);
+							if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon(ImGuiDir_Right);
 							break;
 						}
 						case Transform:
@@ -1382,6 +1388,7 @@ struct Editor
 		static std::filesystem::path selectedFolderPath = assetsPath;
 		static std::vector<std::filesystem::path> openedFiles;
 		static std::unordered_set<std::string> openedFileNames;
+	    static bool showFolders = true;
 		static bool showIcons = true;
 		static bool previewAsset = true;
 
@@ -1409,27 +1416,34 @@ struct Editor
 			}
 			};
 
-		if (gui::Begin("Assets", &showFileExplorer, ImGuiWindowFlags_MenuBar))
+		if (gui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
 		{
 			if (gui::BeginMenuBar())
 			{
 				if (gui::MenuItem("Import"))
 					WC_INFO("TODO - Implement Import");
 
+			    if (gui::MenuItem("Open Path"))
+			        FileDialogs::OpenInFileExplorer(selectedFolderPath.string());
+
 				if (gui::BeginMenu("View##Assets"))
 				{
-					if (gui::MenuItem("Show Icons", nullptr, &showIcons))
-						WC_INFO("Show Icons: {}", showIcons);
+				    gui::MenuItem("Show Folders", nullptr, &showFolders);
 
-					if (gui::MenuItem("Preview Assets", nullptr, &previewAsset))
-						WC_INFO("Preview Asset: {}", previewAsset);
+				    gui::MenuItem("Show Icons", nullptr, &showIcons);
 
-					if (gui::MenuItem("Collapse All"))
-						for (auto& [key, value] : folderStates)
-							value = false;
+				    // TODO - make popup placement better
+					gui::MenuItem("Preview Assets", nullptr, &previewAsset);
 
-					if (gui::MenuItem("Expand All"))
-						setFolderStatesRecursively(assetsPath, true);
+				    if (showFolders)
+				    {
+				        gui::Separator();
+					    if (gui::MenuItem("Collapse All"))
+						    setFolderStatesRecursively(assetsPath, false);
+
+					    if (gui::MenuItem("Expand All"))
+					        setFolderStatesRecursively(assetsPath, true);
+				    }
 
 					gui::EndMenu();
 				}
@@ -1437,9 +1451,7 @@ struct Editor
 				gui::EndMenuBar();
 			}
 
-			std::function<void(const std::filesystem::path&)> displayDirectory;
-
-			displayDirectory = [&](const std::filesystem::path& path)
+			std::function<void(const std::filesystem::path&)> displayDirectory = [&](const std::filesystem::path& path)
 				{
 					if (path != assetsPath) gui::Indent(20);
 
@@ -1519,227 +1531,236 @@ struct Editor
 					if (path != assetsPath) gui::Unindent(20);
 				};
 
-			if (showIcons)
-			{
-				if (gui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+		    std::function<void(const std::filesystem::path&)> displayDirectoryIcons = [&](const std::filesystem::path& path)
+		    {
+		        if (selectedFolderPath == assetsPath)
 				{
-					gui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-					gui::TableSetupColumn("Files", ImGuiTableColumnFlags_WidthStretch);
+					gui::BeginDisabled();
+					gui::ArrowButton("Back", ImGuiDir_Left);
+					gui::EndDisabled();
+				}
+				else
+				{
+					if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
 
-					gui::TableNextRow();
-					gui::TableSetColumnIndex(0);
-
-					gui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-					displayDirectory(assetsPath);
-					gui::EndChild();
-
-					gui::TableSetColumnIndex(1);
-
-					//show icons
-					if (gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true))
+					if (gui::BeginDragDropTarget())
 					{
-						if (selectedFolderPath == assetsPath)
+						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
 						{
-							gui::BeginDisabled();
-							gui::ArrowButton("Back", ImGuiDir_Left);
-							gui::EndDisabled();
-						}
-						else
-						{
-							if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+							const char* payloadPath = static_cast<const char*>(payload->Data);
+							std::filesystem::path sourcePath(payloadPath);
 
-							if (gui::BeginDragDropTarget())
+							try
 							{
-								if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-								{
-									const char* payloadPath = static_cast<const char*>(payload->Data);
-									std::filesystem::path sourcePath(payloadPath);
-
-									try
-									{
-										std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
-									}
-									catch (const std::exception& e)
-									{
-										WC_ERROR(e.what());
-									}
-								}
-								gui::EndDragDropTarget();
+								std::filesystem::rename(sourcePath, sourcePath.parent_path().parent_path() / sourcePath.filename());
+							}
+							catch (const std::exception& e)
+							{
+								WC_ERROR(e.what());
 							}
 						}
+						gui::EndDragDropTarget();
+					}
+				}
 
-						static std::string previewPath;
-						gui::SameLine();
-						//gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
-						gui::PushItemWidth(gui::GetContentRegionAvail().x);
-						gui::InputText("##PreviewPath", &previewPath, ImGuiInputTextFlags_ReadOnly);
-						gui::PopItemWidth();
-						if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
-						else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
+				static std::string previewPath;
+				gui::SameLine();
+				//gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize("Copy Path").x - gui::GetStyle().FramePadding.x * 2 - gui::GetStyle().ItemSpacing.x);
+				gui::PushItemWidth(gui::GetContentRegionAvail().x);
+				gui::InputText("##PreviewPath", &previewPath, ImGuiInputTextFlags_ReadOnly);
+				gui::PopItemWidth();
+				if (gui::IsItemHovered() || gui::IsItemActive()) previewPath = assetsPath.string();
+				else previewPath = std::filesystem::relative(selectedFolderPath, assetsPath.parent_path()).string();
 
-						gui::Separator();
+				gui::Separator();
 
-						constexpr float buttonSize = 70;
-						float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
-						int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
+				constexpr float buttonSize = 70;
+				float totalButtonWidth = buttonSize + gui::GetStyle().ItemSpacing.x;
+				int itemsPerRow = static_cast<int>((gui::GetContentRegionAvail().x + gui::GetStyle().ItemSpacing.x) / totalButtonWidth);
 
-						if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
+				if (itemsPerRow < 1) itemsPerRow = 1; // Ensure at least 1 button per row
 
-						if (std::filesystem::exists(selectedFolderPath))
+				if (std::filesystem::exists(selectedFolderPath))
+				{
+					int i = 0;
+					for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
+					{
+						if (i > 0 && i % itemsPerRow != 0)
+							gui::SameLine();
+
+						if (std::filesystem::exists(entry.path()))
 						{
-							int i = 0;
-							for (const auto& entry : std::filesystem::directory_iterator(selectedFolderPath))
+							if (entry.is_directory())
 							{
-								if (i > 0 && i % itemsPerRow != 0)
-									gui::SameLine();
+								gui::BeginGroup();
+								gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+								gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								// TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
+								gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
+								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
 
-								if (std::filesystem::exists(entry.path()))
+								if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 								{
-									if (entry.is_directory())
+									std::string path = entry.path().string();
+									gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+									gui::Text("Moving %s", entry.path().filename().string().c_str());
+									gui::EndDragDropSource();
+								}
+
+								if (gui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
 									{
-										gui::BeginGroup();
-										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-										// TODO - fix: std::filesystem::is_empty(entry.path()) ? t_FolderEmpty : t_Folder
-										gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
-										if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0)) selectedFolderPath = entry.path();
+										const char* payloadPath = static_cast<const char*>(payload->Data);
+										std::filesystem::path sourcePath(payloadPath);
+										std::filesystem::path targetPath = entry.path() / sourcePath.filename();
 
-										if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-										{
-											std::string path = entry.path().string();
-											gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-											gui::Text("Moving %s", entry.path().filename().string().c_str());
-											gui::EndDragDropSource();
-										}
+										std::filesystem::rename(sourcePath, targetPath);
+									}
+									gui::EndDragDropTarget();
+								}
 
-										if (gui::BeginDragDropTarget())
-										{
-											if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
-											{
-												const char* payloadPath = static_cast<const char*>(payload->Data);
-												std::filesystem::path sourcePath(payloadPath);
-												std::filesystem::path targetPath = entry.path() / sourcePath.filename();
+								gui::PopStyleColor();
+								gui::PopStyleVar();
 
-												std::filesystem::rename(sourcePath, targetPath);
-											}
-											gui::EndDragDropTarget();
-										}
+								std::string filename = entry.path().filename().string();
+								float wrapWidth = buttonSize; // Width for wrapping the text
 
-										gui::PopStyleColor();
-										gui::PopStyleVar();
+								// Split the text into words
+								std::istringstream stream(filename);
+								std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
 
-										std::string filename = entry.path().filename().string();
-										float wrapWidth = buttonSize; // Width for wrapping the text
+								// Display each line centered
+								std::string currentLine;
+								float currentLineWidth = 0.0f;
+								gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
+								for (const auto& word : words)
+								{
+									ImVec2 wordSize = gui::CalcTextSize(word.c_str());
+									if (currentLineWidth + wordSize.x > wrapWidth)
+									{
+										// Push the current line and start a new one
+										gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+										gui::TextUnformatted(currentLine.c_str());
+										currentLine.clear();
+										currentLineWidth = 0.0f;
+									}
 
-										// Split the text into words
-										std::istringstream stream(filename);
-										std::vector<std::string> words{ std::istream_iterator<std::string>{stream}, std::istream_iterator<std::string>{} };
+									if (!currentLine.empty())
+									{
+										currentLine += " "; // Add a space before the next word
+										currentLineWidth += gui::CalcTextSize(" ").x;
+									}
+									currentLine += word;
+									currentLineWidth += wordSize.x;
+								}
 
-										// Display each line centered
-										std::string currentLine;
-										float currentLineWidth = 0.0f;
-										gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 0 }); // Reduce item spacing for text
-										for (const auto& word : words)
-										{
-											ImVec2 wordSize = gui::CalcTextSize(word.c_str());
-											if (currentLineWidth + wordSize.x > wrapWidth)
-											{
-												// Push the current line and start a new one
-												gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-												gui::TextUnformatted(currentLine.c_str());
-												currentLine.clear();
-												currentLineWidth = 0.0f;
-											}
+								// Add the last line if there's any remaining text
+								if (!currentLine.empty())
+								{
+									gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
+									gui::TextUnformatted(currentLine.c_str());
+								}
+								gui::PopStyleVar(); // Restore item spacing for text
 
-											if (!currentLine.empty())
-											{
-												currentLine += " "; // Add a space before the next word
-												currentLineWidth += gui::CalcTextSize(" ").x;
-											}
-											currentLine += word;
-											currentLineWidth += wordSize.x;
-										}
-
-										// Add the last line if there's any remaining text
-										if (!currentLine.empty())
-										{
-											gui::SetCursorPosX(gui::GetCursorPosX() + (wrapWidth - currentLineWidth) / 2.0f);
-											gui::TextUnformatted(currentLine.c_str());
-										}
-										gui::PopStyleVar(); // Restore item spacing for text
-
-										gui::EndGroup();
+								gui::EndGroup();
+							}
+							else
+							{
+								gui::BeginGroup();
+								gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+								gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+								gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
+								if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
+								{
+									if (entry.path().extension() != ".scene")
+									{
+										if (openedFileNames.insert(entry.path().string()).second)
+											openedFiles.push_back(entry.path());
 									}
 									else
-									{
-										gui::BeginGroup();
-										gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
-										gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-										gui::ImageButton((entry.path().string() + "/").c_str(), t_File, { buttonSize, buttonSize });
-										if (gui::IsItemHovered() && gui::IsMouseDoubleClicked(0))
-										{
-											if (entry.path().extension() != ".scene")
-											{
-												if (openedFileNames.insert(entry.path().string()).second)
-													openedFiles.push_back(entry.path());
-											}
-											else
-												gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
-										}
-
-										// Drag source for files
-										if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-										{
-											std::string path = entry.path().string();
-											gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
-											gui::Text("Moving %s", entry.path().filename().string().c_str());
-											gui::EndDragDropSource();
-										}
-
-										gui::PopStyleVar();
-										gui::PopStyleColor();
-
-										gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
-										gui::TextWrapped(entry.path().filename().string().c_str());
-										gui::PopTextWrapPos();
-										gui::EndGroup();
-
-										ui::CenterNextWindow();
-										if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
-										{
-											gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-											const float widgetWidth = gui::GetItemRectSize().x;
-
-											if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-											{
-												m_ScenePath = entry.path().string();
-												m_Scene.Load(m_ScenePath);
-												gui::CloseCurrentPopup();
-											}
-
-											gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-											if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-
-											gui::EndPopup();
-										}
-									}
+										gui::OpenPopup(("Confirm##" + entry.path().string()).c_str());
 								}
-								i++;
+
+								// Drag source for files
+								if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+								{
+									std::string path = entry.path().string();
+									gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+									gui::Text("Moving %s", entry.path().filename().string().c_str());
+									gui::EndDragDropSource();
+								}
+
+								gui::PopStyleVar();
+								gui::PopStyleColor();
+
+								gui::PushTextWrapPos(gui::GetCursorPos().x + buttonSize);
+								gui::TextWrapped(entry.path().filename().string().c_str());
+								gui::PopTextWrapPos();
+								gui::EndGroup();
+
+								ui::CenterNextWindow();
+								if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+								{
+									gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
+									const float widgetWidth = gui::GetItemRectSize().x;
+
+									if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+									{
+										m_ScenePath = entry.path().string();
+										m_Scene.Load(m_ScenePath);
+										gui::CloseCurrentPopup();
+									}
+
+									gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+									if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+
+									gui::EndPopup();
+								}
 							}
 						}
+						i++;
 					}
-					gui::EndChild();
-
-					gui::EndTable();
 				}
-			}
-			else
-			{
-				// Display directories without table
-				gui::BeginChild("FoldersChild##2", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-				displayDirectory(assetsPath);
-				gui::EndChild();
-			}
+		    };
+
+		    if (showFolders && showIcons)
+		    {
+		        if (gui::BeginTable("assets_table", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+		        {
+		            gui::TableNextRow();
+		            gui::TableSetColumnIndex(0);
+
+		            gui::BeginChild("FoldersChild##0", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+		            displayDirectory(assetsPath);
+		            gui::EndChild();
+
+		            gui::TableSetColumnIndex(1);
+
+		            gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
+		            displayDirectoryIcons(selectedFolderPath);
+		            gui::EndChild();
+
+		            gui::EndTable();
+		        }
+		    }
+		    else
+		    {
+		        if (showFolders)
+		        {
+		            gui::Spacing();
+		            gui::BeginChild("FoldersChild##1", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+		            displayDirectory(assetsPath);
+		            gui::EndChild();
+		        }
+		        else if (showIcons)
+		        {
+		            gui::Spacing();
+		            gui::BeginChild("Path Viewer", ImVec2{ 0, 0 }, true);
+		            displayDirectoryIcons(selectedFolderPath);
+		            gui::EndChild();
+		        }
+		    }
 		}
 		gui::End();
 
@@ -2105,21 +2126,30 @@ struct Editor
 		ImGui::PopStyleColor(4);
 		ImGui::PopStyleVar(2);
 		ui::CenterNextWindow();
-		if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
-		{
-			ui::Text("Are you sure you want to EXIT?");
-			ui::Text("Unsaved changes will be lost!");
-			if (gui::Button("Close", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
-			{
-				Globals.window.Close();
-				gui::CloseCurrentPopup();
-			}
-			gui::SameLine(gui::CalcTextSize("Unsaved changes will be lost!").x - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
-			if (gui::Button("Cancel", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape))
-				gui::CloseCurrentPopup();
-
-			gui::EndPopup();
-		}
+	    if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar))
+	    {
+	        gui::Text("Save Changes to [%s] before closing?", Project::name.c_str());
+	        float textSize = gui::CalcTextSize("Save Changes to [").x + gui::CalcTextSize(Project::name.c_str()).x + gui::CalcTextSize("] before closing?").x;
+	        float spacing = textSize * 0.05f;
+	        if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
+	        {
+	            WC_CORE_INFO("Save project before leaving");
+	            Globals.window.Close();
+	            gui::CloseCurrentPopup();
+	        }
+	        gui::SameLine(0, spacing);
+	        if (gui::Button("No", {textSize * 0.3f, 0}))
+	        {
+	            Globals.window.Close();
+	            gui::CloseCurrentPopup();
+	        }
+	        gui::SameLine(0, spacing);
+	        if (gui::Button("Cancel", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
+	        {
+	            gui::CloseCurrentPopup();
+	        }
+	        gui::EndPopup();
+	    }
 
 		// Drag when hovering tab bar
 		//@TODO - Maybe Reposition this
@@ -2333,6 +2363,11 @@ struct Editor
 					{
 						if (gui::MenuItem("Change", "CTRL + P")) Project::Reset();
 
+					    if (gui::MenuItem("Open in File Explorer", "CTRL + O"))
+					    {
+					        FileDialogs::OpenInFileExplorer(Project::rootPath);
+					    }
+
 						// Delete - TODO: FIX IF NEEDED
 						/*ImGui::Separator();
 						ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.f, 0.f, 0.f, 1.f));
@@ -2461,7 +2496,7 @@ struct Editor
 						gui::MenuItem("Entities", nullptr, &showEntities);
 						gui::MenuItem("Properties", nullptr, &showProperties);
 						gui::MenuItem("Console", nullptr, &showConsole);
-						gui::MenuItem("File Explorer", nullptr, &showFileExplorer);
+						gui::MenuItem("Assets", nullptr, &showAssets);
 						gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
 						gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
 
@@ -2476,18 +2511,10 @@ struct Editor
 							{
 								switch (currentTheme)
 								{
-								case 0:
-									gui::GetStyle() = ui::SoDark(hue);
-									break;
-								case 1:
-									gui::StyleColorsClassic();
-									break;
-								case 2:
-									gui::StyleColorsDark();
-									break;
-								case 3:
-									gui::StyleColorsLight();
-									break;
+								case 0: gui::GetStyle() = ui::SoDark(hue); break;
+								case 1: gui::StyleColorsClassic(); break;
+								case 2: gui::StyleColorsDark(); break;
+								case 3: gui::StyleColorsLight(); break;
 								}
 							}
 
@@ -2515,7 +2542,7 @@ struct Editor
 					if (showEntities) UI_Entities();
 					if (showProperties) UI_Properties();
 					if (showConsole) UI_Console();
-					if (showFileExplorer) UI_Assets();
+					if (showAssets) UI_Assets();
 					if (showDebugStats) UI_DebugStats();
 					if (showStyleEditor) UI_StyleEditor();
 				}
