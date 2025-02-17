@@ -92,10 +92,93 @@ namespace wc
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
 
+		void Create()
+		{
+			PhysicsWorld.Create(b2DefaultWorldDef());
 
-		auto AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
+			EntityWorld.observer<BoxCollider2DComponent, RigidBodyComponent, TransformComponent>()
+				.event(flecs::Monitor).each([&](flecs::iter& it, size_t i, BoxCollider2DComponent& collider, RigidBodyComponent& rigidBody, TransformComponent& transform) {
+					if (it.event() == flecs::OnAdd) 
+					{
+						b2BodyDef bodyDef = rigidBody.GetBodyDef();
 
-		auto AddEntity(const std::string& name)
+						bodyDef.position = b2Vec2(transform.Translation.x + collider.Offset.x, transform.Translation.y + collider.Offset.y);
+						bodyDef.rotation = b2MakeRot(transform.Rotation);
+						rigidBody.body.Create(PhysicsWorld, bodyDef);
+						collider.Shape.CreatePolygonShape(rigidBody.body, PhysicsMaterials[collider.MaterialID].GetShapeDef(), b2MakeBox(collider.Size.x * 0.5f, collider.Size.y * 0.5f));
+					}
+					else if (it.event() == flecs::OnSet)
+					{
+						rigidBody.body.SetTransform(glm::vec2(transform.Translation) + collider.Offset, b2MakeRot(transform.Rotation));
+					}
+					else if (it.event() == flecs::OnRemove) 
+					{
+						rigidBody.body.Destroy();
+					}
+				});
+
+			EntityWorld.observer<CircleCollider2DComponent, RigidBodyComponent, TransformComponent>()
+				.event(flecs::Monitor).each([&](flecs::iter& it, size_t i, CircleCollider2DComponent& collider, RigidBodyComponent& rigidBody, TransformComponent& transform) {
+					if (it.event() == flecs::OnAdd)
+					{
+						b2BodyDef bodyDef = rigidBody.GetBodyDef();
+
+						bodyDef.position = b2Vec2(transform.Translation.x + collider.Offset.x, transform.Translation.y + collider.Offset.y);
+						bodyDef.rotation = b2MakeRot(transform.Rotation);
+						rigidBody.body.Create(PhysicsWorld, bodyDef);
+						collider.Shape.CreateCircleShape(rigidBody.body, PhysicsMaterials[collider.MaterialID].GetShapeDef(), { {0.f, 0.f}, collider.Radius });
+					}
+					else if (it.event() == flecs::OnSet)
+					{
+						rigidBody.body.SetTransform(glm::vec2(transform.Translation) + collider.Offset, b2MakeRot(transform.Rotation));
+					}
+					else if (it.event() == flecs::OnRemove)
+					{
+						rigidBody.body.Destroy();
+					}
+				});
+		}
+
+		void CreatePhysicsWorld()
+		{
+			b2WorldDef worldDef = b2DefaultWorldDef();
+			worldDef.gravity = { PhysicsWorldData.Gravity.x, PhysicsWorldData.Gravity.y };
+			PhysicsWorld.Create(worldDef);
+			EntityWorld.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
+				if (p.body.IsValid()) return;
+				b2BodyDef bodyDef = p.GetBodyDef();
+
+				if (entt.has<BoxCollider2DComponent>())
+				{
+					auto collDef = entt.get_ref<BoxCollider2DComponent>();
+					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
+					bodyDef.rotation = b2MakeRot(pos.Rotation);
+					p.body.Create(PhysicsWorld, bodyDef);
+					collDef->Shape.CreatePolygonShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
+				}
+
+				if (entt.has<CircleCollider2DComponent>())
+				{
+					auto collDef = entt.get_ref<CircleCollider2DComponent>();
+					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
+					bodyDef.rotation = b2MakeRot(pos.Rotation);
+					p.body.Create(PhysicsWorld, bodyDef);
+					collDef->Shape.CreateCircleShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
+				}
+				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
+				p.previousRotation = pos.Rotation;
+				});
+		}
+
+		void Destroy()
+		{
+			DeleteAllEntities();
+			if (PhysicsWorld) PhysicsWorld.Destroy();
+		}
+
+		flecs::entity AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
+
+		flecs::entity AddEntity(const std::string& name)
 		{
 			EntityOrder.push_back(name);
 			return EntityWorld.entity(name.c_str()).add<EntityTag>();
@@ -183,41 +266,10 @@ namespace wc
 			EntityOrder.erase(std::remove(EntityOrder.begin(), EntityOrder.end(), child.name().c_str()), EntityOrder.end());
 		}
 
-		void CreatePhysicsWorld()
+		void DeleteAllEntities()
 		{
-			b2WorldDef worldDef = b2DefaultWorldDef();
-			worldDef.gravity = { PhysicsWorldData.Gravity.x, PhysicsWorldData.Gravity.y };
-			PhysicsWorld.Create(worldDef);
-			EntityWorld.each([this](flecs::entity entt, RigidBodyComponent& p, TransformComponent& pos) {
-				if (p.body.IsValid()) return;
-				b2BodyDef bodyDef = p.GetBodyDef();
-
-				if (entt.has<BoxCollider2DComponent>())
-				{
-					auto collDef = entt.get_ref<BoxCollider2DComponent>();
-					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
-					bodyDef.rotation = b2MakeRot(pos.Rotation);
-					p.body.Create(PhysicsWorld, bodyDef);
-					collDef->Shape.CreatePolygonShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
-				}
-
-				if (entt.has<CircleCollider2DComponent>())
-				{
-					auto collDef = entt.get_ref<CircleCollider2DComponent>();
-					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
-					bodyDef.rotation = b2MakeRot(pos.Rotation);
-					p.body.Create(PhysicsWorld, bodyDef);
-					collDef->Shape.CreateCircleShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
-				}
-				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
-				p.previousRotation = pos.Rotation;
-				});
-		}
-
-		void Destroy()
-		{
-			if (PhysicsWorld) PhysicsWorld.Destroy();
-			DeleteAllEntities();
+			EntityWorld.reset();
+			EntityOrder.clear();
 		}
 
 		void UpdatePhysics()
@@ -226,13 +278,19 @@ namespace wc
 
 			AccumulatedTime += Globals.deltaTime;
 
+			EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
+				if (!p.body.IsValid())
+				{
+					WC_CORE_ERROR("Body is invalid!");
+					return;
+				}
+
+				p.prevPos = p.body.GetPosition();
+				p.previousRotation = p.body.GetAngle();
+				});
+
 			while (AccumulatedTime >= SimulationTime)
 			{
-				EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
-					p.prevPos = p.body.GetPosition();
-					p.previousRotation = p.body.GetAngle();
-					});
-
 				PhysicsWorld.Step(SimulationTime, 4);
 
 				AccumulatedTime -= SimulationTime;
@@ -242,6 +300,11 @@ namespace wc
 
 			EntityWorld.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
+					if (!p.body.IsValid())
+					{
+						WC_CORE_ERROR("Body is invalid!");
+						return;
+					}
 					pc.Translation = { glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z };
 
 					float start = p.previousRotation;
@@ -565,12 +628,6 @@ namespace wc
 					SetChild(entity, deserializedChildEntity);
 				}
 			}
-		}
-
-		void DeleteAllEntities()
-		{
-			EntityWorld.reset();
-			EntityOrder.clear();
 		}
 
 		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }

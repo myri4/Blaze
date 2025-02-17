@@ -218,6 +218,7 @@ struct Editor
 	{
 		m_Renderer.DestroyScreen();
 		m_Renderer.CreateScreen(size);
+		camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
 	}
 
 	void Destroy()
@@ -1515,7 +1516,7 @@ struct Editor
 									if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 									{
 										m_ScenePath = entry.path().string();
-										WC_INFO(m_ScenePath);
+										m_Scene.Load(m_ScenePath);
 										gui::CloseCurrentPopup();
 									}
 									gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
@@ -2426,7 +2427,7 @@ struct Editor
 							gui::BeginDisabled(sceneName.empty());
 							if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
 							{
-								m_Scene.Destroy();
+								m_Scene.DeleteAllEntities();
 								m_ScenePath = newSceneSavePath + '/' + sceneName + ".scene";
 								m_SelectedEntity = flecs::entity::null();
 
