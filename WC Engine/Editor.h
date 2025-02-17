@@ -623,11 +623,18 @@ struct Editor
 							gui::CloseCurrentPopup();
 						}
 
-						if (gui::MenuItem("Export"))
+						if (ui::MenuItemButton("Export"))
 						{
-							WC_CORE_INFO("Implement Export");
-							gui::CloseCurrentPopup();
+						    gui::OpenPopup("Export Entity");
 						}
+					    std::string exportPath = ui::FileDialog("Export Entity", ".", Project::rootPath);
+					    if (!exportPath.empty())
+                        {
+					        // TODO - FIX THIS
+                            YAML::Node entityData;
+					        m_Scene.SerializeEntity(entity, entityData);
+					        YAMLUtils::SaveFile(exportPath, entityData);
+                        }
 
 						if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
 						{
@@ -768,7 +775,7 @@ struct Editor
 					{
 						if (gui::IsItemHovered())
 						{
-							WC_INFO("Hovered {}", entity.name().c_str());
+							//WC_INFO("Hovered {}", entity.name().c_str());
 							gui::OpenPopup(std::to_string(entity.id()).c_str());
 						}
 					}
@@ -1432,15 +1439,18 @@ struct Editor
 
 	    auto openRightClick = [&](const std::string& file)
 	    {
-	        static bool showDeleteWarnPopup = false;
 	        std::filesystem::path filePath = file;
 	        if (gui::BeginPopup(("##RightClick" + file).c_str(), ImGuiWindowFlags_NoSavedSettings))
             {
+	            ui::ClosePopupIfCursorFarFromCenter();
                 gui::Text(filePath.filename().string().c_str());
 	            gui::Separator();
 	            if (!is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
 	            else if (gui::MenuItem("Open in File Explorer")) FileDialogs::OpenInFileExplorer(file);
+                gui::BeginDisabled(filePath == assetsPath);
 	            if (ui::MenuItemButton("Rename")) gui::OpenPopup(("Rename##Rename" + file).c_str());
+	            gui::EndDisabled();
+	            if (filePath == assetsPath) gui::SetItemTooltip("Cannot rename root folder");
 	            if (is_directory(filePath)) if (ui::MenuItemButton("New File")) gui::OpenPopup(("New File##NewFile" + file).c_str());
 	            gui::PushStyleColor(ImGuiCol_HeaderHovered, { 1.f, 0.f, 0.f, 0.5f });
 	            if (ui::MenuItemButton("Delete")) gui::OpenPopup(("Delete Warning##DeleteWarn" + file).c_str());
@@ -1499,6 +1509,7 @@ struct Editor
                             {
                                 folderStates.erase(newFilePath.string());
                                 folderStates[(newFilePath.parent_path() / newName).string()] = false;
+                                if (selectedFolderPath == filePath) selectedFolderPath = newFilePath;
                             }
                             else
                             {
@@ -1511,7 +1522,6 @@ struct Editor
                                     openedFiles.push_back(newFilePath);
                                     openedFileNames.insert(newFilePath.string());
                                 }
-
                             }
                             newName = "#@#";
                         }
@@ -1575,8 +1585,29 @@ struct Editor
         {
             if (gui::BeginMenuBar())
             {
-                if (gui::MenuItem("Import"))
-                    WC_INFO("TODO - Implement Import");
+                if (gui::MenuItem("Import")) gui::OpenPopup("Import Asset##Assets");
+                std::string importPath = ui::FileDialog("Import Asset##Assets", ".*");
+                if (!importPath.empty())
+                {
+                    std::filesystem::path importFilePath = importPath;
+                    std::filesystem::path importDestPath = selectedFolderPath / importFilePath.filename();
+                    std::error_code ec;
+                    std::filesystem::copy(importFilePath, importDestPath, ec);
+                    if (ec) { WC_ERROR("Failed to copy file: {}", ec.message()); }
+                    else
+                    {
+                        if (is_directory(importDestPath))
+                        {
+                            folderStates[importDestPath.string()] = false;
+                        }
+                        else
+                        {
+                            //AUTO OPEN FILE IF NEEDED
+                            //openedFiles.push_back(importDestPath);
+                            //openedFileNames.insert(importDestPath.string());
+                        }
+                    }
+                }
 
                 if (gui::MenuItem("Open Path"))
                     FileDialogs::OpenInFileExplorer(selectedFolderPath.string());
@@ -1658,7 +1689,7 @@ struct Editor
                                 if (gui::IsMouseClicked(ImGuiMouseButton_Right))
                                     gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
 
-                                gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
+                                //gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
                                 if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoSavedSettings))
                                 {
                                     gui::Text("Preview: %s", filenameStr.c_str());
@@ -1917,7 +1948,7 @@ struct Editor
                 }
             }
 
-            if (!gui::IsAnyItemHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right)) gui::OpenPopup(("##RightClick" + selectedFolderPath.string()).c_str());
+            if (gui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) && !gui::IsAnyItemHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right)) gui::OpenPopup(("##RightClick" + selectedFolderPath.string()).c_str());
             openRightClick(selectedFolderPath.string());
         }
         gui::End();
@@ -1925,7 +1956,7 @@ struct Editor
         // Handle opened files (e.g., as tabs or separate windows)
         for (auto it = openedFiles.begin(); it != openedFiles.end();)
         {
-            WC_CORE_INFO("Opened file: {}", it->string());
+            //WC_CORE_INFO("Opened file: {}", it->string());
             bool openFile = true;
             if (gui::Begin(it->filename().string().c_str(), &openFile, ImGuiWindowFlags_NoSavedSettings))
                 gui::Text("File: %s", it->string().c_str());
@@ -2525,6 +2556,35 @@ struct Editor
 					    if (gui::MenuItem("Open in File Explorer", "CTRL + L"))
 					    {
 					        FileDialogs::OpenInFileExplorer(Project::rootPath);
+					    }
+
+					    if (ui::MenuItemButton("Rename")) gui::OpenPopup("Rename Project");
+
+					    ui::CenterNextWindow();
+					    if (gui::BeginPopupModal("Rename Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+					    {
+					        static std::string newName = "#@#";
+					        if (newName == "#@#") newName = Project::name;
+					        if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+					        gui::InputText("New Name", &newName);
+					        const float widgetWidth = gui::GetItemRectSize().x;
+
+					        gui::BeginDisabled(newName.empty());
+					        if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
+                            {
+                                Project::Rename(newName);
+                                newName = "#@#";
+                                gui::CloseCurrentPopup();
+                            }
+					        gui::EndDisabled();
+					        if (newName.empty()) gui::SetItemTooltip("Project name cannot be empty!");
+					        gui::SameLine(widgetWidth - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+					        if (gui::Button("Cancel", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape))
+                            {
+                                newName = "#@#";
+                                gui::CloseCurrentPopup();
+                            }
+					        gui::EndPopup();
 					    }
 
 						// Delete - TODO: FIX IF NEEDED

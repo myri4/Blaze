@@ -46,7 +46,6 @@ namespace wc
 
 	namespace ui
 	{
-
 		//Center Window
 		//if left on false, no need for ImGuiWindowFlags_NoMove
 		inline void CenterNextWindow(bool once = false)
@@ -78,7 +77,8 @@ namespace wc
 			std::string finalPath;
 			static std::vector<std::filesystem::directory_entry> fileEntries;
 
-			if (ImGui::BeginPopupModal(name))
+		    CenterNextWindow();
+			if (ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoSavedSettings))
 			{
 				// Initialize disks
 				if (disks.empty())
@@ -229,16 +229,14 @@ namespace wc
 							{
 								if (isDirectory)
 								{
-									if (filter == ".")
-										selectedPath = entry.path().string();
-									else
+									if (filter == ".") selectedPath = entry.path().string();
+									/*else
 									{
 										currentPath = entry.path();
 										fileEntries.clear();
-									}
+									}*/
 								}
-								else
-									selectedPath = entry.path().string();
+								else selectedPath = entry.path().string();
 							}
 
 							// Handle double-click
@@ -249,8 +247,7 @@ namespace wc
 									currentPath = entry.path();
 									fileEntries.clear();
 								}
-								else
-									selectedPath = entry.path().string();
+								else selectedPath = entry.path().string();
 							}
 
 							ImGui::PopID();
@@ -461,6 +458,24 @@ namespace wc
 			if (window->DC.NavLayerCurrent != upper_popup->ParentNavLayer)
 				return false;
 			return upper_popup->Window && (upper_popup->Window->Flags & ImGuiWindowFlags_ChildMenu) && ImGui::IsWindowChildOf(upper_popup->Window, window, true, false);
+		}
+
+        inline void ClosePopupIfCursorFarFromCenter(float distance = -1.f)
+		{
+		    if (distance < 0.f) distance = gui::GetWindowWidth() * 0.5f;
+		    const ImVec2 mousePos = gui::GetIO().MousePos;
+		    const ImVec2 windowPos = gui::GetWindowPos();
+		    const float windowWidth = gui::GetWindowWidth();
+		    const float windowHeight = gui::GetWindowHeight();
+
+		    if (gui::IsWindowFocused() && gui::IsMousePosValid() &&
+                (mousePos.x < windowPos.x - distance ||
+                 mousePos.x > windowPos.x + windowWidth + distance ||
+                 mousePos.y < windowPos.y - distance ||
+                 mousePos.y > windowPos.y + windowHeight + distance))
+		    {
+                gui::CloseCurrentPopup();
+		    }
 		}
 
 		inline bool MenuItemButton(const char* label, const char* shortcut = nullptr, bool closePopupOnClick = true, const char* icon = nullptr, bool selected = false, bool enabled = true)

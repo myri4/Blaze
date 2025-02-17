@@ -156,5 +156,27 @@ namespace Project
 			WC_CORE_WARN("Project path does not exist: {}", filepath);
 	}
 
+    inline void Rename(const std::string& newName)
+	{
+	            if (newName.empty())
+        {
+            WC_CORE_WARN("Project name cannot be empty");
+            return;
+        }
+
+        if (ExistListProject(newName))
+        {
+            WC_CORE_WARN("Project with this name already exists: {}", newName);
+            return;
+        }
+
+        RemoveProjectFromList(rootPath);
+        std::filesystem::rename(rootPath, rootPath.substr(0, rootPath.find_last_of('\\') + 1) + newName);
+	    rootPath = rootPath.substr(0, rootPath.find_last_of('\\') + 1) + newName;
+        AddProjectToList(rootPath);
+        name = newName;
+        Save();
+	}
+
 	inline bool Exists() { return !name.empty() && !rootPath.empty(); }
 }
