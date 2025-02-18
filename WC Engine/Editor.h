@@ -2413,8 +2413,6 @@ struct Editor
 					gui::EndMenuBar();
 				}
 
-				static bool openProjNamePopup = false; // New persistent flag
-
 				gui::PushFont(Globals.f_Default.Big);
 				if (gui::Button("New Project"))
 				{
@@ -2423,65 +2421,27 @@ struct Editor
 				gui::PopFont();
 
 				// File dialog logic
-				std::string newProjectPath = ui::FileDialog("New Project", ".");
-				static std::string newProjectSavePath;
+				std::string newProjectPath = ui::FileDialog("New Project", ".", "", false, ".");
 				if (!newProjectPath.empty())
 				{
-					newProjectSavePath = newProjectPath;
-					openProjNamePopup = true;
+				    std::string projName = std::filesystem::path(newProjectPath).filename().string();
+				    std::string projPath = std::filesystem::path(newProjectPath).parent_path().string();
+				    if (Project::ExistListProject(projName))
+				    {
+				        gui::OpenPopup("Project Already Exists");
+				    }
+				    else
+				    {
+				        Project::Create(projPath, projName);
+				    }
 				}
-
-				if (openProjNamePopup)
-				{
-					gui::OpenPopup("New Project - Name");
-					openProjNamePopup = false;
-				}
-
-				ui::CenterNextWindow();
-				if (gui::BeginPopupModal("New Project - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-				{
-					static std::string projName = "Untitled";
-					if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
-					gui::InputText("Project Name", &projName);
-					const float widgetWidth = gui::GetItemRectSize().x;
-
-					gui::BeginDisabled(projName.empty());
-					if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
-					{
-						if (Project::ExistListProject(projName))
-						{
-							gui::OpenPopup("Project Already Exists");
-						}
-						else
-						{
-							Project::Create(newProjectSavePath, projName);
-							newProjectSavePath.clear();
-							openProjNamePopup = false;
-							gui::CloseCurrentPopup();
-						}
-					}
-					gui::EndDisabled();
-					if (projName.empty())gui::SetItemTooltip("Project name cannot be empty!");
-
-					gui::SameLine(widgetWidth - gui::GetContentRegionMax().x * 0.3f + gui::GetStyle().ItemSpacing.x);
-					if (gui::Button("Cancel", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape))
-					{
-						projName = "Untitled";
-						newProjectSavePath.clear();
-						openProjNamePopup = false;
-						gui::CloseCurrentPopup();
-					}
-
-					ui::CenterNextWindow();
-					if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-					{
-						gui::Text("Project with this name already exists!");
-						if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-						gui::EndPopup();
-					}
-
-					gui::EndPopup();
-				}
+			    ui::CenterNextWindow();
+			    if (gui::BeginPopupModal("Project Already Exists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+			    {
+			        gui::Text("Project with this name already exists!");
+			        if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+			        gui::EndPopup();
+			    }
 
 				gui::SameLine();
 
@@ -2632,56 +2592,15 @@ struct Editor
 					{
 						gui::SeparatorText("Scene");
 
-						static bool openSceneNamePopup = false;
 						if (ui::MenuItemButton("New", "CTRL + N", false)) gui::OpenPopup("New Scene");
 
-						std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath);
-						static std::string newSceneSavePath;
+						std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath, true, ".scene");
 						if (!newScenePath.empty())
 						{
-							newSceneSavePath = newScenePath;
-							openSceneNamePopup = true;
-						}
-
-						if (openSceneNamePopup)
-						{
-							gui::OpenPopup("New Scene - Name");
-							openSceneNamePopup = false;
-						}
-
-						ui::CenterNextWindow();
-						if (gui::BeginPopupModal("New Scene - Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-						{
-							static std::string sceneName = "newScene";
-							if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
-							gui::InputText("Scene Name", &sceneName);
-							const float widgetWidth = gui::GetItemRectSize().x;
-
-							gui::BeginDisabled(sceneName.empty());
-							if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
-							{
-								m_Scene.Destroy();
-								m_ScenePath = newSceneSavePath + '/' + sceneName + ".scene";
-								m_SelectedEntity = flecs::entity::null();
-
-								sceneName = "newScene";
-								newSceneSavePath.clear();
-								openSceneNamePopup = false;
-								gui::CloseCurrentPopup();
-							}
-							gui::EndDisabled();
-							if (sceneName.empty()) gui::SetItemTooltip("Scene name cannot be empty!");
-
-							gui::SameLine(widgetWidth - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
-							if (gui::Button("Cancel", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape))
-							{
-								sceneName = "newScene";
-								newSceneSavePath.clear();
-								openSceneNamePopup = false;
-								gui::CloseCurrentPopup();
-							}
-
-							gui::EndPopup();
+						    m_Scene.Destroy();
+						    m_ScenePath = newScenePath;
+						    m_SelectedEntity = flecs::entity::null();
+						    m_Scene.Save(m_ScenePath);
 						}
 
 						if (ui::MenuItemButton("Open", "CTRL + O", false))
@@ -2689,7 +2608,7 @@ struct Editor
 							gui::OpenPopup("Open Scene");
 						}
 
-						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath);
+						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath, true);
 						if (!sOpenPath.empty())
 						{
 							m_ScenePath = sOpenPath;

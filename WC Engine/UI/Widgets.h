@@ -60,7 +60,7 @@ namespace wc
 			{".png", "Image"},
 			{".wav", "WAVE"},
 			{".mp3", "mp3"},
-			{".scene", "Scene"},
+			{".scene", ""}, // self-explanatory
 			{".script", "Script"},
 			{".shader", "Shader"},
 			{".font", "Font"}
@@ -68,7 +68,8 @@ namespace wc
 
 		// FileDialog - A simple file dialog for opening files or selecting directories
 		// Only way to return a Directory(Folder) is to use the "." filter
-		inline std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "")
+	    // If newFileFilter is set, then there will be a input text for the new file name, and the path will return the new file path
+		inline std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "", const bool limitToStart = false, const std::string& newFileFilter = "")
 		{
 			//bool showPopup = true; for close button X on the window
 			static std::filesystem::path currentPath;
@@ -98,7 +99,7 @@ namespace wc
 				}
 
 				// Navigation controls
-				ImGui::BeginDisabled(currentPath == currentPath.root_path());
+				ImGui::BeginDisabled(currentPath == currentPath.root_path() || limitToStart ? currentPath == startPath : false);
 				if (ImGui::ArrowButton("##back", ImGuiDir_Left))
 				{
 					if (currentPath.has_parent_path())
@@ -261,7 +262,6 @@ namespace wc
 				ImGui::EndChild();
 
 				// Selected file path
-				ImGui::SetNextItemWidth(std::max(ImGui::CalcTextSize(selectedPath.c_str()).x + ImGui::GetStyle().FramePadding.x * 2, 300.0f));
 				ImGui::Text("Selected:"); ImGui::SameLine();
 				auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
 				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
@@ -273,11 +273,25 @@ namespace wc
 				auto filterText = filter + " " + fileTypeExt.at(filter);
 				ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
 
+			    static std::string newFileName;
+			    if (!newFileFilter.empty())
+			    {
+			        gui::Text("NewFile Name:"); ImGui::SameLine();
+			        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(newFileFilter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(newFileFilter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+			        gui::InputText("##NewFile", &newFileName);
+			        ImGui::SameLine();
+			        ImGui::SetNextItemWidth(ImGui::CalcTextSize(newFileFilter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(newFileFilter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
+			        auto newFileText = newFileFilter + " " + fileTypeExt.at(newFileFilter);
+			        gui::InputText("##NewFileFilter", &newFileText, ImGuiInputTextFlags_ReadOnly);
+			    }
+
 				// Action buttons
-				ImGui::BeginDisabled(selectedPath.empty());
+				ImGui::BeginDisabled(selectedPath.empty() || !newFileFilter.empty() ? newFileName.empty() : false);
 				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
 				{
-					finalPath = selectedPath;
+                    if (newFileFilter.empty()) { finalPath = selectedPath; }
+				    else { finalPath = selectedPath + "\\" + newFileName + (newFileFilter != "." ? newFileFilter : ""); }
+				    newFileName.clear();
 					selectedPath.clear();
 					currentPath = disks[0];
 					disks.clear();
@@ -290,6 +304,7 @@ namespace wc
 				ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - gui::GetContentRegionMax().x * 0.3f);
 				if (ImGui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Escape))
 				{
+				    newFileName.clear();
 					selectedPath.clear();
 					currentPath = disks[0];
 					disks.clear();
