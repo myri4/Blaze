@@ -610,8 +610,7 @@ struct Editor
 			auto popup = [&](flecs::entity entity) -> void
 				{
 					// Display the popup menu
-			        // @NOTE: change this if you change theme default
-			        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
+			        gui::PopStyleVar(); // pop window padding
 					if (gui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoSavedSettings))
 					{
 						gui::Text("%s", entity.name().c_str());
@@ -633,7 +632,7 @@ struct Editor
 					        // TODO - FIX THIS
                             YAML::Node entityData;
 					        m_Scene.SerializeEntity(entity, entityData);
-					        YAMLUtils::SaveFile(exportPath, entityData);
+					        YAMLUtils::SaveFile(exportPath + "\\" +  std::string(entity.name().c_str()) + ".blzent", entityData);
                         }
 
 						if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
@@ -661,7 +660,7 @@ struct Editor
 
 						gui::EndPopup();
 					}
-			        gui::PopStyleVar();
+                    gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 				};
 
 			// Reorder
@@ -769,7 +768,9 @@ struct Editor
 					}
 
 					// Render the entity
+			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
 					bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
+			        gui::PopStyleVar();
 
 					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 					{
@@ -779,23 +780,24 @@ struct Editor
 							gui::OpenPopup(std::to_string(entity.id()).c_str());
 						}
 					}
-					popup(entity);
+			        popup(entity);
 
 					// Handle selection on click
 					if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
 
 					if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
 					{
-						if (entity.has<TransformComponent>())
-							camera.Position = entity.get<TransformComponent>()->Translation;
+						if (entity.has<TransformComponent>()) camera.Position = entity.get<TransformComponent>()->Translation;
 					}
 
-					if (gui::BeginDragDropSource(ImGuiDragDropFlags_None))
+			        gui::PopStyleVar();
+					if (gui::BeginDragDropSource())
 					{
 						gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
 						gui::Text("Dragging %s", entity.name().c_str());
 						gui::EndDragDropSource();
 					}
+			        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
 					// Bond
 					if (gui::BeginDragDropTarget())
@@ -803,7 +805,7 @@ struct Editor
 						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
 						{
 							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-							flecs::entity droppedEntity = *(const flecs::entity*)payload->Data;
+							flecs::entity droppedEntity = *static_cast<const flecs::entity *>(payload->Data);
 
 							// Check if the drop target is empty space
 							if (droppedEntity != entity.parent())
@@ -817,31 +819,34 @@ struct Editor
 					{
 						gui::TreePop(); // Pop before separator
 
+					    gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
 						separator(entity);
+					    gui::PopStyleVar();
 
 						gui::TreePush(entity.name().c_str());
 						for (const auto& child : children)
 							displayEntityRef(child, displayEntityRef);
 						gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
 					}
-					else separator(entity);
-
+					else
+					{
+					    gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
+					    separator(entity);
+					    gui::PopStyleVar();
+					}
 				};
 
 			ui::DrawBgRows(10);
-			gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
 			for (const auto& name : m_Scene.EntityOrder)
 			{
 				auto rootEntity = m_Scene.EntityWorld.lookup(name.c_str());
 				if (rootEntity) displayEntity(rootEntity, displayEntity);
 			}
-			gui::PopStyleVar();
 
 			if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 			{
 				if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
 				{
-					WC_INFO("Hovered SELECTED {}", m_SelectedEntity.name().c_str());
 					gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
 				}
 			}
@@ -912,43 +917,30 @@ struct Editor
 				ImVec2 windowPos = ImVec2(center.x - windowSize.x * 0.5f, center.y - windowSize.y * 0.5f);
 				gui::SetWindowPos(windowPos, ImGuiCond_Once);
 
-				static std::string name = "Entity ";
+				static std::string name = "Entity";
 				if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 				gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll);
 
 				const float widgetSize = gui::GetItemRectSize().x;
 
-				gui::BeginDisabled(name.empty());
+				gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
 				if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
 				{
-					if (m_Scene.EntityWorld.lookup(name.c_str()) == flecs::entity::null())
-					{
-						m_SelectedEntity = m_Scene.AddEntity(name);
-						name = "Entity ";
-						gui::CloseCurrentPopup();
-					}
-					else gui::OpenPopup("WarnNameExists");
+					m_SelectedEntity = m_Scene.AddEntity(name);
+					name = "Entity";
+					gui::CloseCurrentPopup();
 				}
 				gui::EndDisabled();
 				if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
+			    if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
 
 				gui::SameLine();
 				gui::SetCursorPosX(widgetSize);
 				if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 				{
-					name = "Entity ";
+					name = "Entity";
 					gui::CloseCurrentPopup();
 				}
-
-				ui::CenterNextWindow();
-				if (gui::BeginPopupModal("WarnNameExists", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
-				{
-					gui::Text("Name already exists!");
-
-					if (gui::Button("Close") || gui::IsKeyPressed(ImGuiKey_Enter) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
-					gui::EndPopup();
-				}
-
 				gui::EndPopup();
 			}
 		}
@@ -1426,16 +1418,70 @@ struct Editor
         // Lambda to handle file double click logic
         auto openFileOnDoubleClick = [&](const std::filesystem::path& filePath)
         {
-            if (filePath.extension() != ".scene")
+
+            if (filePath.extension() == ".scene")
+            {
+                gui::OpenPopup(("Confirm##Scene" + filePath.string()).c_str());
+            }
+            else if (filePath.extension() == ".blzent")
+            {
+                gui::OpenPopup(("Confirm##Blzent" + filePath.string()).c_str());
+            }
+            else
             {
                 if (openedFileNames.insert(filePath.string()).second)
                     openedFiles.push_back(filePath);
             }
-            else
-            {
-                gui::OpenPopup(("Confirm##" + filePath.string()).c_str());
-            }
         };
+
+	    auto openFilePopups = [&](const std::filesystem::path& filePath)
+	    {
+	        ui::CenterNextWindow();
+	        if (gui::BeginPopupModal(("Confirm##Scene" + filePath.string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+	        {
+	            gui::Text("Are you sure you want to load this scene? -> %s", filePath.filename().string().c_str());
+	            const float widgetWidth = gui::GetItemRectSize().x;
+	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	            {
+	                m_ScenePath = filePath.string();
+	                m_Scene.Load(m_ScenePath);
+	                gui::CloseCurrentPopup();
+	            }
+	            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+	            if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+	                gui::CloseCurrentPopup();
+	            gui::EndPopup();
+	        }
+
+	        ui::CenterNextWindow();
+	        if (gui::BeginPopupModal(("Confirm##Blzent" + filePath.string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+	        {
+	            gui::Text("Are you sure you want to add this entity to the current scene? -> %s", filePath.filename().string().c_str());
+	            static std::string name = "#@#";
+	            if (name == "#@#") name = filePath.stem().string();
+	            const float widgetWidth = gui::GetItemRectSize().x;
+	            gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
+	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	            {
+	                YAML::Node node = YAML::LoadFile(filePath.string());
+	                flecs::entity entity;
+                    m_Scene.DeserializeEntity(entity, node);
+	                name = "#@#";
+	                gui::CloseCurrentPopup();
+	            }
+	            gui::EndDisabled();
+	            if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
+	            if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
+
+	            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+	            if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+	            {
+	                name = "#@#";
+	                gui::CloseCurrentPopup();
+	            }
+	            gui::EndPopup();
+	        }
+	    };
 
 	    auto openRightClick = [&](const std::string& file)
 	    {
@@ -1697,23 +1743,7 @@ struct Editor
                                 }
                             }
 
-                            ui::CenterNextWindow();
-                            if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-                            {
-                                gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-                                const float widgetWidth = gui::GetItemRectSize().x;
-                                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-                                {
-                                    m_ScenePath = entry.path().string();
-                                    WC_INFO(m_ScenePath);
-                                    gui::CloseCurrentPopup();
-                                }
-                                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-                                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
-                                    gui::CloseCurrentPopup();
-
-                                gui::EndPopup();
-                            }
+                            openFilePopups(entry.path());
                         }
                     }
                     openRightClick(entry.path().string());
@@ -1886,22 +1916,7 @@ struct Editor
                                 gui::PopTextWrapPos();
                                 gui::EndGroup();
 
-                                ui::CenterNextWindow();
-                                if (gui::BeginPopupModal(("Confirm##" + entry.path().string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-                                {
-                                    gui::Text("Are you sure you want to load this scene? -> %s", entry.path().filename().string().c_str());
-                                    const float widgetWidth = gui::GetItemRectSize().x;
-                                    if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
-                                    {
-                                        m_ScenePath = entry.path().string();
-                                        m_Scene.Load(m_ScenePath);
-                                        gui::CloseCurrentPopup();
-                                    }
-                                    gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-                                    if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
-                                        gui::CloseCurrentPopup();
-                                    gui::EndPopup();
-                                }
+                                openFilePopups(entry.path());
                             }
                         }
                         i++;
