@@ -3,6 +3,7 @@
 #include "flecs.h"
 #include "Components.h"
 #include "../Globals.h"
+#include "../Project/Project.h"
 #include <wc/Utils/YAML.h>
 
 namespace wc
@@ -585,6 +586,7 @@ namespace wc
 			}
 
 			fromYAML(YAML::LoadFile(filepath));
+		    Project::AddSceneToList(filepath);
 			return true;
 		}
 

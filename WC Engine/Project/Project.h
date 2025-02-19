@@ -10,25 +10,43 @@
 
 namespace Project
 {
-	std::string name;
-	std::string rootPath;
-	std::string firstScene;
+	inline std::string name;
+	inline std::string rootPath;
+	inline std::string firstScene;
 
-	std::string texturePath;
-	std::string fontPath;
-	std::string soundPath;
+	inline std::string texturePath;
+	inline std::string fontPath;
+	inline std::string soundPath;
 
-	std::string lightMaterialsPath;
-	std::string physicsMaterialsPath;
-	std::string soundMaterialsPath;
+	inline std::string lightMaterialsPath;
+	inline std::string physicsMaterialsPath;
+	inline std::string soundMaterialsPath;
 
-	std::string scenesPath;
-	std::string scriptsPath;
-	std::string entitiesPath;
+	inline std::string scenesPath;
+	inline std::string scriptsPath;
+	inline std::string entitiesPath;
 
-	std::vector<std::string> savedProjectPaths; // @NOTE: This could just be std::set
+	inline std::vector<std::string> savedProjectPaths; // @NOTE: This could just be std::set
+    inline std::vector<std::string> savedProjectScenes;
 
-	bool AutoCleanUpOnExit = true; // If this flag is set, when exiting the application all materials and entities that are not used in any scenes will be deleted.
+    inline bool AutoCleanUpOnExit = true; // If this flag is set, when exiting the application all materials and entities that are not used in any scenes will be deleted.
+
+    inline void AddSceneToList(const std::string& path)
+    {
+        if (std::find(savedProjectScenes.begin(), savedProjectScenes.end(), path) == savedProjectScenes.end())
+            savedProjectScenes.push_back(path);
+    }
+
+    inline void RemoveSceneFromList(const std::string& filepath) { std::erase(savedProjectScenes, filepath); }
+
+    inline bool SceneExistInList(const std::string& pName)
+    {
+        for (auto& each : savedProjectScenes)
+            if (std::filesystem::path(each).filename().string() == pName)
+                return true;
+
+        return false;
+    }
 
 	inline void AddProjectToList(const std::string& path)
 	{
@@ -38,7 +56,7 @@ namespace Project
 
 	inline void RemoveProjectFromList(const std::string& filepath) { std::erase(savedProjectPaths, filepath); }
 
-	inline bool ExistListProject(const std::string& pName)
+	inline bool ProjectExistInList(const std::string& pName)
 	{
 		for (auto& each : savedProjectPaths)
 			if (std::filesystem::path(each).filename().string() == pName)
@@ -71,7 +89,7 @@ namespace Project
 
 	inline void Create(const std::string& filepath, const std::string& pName)
 	{
-		if (ExistListProject(pName))
+		if (ProjectExistInList(pName))
 		{
 			WC_CORE_WARN("Project with this name already exists: {}", pName);
 			return;
@@ -145,9 +163,9 @@ namespace Project
 		{
 			if (IsProject(filepath))
 			{
+				std::filesystem::remove_all(filepath);
 				RemoveProjectFromList(filepath);
 				Reset();
-				std::filesystem::remove_all(filepath);
 				WC_CORE_INFO("Deleted project: {}", filepath);
 			}
 			else WC_CORE_WARN("Directory is not a .blz project: {}", filepath);
@@ -164,7 +182,7 @@ namespace Project
             return;
         }
 
-        if (ExistListProject(newName))
+        if (ProjectExistInList(newName))
         {
             WC_CORE_WARN("Project with this name already exists: {}", newName);
             return;
