@@ -388,12 +388,22 @@ struct Editor
 		    {
 		        gui::TabItemSpacing("##TabSpacing", ImGuiTabItemFlags_Leading | ImGuiTabItemFlags_Invisible, 0.f);
 
+		        ImGuiTabItemFlags flags = ImGuiTabBarFlags_NoTooltip;
 		        gui::BeginDisabled(SceneState::Play == m_SceneState || SceneState::Simulate == m_SceneState);
 		        auto scenes = Project::savedProjectScenes;
 		        for (const auto& scene : scenes)
 		        {
+		            if (scene == m_ScenePath)
+                    {
+                        flags |= ImGuiTabItemFlags_SetSelected;
+                    }
+		            else
+                    {
+                        flags &= ~ImGuiTabItemFlags_SetSelected;
+                    }
+
 		            bool open = true;
-		            if (gui::BeginTabItem(std::filesystem::path(scene).stem().string().c_str(), &open, ImGuiTabItemFlags_NoTooltip))
+		            if (gui::BeginTabItem(std::filesystem::path(scene).stem().string().c_str(), &open, flags))
 		            {
 		                // Updates if open
 		                gui::EndTabItem();
@@ -929,16 +939,15 @@ struct Editor
 			if (gui::BeginMenuBar())
 			{
 			    gui::BeginDisabled(m_ScenePath.empty());
-				//TODO - Implement search
-				char filterBuff[256];
-				//TODO - fix, imgui is DnD active crashes flecs for some reason
 				bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
 				//WC_INFO("1: {}", gui::IsDragDropActive());
 				gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
 				gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
 				gui::PushFont(Globals.f_Display.Bold);
 				gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
-				if (gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll)) { entityFilter = filterBuff; }
+				static char filterBuff[256];
+				gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_None);
+			    entityFilter = filterBuff;
 
 				gui::BeginDisabled(buttonDnD);
 				ui::PushButtonColor(gui::GetStyle().Colors[ImGuiCol_CheckMark]);
@@ -966,6 +975,8 @@ struct Editor
 			}
 
 		    gui::Spacing();
+            //WC_INFO(entityFilter);
+		    //TODO - Implement search
 			ShowEntities();
 
 			if (showPopup)
@@ -1515,8 +1526,13 @@ struct Editor
 	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 	            {
 	                Project::AddSceneToList(filePath.string());
-	                //m_ScenePath = filePath.string();
-	                //m_Scene.Load(m_ScenePath);
+	                if (m_ScenePath != filePath.string())
+	                {
+	                    //WC_INFO("Assets: Opening scene: {0}", filePath.string());
+	                    m_Scene.Save(m_ScenePath);
+	                    m_ScenePath = filePath.string();
+	                    m_Scene.Load(filePath.string());
+	                }
 	                gui::CloseCurrentPopup();
 	            }
 	            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
