@@ -142,10 +142,12 @@ struct Editor
 	Texture t_Simulate;
 	Texture t_Stop;
 	Texture t_Add;
-
+    Texture t_Eye;
+    Texture t_EyeClosed;
 	bool allowInput = true;
 
 	bool showEditor = true;
+    bool showDemo = false;
 	bool showSceneProperties = true;
 	bool showEntities = true;
 	bool showProperties = true;
@@ -189,6 +191,8 @@ struct Editor
 		t_Simulate.Load(assetPath + "simulate.png");
 		t_Stop.Load(assetPath + "stop.png");
 		t_Add.Load(assetPath + "add.png");
+		t_Eye.Load(assetPath + "eye.png");
+		t_EyeClosed.Load(assetPath + "eye-slash.png");
 
 		PhysicsMaterials.emplace_back(PhysicsMaterial()); // @NOTE: Index 0 is the default material
 		PhysicsMaterialNames["Default"] = PhysicsMaterials.size() - 1;
@@ -240,6 +244,8 @@ struct Editor
 		t_Simulate.Destroy();
 		t_Stop.Destroy();
 		t_Add.Destroy();
+		t_Eye.Destroy();
+		t_EyeClosed.Destroy();
 
 		assetManager.Free();
 		m_Renderer.Deinit();
@@ -289,32 +295,35 @@ struct Editor
 
 	void RenderEntity(flecs::entity entt, glm::mat4& transform)
 	{
-		auto& renderData = m_RenderData[CURRENT_FRAME];
-		if (entt.has<SpriteRendererComponent>())
-		{
-			auto& data = *entt.get<SpriteRendererComponent>();
+	    if (entt.get<EntityTag>()->showEntity)
+	    {
+	        auto& renderData = m_RenderData[CURRENT_FRAME];
+	        if (entt.has<SpriteRendererComponent>())
+	        {
+	            auto& data = *entt.get<SpriteRendererComponent>();
 
-			renderData.DrawQuad(transform, data.Texture, data.Color, entt.id());
-		}
-		else if (entt.has<CircleRendererComponent>())
-		{
-			auto& data = *entt.get<CircleRendererComponent>();
-			renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color, entt.id());
-		}
-		else if (entt.has<TextRendererComponent>())
-		{
-			auto& data = *entt.get<TextRendererComponent>();
+	            renderData.DrawQuad(transform, data.Texture, data.Color, entt.id());
+	        }
+	        else if (entt.has<CircleRendererComponent>())
+	        {
+	            auto& data = *entt.get<CircleRendererComponent>();
+	            renderData.DrawCircle(transform, data.Thickness, data.Fade, data.Color, entt.id());
+	        }
+	        else if (entt.has<TextRendererComponent>())
+	        {
+	            auto& data = *entt.get<TextRendererComponent>();
 
-			if (data.FontID != UINT32_MAX)
-				renderData.DrawString(data.Text, assetManager.Fonts[data.FontID], transform, data.Color, data.LineSpacing, data.Kerning, entt.id());
-		}
-		m_Scene.EntityWorld.query_builder<TransformComponent, EntityTag>()
-			.with(flecs::ChildOf, entt)
-			.each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
-				{
-					transform = transform * childTransform.GetTransform();
-					RenderEntity(child, transform);
-				});
+	            if (data.FontID != UINT32_MAX)
+	                renderData.DrawString(data.Text, assetManager.Fonts[data.FontID], transform, data.Color, data.LineSpacing, data.Kerning, entt.id());
+	        }
+	        m_Scene.EntityWorld.query_builder<TransformComponent, EntityTag>()
+                .with(flecs::ChildOf, entt)
+                .each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
+                    {
+                        transform = transform * childTransform.GetTransform();
+                        RenderEntity(child, transform);
+                    });
+	    }
 	}
 
 	void Render()
@@ -740,59 +749,59 @@ struct Editor
 			// Reorder
 			auto separator = [&](flecs::entity entity) -> void
 				{
-					if (ui::MatchPayloadType("ENTITY"))
+			        //gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
+			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0);
+					gui::PushStyleColor(ImGuiCol_Separator, { 0.5f, 0.5f, 0.5f, 0.f }); // NOTE: change back to zero alpha
+					gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
+					gui::PopStyleColor();
+                    gui::PopStyleVar();
+
+			        if (gui::BeginDragDropTarget())
 					{
-						gui::PushStyleColor(ImGuiCol_Separator, { 0.5f, 0.5f, 0.5f, 0.f });
-						gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
-						gui::PopStyleColor();
-
-						if (gui::BeginDragDropTarget())
+						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
 						{
-							if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+							flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
+
+							// Only allow reordering if both entities share the same parent.
+							if (droppedEntity.parent() == entity.parent())
 							{
-								IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-								flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
+								// Get the list of names from the proper container.
+								// For top-level entities, use the scene's parent names;
+								// for children, use the parent's EntityOrderComponent.
+								std::vector<std::string>* entityOrder = nullptr;
+								if (entity.parent() == flecs::entity::null())
+									entityOrder = &m_Scene.EntityOrder;
+								else if (entity.parent().has<EntityOrderComponent>())
+									entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 
-								// Only allow reordering if both entities share the same parent.
-								if (droppedEntity.parent() == entity.parent())
+								if (entityOrder)
 								{
-									// Get the list of names from the proper container.
-									// For top-level entities, use the scene's parent names;
-									// for children, use the parent's EntityOrderComponent.
-									std::vector<std::string>* entityOrder = nullptr;
-									if (entity.parent() == flecs::entity::null())
-										entityOrder = &m_Scene.EntityOrder;
-									else if (entity.parent().has<EntityOrderComponent>())
-										entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
+									// Find the positions of the target (the entity associated with the separator)
+									// and the dropped entity.
+									auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
+									auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
 
-									if (entityOrder)
+									if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
 									{
-										// Find the positions of the target (the entity associated with the separator)
-										// and the dropped entity.
-										auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
-										auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
+										// Remove the dropped entity from its current position.
+										std::string droppedName = *droppedIt;
+										entityOrder->erase(droppedIt);
 
-										if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
-										{
-											// Remove the dropped entity from its current position.
-											std::string droppedName = *droppedIt;
-											entityOrder->erase(droppedIt);
+										// Recalculate the target's index (in case removal shifted it).
+										int newTargetIndex = std::distance(entityOrder->begin(),
+											std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
 
-											// Recalculate the target's index (in case removal shifted it).
-											int newTargetIndex = std::distance(entityOrder->begin(),
-												std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
-
-											// Insert the dropped entity immediately after the target.
-											int insertIndex = newTargetIndex + 1;
-											if (insertIndex > static_cast<int>(entityOrder->size()))
-												insertIndex = static_cast<int>(entityOrder->size());
-											entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
-										}
+										// Insert the dropped entity immediately after the target.
+										int insertIndex = newTargetIndex + 1;
+										if (insertIndex > static_cast<int>(entityOrder->size()))
+											insertIndex = static_cast<int>(entityOrder->size());
+										entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
 									}
 								}
 							}
-							gui::EndDragDropTarget();
 						}
+						gui::EndDragDropTarget();
 					}
 				};
 
@@ -842,8 +851,11 @@ struct Editor
 					}
 
 					// Render the entity
-			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
+			        //gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 14);
+			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0);
+			        gui::SetNextItemAllowOverlap();
 					bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
+			        float height = gui::GetItemRectSize().y;
 			        gui::PopStyleVar();
 
 					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
@@ -888,14 +900,26 @@ struct Editor
 						gui::EndDragDropTarget();
 					}
 
+			        gui::SameLine(gui::GetContentRegionMax().x - 20.f - gui::GetStyle().ItemSpacing.x);
+
+			        gui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+		    	    gui::PushStyleColor(ImGuiCol_Button, {0, 0, 0, 0});
+		    	    //gui::PushStyleColor(ImGuiCol_ButtonHovered, {0, 0, 0, 0});
+		    	    gui::PushStyleColor(ImGuiCol_ButtonActive, {0, 0, 0, 0});
+		    	    if (gui::ImageButton(("Show##" + std::string(entity.name())).c_str(), entity.get<EntityTag>()->showEntity ? t_Eye : t_EyeClosed, {height, height}))
+	    		    {
+    			        entity.set<EntityTag>({!entity.get<EntityTag>()->showEntity});
+    			        //WC_INFO("Set to: {}", entity.get<EntityTag>()->showEntity);
+			        }
+			        gui::PopStyleVar();
+			        gui::PopStyleColor(2); // 3
+
 					// If the node is open, recursively display children
 					if (is_open)
 					{
 						gui::TreePop(); // Pop before separator
 
-					    gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
-						separator(entity);
-					    gui::PopStyleVar();
+					    separator(entity);
 
 						gui::TreePush(entity.name().c_str());
 						for (const auto& child : children)
@@ -904,9 +928,7 @@ struct Editor
 					}
 					else
 					{
-					    gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
 					    separator(entity);
-					    gui::PopStyleVar();
 					}
 				};
 
@@ -946,7 +968,7 @@ struct Editor
 				gui::PushFont(Globals.f_Display.Bold);
 				gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
 				static char filterBuff[256];
-				gui::InputTextEx("##Search", "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_None);
+				gui::InputTextEx("##Search", m_ScenePath.empty() ? "Select a Scene" : "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_None);
 			    entityFilter = filterBuff;
 
 				gui::BeginDisabled(buttonDnD);
@@ -1544,28 +1566,39 @@ struct Editor
 	        ui::CenterNextWindow();
 	        if (gui::BeginPopupModal(("Confirm##Blzent" + filePath.string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 	        {
-	            gui::Text("Are you sure you want to add this entity to the current scene? -> %s", filePath.filename().string().c_str());
-	            static std::string name = "#@#";
-	            if (name == "#@#") name = filePath.stem().string();
-	            const float widgetWidth = gui::GetItemRectSize().x;
-	            gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
-	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	            if (!m_ScenePath.empty())
 	            {
-	                YAML::Node node = YAML::LoadFile(filePath.string());
-	                flecs::entity entity;
-                    m_Scene.DeserializeEntity(entity, node);
-	                name = "#@#";
-	                gui::CloseCurrentPopup();
-	            }
-	            gui::EndDisabled();
-	            if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
-	            if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
+	                gui::Text("Are you sure you want to add this entity to the current scene? -> %s", filePath.filename().string().c_str());
+	                static std::string name = "#@#";
+	                if (name == "#@#") name = filePath.stem().string();
+	                const float widgetWidth = gui::GetItemRectSize().x;
+	                gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
+	                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                {
+	                    YAML::Node node = YAML::LoadFile(filePath.string());
+	                    flecs::entity entity;
+                        m_Scene.DeserializeEntity(entity, node);
+	                    name = "#@#";
+	                    gui::CloseCurrentPopup();
+	                }
+	                gui::EndDisabled();
+	                if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
+	                if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
 
-	            gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
-	            if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+	                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
+	                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
+	                {
+	                    name = "#@#";
+	                    gui::CloseCurrentPopup();
+	                }
+	            }
+	            else
 	            {
-	                name = "#@#";
-	                gui::CloseCurrentPopup();
+	                gui::Text("Open a scene to Import an Entity");
+	                if (gui::Button("Close##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                {
+	                    gui::CloseCurrentPopup();
+	                }
 	            }
 	            gui::EndPopup();
 	        }
@@ -2746,6 +2779,7 @@ struct Editor
 						gui::MenuItem("Assets", nullptr, &showAssets);
 						gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
 						gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
+					    gui::MenuItem("Demo Window", nullptr, &showDemo);
 
 						if (gui::BeginMenu("Theme"))
 						{
@@ -2792,6 +2826,7 @@ struct Editor
 					if (showAssets) UI_Assets();
 					if (showDebugStats) UI_DebugStats();
 					if (showStyleEditor) UI_StyleEditor();
+				    if (showDemo) gui::ShowDemoWindow();
 				}
 			}
 		}

@@ -8,7 +8,10 @@
 
 namespace wc
 {
-	struct EntityTag {};
+	struct EntityTag
+	{
+	    bool showEntity = true;
+	};
 
 	struct EntityOrderComponent
 	{

@@ -160,7 +160,6 @@ namespace wc
 						parent.remove<EntityOrderComponent>();
 				}
 			}
-
 			EntityOrder.push_back(child.name().c_str());
 		}
 
