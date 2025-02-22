@@ -420,14 +420,55 @@ struct Editor
 		            // Handle tab selection
 		            if (gui::IsItemClicked())
 		            {
-		                if (m_ScenePath != scene)
+		                if (true /*changesInCurrentScene*/)
 		                {
+		                    gui::OpenPopup(("Confirm##SceneChange" + scene).c_str());
+		                }
+		                else
+		                {
+		                    /*if (m_ScenePath != scene)
+		                    {
+		                        //WC_INFO("Opening scene: {0}", scene);
+		                        m_Scene.Save(m_ScenePath);
+		                        m_ScenePath = scene;
+		                        m_Scene.Load(scene);
+		                    }*/
+		                }
+		            }
+
+		            gui::PopStyleVar();
+		            ui::CenterNextWindow();
+		            if (gui::BeginPopupModal(("Confirm##SceneChange" + scene).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		            {
+		                gui::Text("Save changes to %s before changing", scene.c_str());
+		                float textSize = gui::CalcTextSize("Save Changes to ").x + gui::CalcTextSize(scene.c_str()).x + gui::CalcTextSize(" before closing?").x;
+		                float spacing = textSize * 0.05f;
+		                if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
+		                {
+		                    //WC_CORE_INFO("Save scene before changing");
 		                    //WC_INFO("Opening scene: {0}", scene);
 		                    m_Scene.Save(m_ScenePath);
 		                    m_ScenePath = scene;
 		                    m_Scene.Load(scene);
+		                    gui::CloseCurrentPopup();
 		                }
+		                gui::SameLine(0, spacing);
+		                if (gui::Button("No", {textSize * 0.3f, 0}))
+		                {
+		                    //WC_INFO("Opening scene: {0}", scene);
+		                    m_ScenePath = scene;
+		                    m_Scene.Load(scene);
+		                    gui::CloseCurrentPopup();
+		                }
+		                gui::SameLine(0, spacing);
+		                if (gui::Button("Cancel", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Escape))
+		                {
+		                    gui::CloseCurrentPopup();
+		                }
+
+		                gui::EndPopup();
 		            }
+		            gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 
 		            // Handle tab closure
 		            if (!open)
@@ -453,7 +494,6 @@ struct Editor
 		                    else
 		                    {
 		                        m_ScenePath.clear();
-		                        // Optionally create a new default scene here if needed
 		                    }
 		                }
 		            }
@@ -857,15 +897,15 @@ struct Editor
 					bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 			        float height = gui::GetItemRectSize().y;
 
+			        static bool openPopup = false;
 					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 					{
 						if (gui::IsItemHovered())
 						{
 							//WC_INFO("Hovered {}", entity.name().c_str());
-							gui::OpenPopup(std::to_string(entity.id()).c_str());
+							openPopup = true;
 						}
 					}
-			        popup(entity);
 
 					// Handle selection on click
 					if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
@@ -899,6 +939,7 @@ struct Editor
 						gui::EndDragDropTarget();
 					}
 
+
 			        gui::SameLine(gui::GetContentRegionMax().x - 20.f - gui::GetStyle().ItemSpacing.x);
 			        gui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
 			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
@@ -913,7 +954,14 @@ struct Editor
 			        gui::PopStyleVar(2);
 			        gui::PopStyleColor(2); // 3
 
-					// If the node is open, recursively display children
+		    	    if (openPopup)
+			        {
+	    		        gui::OpenPopup(std::to_string(entity.id()).c_str());
+    			        openPopup = false;
+			        }
+			        popup(entity);
+
+			        // If the node is open, recursively display children
 					if (is_open)
 					{
 						gui::TreePop(); // Pop before separator

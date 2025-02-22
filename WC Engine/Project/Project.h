@@ -155,6 +155,7 @@ namespace Project
 		name = "";
 		rootPath = "";
 		firstScene = "";
+        savedProjectScenes.clear();
 	}
 
 	inline void Delete(const std::string& filepath) // @TODO: This function should accept project index from savedProjectPaths
