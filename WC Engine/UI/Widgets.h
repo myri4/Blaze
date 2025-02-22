@@ -766,6 +766,70 @@ namespace wc
 			ImGui::SeparatorText(label.c_str());
 		}
 
+	    inline void SeparatorEx(ImGuiSeparatorFlags flags, float thickness, bool hover = false)
+        {
+            ImGuiWindow* window = gui::GetCurrentWindow();
+            if (window->SkipItems)
+                return;
+
+            ImGuiContext& g = *GImGui;
+            IM_ASSERT(ImIsPowerOfTwo(flags & (ImGuiSeparatorFlags_Horizontal | ImGuiSeparatorFlags_Vertical)));   // Check that only 1 option is selected
+            IM_ASSERT(thickness > 0.0f);
+
+            if (flags & ImGuiSeparatorFlags_Vertical)
+            {
+                // Vertical separator, for menu bars (use current line height).
+                float y1 = window->DC.CursorPos.y;
+                float y2 = window->DC.CursorPos.y + window->DC.CurrLineSize.y;
+                const ImRect bb(ImVec2(window->DC.CursorPos.x, y1), ImVec2(window->DC.CursorPos.x + thickness, y2));
+                gui::ItemSize(ImVec2(thickness, 0.0f));
+                if (!gui::ItemAdd(bb, 0))
+                    return;
+
+                // Draw
+                window->DrawList->AddRectFilled(bb.Min, bb.Max, gui::GetColorU32(hover && gui::IsMouseHoveringRect(gui::GetItemRectMin(), gui::GetItemRectMax()) ? ImGuiCol_SeparatorHovered : ImGuiCol_Separator));
+                if (g.LogEnabled)
+                    gui::LogText(" |");
+            }
+            else if (flags & ImGuiSeparatorFlags_Horizontal)
+            {
+                // Horizontal Separator
+                float x1 = window->DC.CursorPos.x;
+                float x2 = window->WorkRect.Max.x;
+
+                // Preserve legacy behavior inside Columns()
+                // Before Tables API happened, we relied on Separator() to span all columns of a Columns() set.
+                // We currently don't need to provide the same feature for tables because tables naturally have border features.
+                ImGuiOldColumns* columns = (flags & ImGuiSeparatorFlags_SpanAllColumns) ? window->DC.CurrentColumns : NULL;
+                if (columns)
+                {
+                    x1 = window->Pos.x + window->DC.Indent.x; // Used to be Pos.x before 2023/10/03
+                    x2 = window->Pos.x + window->Size.x;
+                    gui::PushColumnsBackground();
+                }
+
+                // We don't provide our width to the layout so that it doesn't get feed back into AutoFit
+                // FIXME: This prevents ->CursorMaxPos based bounding box evaluation from working (e.g. TableEndCell)
+                const float thickness_for_layout = (thickness == 1.0f) ? 0.0f : thickness; // FIXME: See 1.70/1.71 Separator() change: makes legacy 1-px separator not affect layout yet. Should change.
+                const ImRect bb(ImVec2(x1, window->DC.CursorPos.y), ImVec2(x2, window->DC.CursorPos.y + thickness));
+                gui::ItemSize(ImVec2(0.0f, thickness_for_layout));
+
+                if (gui::ItemAdd(bb, 0))
+                {
+                    // Draw
+                    window->DrawList->AddRectFilled(bb.Min, bb.Max, gui::GetColorU32(hover && gui::IsMouseHoveringRect(gui::GetItemRectMin(), gui::GetItemRectMax()) ? ImGuiCol_SeparatorHovered : ImGuiCol_Separator));
+                    if (g.LogEnabled)
+                        gui::LogRenderedText(&bb.Min, "--------------------------------\n");
+
+                }
+                if (columns)
+                {
+                    gui::PopColumnsBackground();
+                    columns->LineMinY = window->DC.CursorPos.y;
+                }
+            }
+        }
+
 		inline void Text(const std::string& text)
 		{
 			ImGui::TextUnformatted(text.c_str());

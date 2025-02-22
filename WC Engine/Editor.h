@@ -399,8 +399,7 @@ struct Editor
 
 		        ImGuiTabItemFlags flags = ImGuiTabBarFlags_NoTooltip;
 		        gui::BeginDisabled(SceneState::Play == m_SceneState || SceneState::Simulate == m_SceneState);
-		        auto scenes = Project::savedProjectScenes;
-		        for (const auto& scene : scenes)
+		        for (const auto& scene : Project::savedProjectScenes)
 		        {
 		            if (scene == m_ScenePath)
                     {
@@ -749,13 +748,14 @@ struct Editor
 			// Reorder
 			auto separator = [&](flecs::entity entity) -> void
 				{
-			        //gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 10);
-			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0);
-					gui::PushStyleColor(ImGuiCol_Separator, { 0.5f, 0.5f, 0.5f, 0.f }); // NOTE: change back to zero alpha
-					gui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4);
-					gui::PopStyleColor();
+			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
+                    gui::PushStyleColor(ImGuiCol_Separator, ImVec4(0, 0, 0, 0));
+			        gui::PushStyleColor(ImGuiCol_SeparatorHovered, gui::GetStyle().Colors[ImGuiCol_DragDropTarget]);
+					ui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4, ui::MatchPayloadType("ENTITY"));
+			        gui::PopStyleColor(2);
                     gui::PopStyleVar();
 
+			        gui::PushStyleColor(ImGuiCol_DragDropTarget, ImVec4(0, 0, 0, 0));
 			        if (gui::BeginDragDropTarget())
 					{
 						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
@@ -803,6 +803,7 @@ struct Editor
 						}
 						gui::EndDragDropTarget();
 					}
+			        gui::PopStyleColor();
 				};
 
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
@@ -852,11 +853,9 @@ struct Editor
 
 					// Render the entity
 			        //gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 14);
-			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0);
 			        gui::SetNextItemAllowOverlap();
 					bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
 			        float height = gui::GetItemRectSize().y;
-			        gui::PopStyleVar();
 
 					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 					{
@@ -901,8 +900,8 @@ struct Editor
 					}
 
 			        gui::SameLine(gui::GetContentRegionMax().x - 20.f - gui::GetStyle().ItemSpacing.x);
-
 			        gui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
 		    	    gui::PushStyleColor(ImGuiCol_Button, {0, 0, 0, 0});
 		    	    //gui::PushStyleColor(ImGuiCol_ButtonHovered, {0, 0, 0, 0});
 		    	    gui::PushStyleColor(ImGuiCol_ButtonActive, {0, 0, 0, 0});
@@ -911,7 +910,7 @@ struct Editor
     			        entity.set<EntityTag>({!entity.get<EntityTag>()->showEntity});
     			        //WC_INFO("Set to: {}", entity.get<EntityTag>()->showEntity);
 			        }
-			        gui::PopStyleVar();
+			        gui::PopStyleVar(2);
 			        gui::PopStyleColor(2); // 3
 
 					// If the node is open, recursively display children
@@ -2418,7 +2417,7 @@ struct Editor
 		}
 	}
 
-	void WindowButtons() const
+	void WindowButtons()
 	{
 		// Buttons
 		gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
@@ -2466,6 +2465,7 @@ struct Editor
 	        if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 	        {
 	            WC_CORE_INFO("Save project before leaving");
+	            m_Scene.Save(m_ScenePath); // Saving scene
 	            Globals.window.Close();
 	            gui::CloseCurrentPopup();
 	        }
