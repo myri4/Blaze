@@ -1,8 +1,17 @@
 #pragma once
 
-#include <luau/Common/include/Luau/Common.h>
-#include <luau/Compiler/include/luacode.h>
-#include <luau/VM/include/lualib.h>
+#include <Luau/Common.h>
+#include <luacode.h>
+#include <lualib.h>
+
+#include <Luau/Parser.h>
+#include <Luau/Scope.h>
+#include <Luau/TypeInfer.h>
+#include <Luau/TypeChecker2.h>
+#include <Luau/Frontend.h>
+#include <Luau/BuiltinDefinitions.h>
+#include <Luau/Module.h>
+
 
 #include <wc/Utils/Log.h>
 #include <filesystem>
@@ -16,11 +25,11 @@ static int printWrapper(lua_State* L)
 	{
 		if (lua_isstring(L, -1))
 		{
-			WC_INFO(lua_tostring(L, -1))
+			WC_TRACE(lua_tostring(L, -1))
 		}
 		else if (lua_isboolean(L, -1))
 		{
-			WC_INFO((bool)lua_toboolean(L, -1));
+			WC_TRACE((bool)lua_toboolean(L, -1));
 		}
 		else
 		{
@@ -33,7 +42,7 @@ static int printWrapper(lua_State* L)
 
 static const struct luaL_Reg blazeLib[]
 {
-	{"logWarn", printWrapper},
+	{"warn", printWrapper},
 	{NULL, NULL}
 };
 
@@ -50,9 +59,128 @@ namespace blaze
 		return fileContents.str();
 	}
 
-	struct Script
+	struct ScriptBinary
 	{
-	private:
+		std::vector<uint8_t> binary;
+		std::vector<std::string> VariableNames;
+		std::string Name;
+
+		bool CompileScript(const std::string& filePath)
+		{
+			if (!std::filesystem::exists(filePath))
+			{
+				WC_CORE_ERROR("Could not find {}", filePath);
+				return false;
+			}
+
+			Name = filePath;
+
+			std::string srcCode = OpenFile(filePath);
+			bool hasErrors = false;
+			{ // analyze script
+				Luau::FrontendOptions options;
+
+				struct FileResolver : public Luau::FileResolver
+				{
+					FileResolver(const std::string& s) { src = s; }
+
+					std::string src;
+
+					std::optional<Luau::SourceCode> readSource(const Luau::ModuleName& name) override
+					{
+						Luau::SourceCode res;
+						res.type = res.Module;
+						res.source = src;
+						return res;
+					}
+				} fileResolver(srcCode);
+
+				struct ConfigResolver : public Luau::ConfigResolver
+				{
+					Luau::Config res = {};
+
+					const Luau::Config& getConfig(const Luau::ModuleName& name) const override
+					{
+						return res;
+					}
+				} configResolver;
+
+
+				Luau::Frontend frontend(&fileResolver, &configResolver, options);
+				Luau::registerBuiltinGlobals(frontend, frontend.globals);
+				Luau::freeze(frontend.globals.globalTypes);
+
+				const char* name = filePath.c_str();
+				Luau::CheckResult cr;
+
+				if (frontend.isDirty(name))
+					cr = frontend.check(name);
+
+				if (!frontend.getSourceModule(name))
+				{
+					WC_CORE_ERROR("{} does not exist", name);
+					return false;
+				}
+
+				for (auto& error : cr.errors)
+				{
+					std::string humanReadableName = frontend.fileResolver->getHumanReadableModuleName(error.moduleName);
+					const auto* syntaxError = Luau::get_if<Luau::SyntaxError>(&error.data);
+					hasErrors = true;
+					if (syntaxError)
+					{
+						WC_ERROR("{}[{},{}]: Syntax error: {}", humanReadableName, (error.location.begin.line + 1), (error.location.begin.column + 1), syntaxError->message);
+					}
+					else
+					{
+						WC_ERROR("{}[{},{}]: Type error: {}", humanReadableName, error.location.begin.line + 1, error.location.begin.column + 1, Luau::toString(error, Luau::TypeErrorToStringOptions{ frontend.fileResolver }));
+					}
+				}
+				for (auto& warning : cr.lintResult.warnings)
+				{
+					std::string humanReadableName = frontend.fileResolver->getHumanReadableModuleName(filePath);
+					WC_WARN("{}({},{}): {}: {}", humanReadableName, warning.location.begin.line + 1, warning.location.begin.column + 1, Luau::LintWarning::getName(warning.code), warning.text);
+				}
+
+				if (!hasErrors)
+				{
+					Luau::Allocator allocator;
+					Luau::AstNameTable names(allocator);
+					Luau::ParseOptions options;
+
+					Luau::ParseResult parseResult = Luau::Parser::parse(srcCode.data(), srcCode.size(), names, allocator, options);
+
+					// Visit all statements in the block
+					for (auto* stat : parseResult.root->body)
+					{
+						/*if (auto local = stat->as<Luau::AstStatLocal>())
+						{
+							for (auto* var : local->vars)
+								VariableNames.push_back(var->name.value);
+						} else*/
+						if (auto assign = stat->as<Luau::AstStatAssign>())
+						{
+							for (auto* expr : assign->vars)
+								if (auto global = expr->as<Luau::AstExprGlobal>())
+									VariableNames.push_back(global->name.value);
+						}
+					}
+
+					size_t bytecodeSize = 0;
+					char* bytecode = luau_compile(srcCode.c_str(), srcCode.size(), NULL, &bytecodeSize);
+					binary.resize(bytecodeSize);
+					memcpy(binary.data(), (void*)bytecode, bytecodeSize);
+
+					free(bytecode);
+				}
+
+				return hasErrors;
+			}
+		}
+	};
+
+	struct ScriptState
+	{
 		lua_State* L = nullptr;
 
 		void Pop(int n = 1) { lua_pop(L, n); }
@@ -65,7 +193,7 @@ namespace blaze
 		auto IsTable(int n = -1) { return lua_istable(L, n); }
 		auto IsLightUserData(int n = -1) { return lua_islightuserdata(L, n); }
 		auto IsNil(int n = -1) { return lua_isnil(L, n); }
-		auto IsBoolean(int n = -1) { return lua_isboolean(L, n); }
+		auto IsBool(int n = -1) { return lua_isboolean(L, n); }
 		auto IsVector(int n = -1) { return lua_isvector(L, n); }
 		auto IsThread(int n = -1) { return lua_isthread(L, n); }
 		auto IsBuffer(int n = -1) { return lua_isbuffer(L, n); }
@@ -84,25 +212,10 @@ namespace blaze
 		void PushNil() { lua_pushnil(L); }
 		void PushNumber(lua_Number n) { lua_pushnumber(L, n); }
 		void PushValue(int n) { lua_pushvalue(L, n); }
-
-		auto Next(int idx) { return lua_next(L, idx); }
-		std::string ToTypeName(int i = -1) { return std::string(lua_typename(L, lua_type(L, i))); }
-
-		std::string ToString(int i = -1) { return std::string(lua_tostring(L, i)); }
-		int32_t ToInt(int i = -1) { return lua_tointeger(L, i); }
-		uint32_t ToUInt(int i = -1) { return lua_tounsigned(L, i); }
-		double ToNumber(int i = -1) { return lua_tonumber(L, i); }
-
-		void SetGlobal(const std::string& s) { lua_setglobal(L, s.c_str()); }
-		auto GetGlobal(const std::string& s) { return lua_getglobal(L, s.c_str()); }
-
-		void Register(const std::string& libName, const luaL_Reg* l) { luaL_register(L, libName.c_str(), l); }
-
-		auto PCall(int nargs, int nresults, int errfunc) { return lua_pcall(L, nargs, nresults, errfunc); }
-		auto Call(int nargs, int nresults) { return lua_call(L, nargs, nresults); }
+		void PushCFunction(lua_CFunction fn, const std::string& name) { lua_pushcfunction(L, fn, name.c_str()); }
 
 		template<typename T>
-		void PushValue(T value)
+		void Push(T value)
 		{
 			if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>)
 				PushInt(value);
@@ -116,71 +229,49 @@ namespace blaze
 				static_assert("Unsupported type for Lua");
 		}
 
-		void Convert(int idx)
-		{
+		auto Next(int idx) { return lua_next(L, idx); }
+		std::string ToTypeName(int i = -1) { return std::string(lua_typename(L, lua_type(L, i))); }
 
-		}
+		std::string ToString(int i = -1) { return std::string(lua_tostring(L, i)); }
+		int32_t ToInt(int i = -1) { return lua_tointeger(L, i); }
+		uint32_t ToUInt(int i = -1) { return lua_tounsigned(L, i); }
+		double ToNumber(int i = -1) { return lua_tonumber(L, i); }
+		double ToBool(int i = -1) { return lua_toboolean(L, i); }
 
-	public:
+		void SetField(const char* k, int i = -1) { lua_setfield(L, i, k); }
+		void SetGlobal(const std::string& s) { lua_setglobal(L, s.c_str()); }
+		auto GetGlobal(const std::string& s) { return lua_getglobal(L, s.c_str()); }
 
-		int Load(const char* byteCode, size_t byteCodeSize, const std::string& name)
-		{
-			L = luaL_newstate();
-			luaL_openlibs(L);
-			Register("blaze", blazeLib);
+		void Register(const std::string& libName, const luaL_Reg* l) { luaL_register(L, libName.c_str(), l); }
 
-			if (luau_load(L, name.c_str(), byteCode, byteCodeSize, 0) != LUA_OK)
-				return -1;
-
-			PCall(0, LUA_MULTRET, 0); // This is really strange and has to be here.
-
-			GetGlobal("_G");
-			lua_pushnil(L);  /* first key */
-			while (lua_next(L, -2) != 0)
-			{
-				/* uses 'key' (at index -2) and 'value' (at index -1) */
-				std::string value;
-				if (IsString())
-				{
-					value = ToString();
-				}
-				else if (IsNumber())
-					value = std::format("{}", ToNumber());
-
-				WC_CORE_INFO("{}: {}", value, ToString(-2));
-				/* removes 'value'; keeps 'key' for next iteration */
-				lua_pop(L, 1);
-			}
-
-			return LUA_OK;
-		}
-
-		void LoadFromFile(const std::string& filePath)
-		{
-			if (!std::filesystem::exists(filePath))
-			{
-				WC_CORE_ERROR("Could not find {}", filePath);
-				return;
-			}
-
-			// needs lua.h and luacode.h
-			size_t bytecodeSize = 0;
-			std::string srcCode = OpenFile(filePath);
-			char* bytecode = luau_compile(srcCode.c_str(), srcCode.size(), NULL, &bytecodeSize);
-
-			std::string_view sv = std::string_view();
-
-			if (Load(bytecode, bytecodeSize, filePath) != LUA_OK)
-				WC_ERROR(std::string(bytecode, bytecodeSize));
-
-			free(bytecode);
-		}
+		auto PCall(int nargs, int nresults, int errfunc) { return lua_pcall(L, nargs, nresults, errfunc); }
+		auto Call(int nargs, int nresults) { return lua_call(L, nargs, nresults); }
 
 		template<typename T>
 		void SetVariable(const std::string& name, const T& value)
 		{
-			PushValue(value);
+			Push(value);
 			SetGlobal(name);
+		}
+
+		template<typename T>
+		T To()
+		{
+			if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>)					 return ToInt();
+			else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>)			 return ToNumber();
+			else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, std::string>) return ToString();
+			else if constexpr (std::is_same_v<T, bool>)									  		 return ToBool();
+			else static_assert("Unsupported type for Lua");
+		}
+
+		template<typename T>
+		T GetVariable(const std::string& name)
+		{
+			GetGlobal(name);
+
+			auto val = To<T>();
+			Pop();
+			return val;
 		}
 
 		template<typename... Args>
@@ -190,14 +281,14 @@ namespace blaze
 
 			if (!IsFunction())
 			{
-				WC_ERROR("{} is not a function", functionName);
+				//WC_ERROR("{} is not a function", functionName);
 				return;
 			}
 
 			(PushValue(args), ...);
 
 			constexpr int argCount = sizeof...(Args);
-			WC_CORE_INFO(GetTop());
+			//WC_CORE_INFO(GetTop());
 			if (PCall(argCount, 0, 0) != LUA_OK)
 			{
 				// Print error message if the call fails
@@ -206,5 +297,50 @@ namespace blaze
 				Pop(); // Remove error message from the stack
 			}
 		}
+
+		int Load(const char* byteCode, size_t byteCodeSize, const std::string& name)
+		{
+			L = luaL_newstate();
+			luaL_openlibs(L);
+			PushCFunction(printWrapper, "print");
+			SetGlobal("print");
+			luaL_register(L, "blaze", blazeLib);
+
+			if (luau_load(L, name.c_str(), byteCode, byteCodeSize, 0) != LUA_OK)
+			{
+				WC_ERROR(std::string(byteCode, byteCodeSize));
+				return -1;
+			}
+
+
+			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+			{
+				WC_ERROR(std::string(byteCode, byteCodeSize));
+				return -1;
+			}
+
+
+			return LUA_OK;
+		}
+
+		std::string Name;
+
+		void Load(const ScriptBinary& script)
+		{
+			Name = script.Name;
+			if (script.binary.size() > 0)
+			{
+				Load((char*)script.binary.data(), script.binary.size(), script.Name);
+			}
+			else
+				WC_CORE_ERROR("Script binary is empty");
+		}
+
+		void Free() 
+		{
+			Name.clear();
+			lua_close(L);
+		}
+		
 	};
 }

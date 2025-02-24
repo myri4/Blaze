@@ -11,7 +11,7 @@
 #include <glm/glm.hpp>
 #include <wc/Texture.h>
 
-namespace wc
+namespace blaze
 {
     struct AssetManager;
 

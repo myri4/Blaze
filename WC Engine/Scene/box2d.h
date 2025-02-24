@@ -3,16 +3,16 @@
 #include <glm/glm.hpp>
 #include <box2d/box2d.h>
 
-namespace wc
+namespace b2
 {
-	struct b2World
+	struct World
 	{
 	private:
 		b2WorldId id = b2_nullWorldId;
 	public:
-		b2World() = default;
-		b2World(b2WorldId handle) { id = handle; }
-		b2World(const b2WorldDef& def) { Create(def); }
+		World() = default;
+		World(b2WorldId handle) { id = handle; }
+		World(const b2WorldDef& def) { Create(def); }
 
 		operator b2WorldId& () { return id; }
 		operator const b2WorldId& () const { return id; }
@@ -189,20 +189,20 @@ namespace wc
 		inline void DumpMemoryStats() { b2World_DumpMemoryStats(id); }
 	};
 
-	struct b2Body
+	struct Body
 	{
 	private:
 		b2BodyId id = b2_nullBodyId;
 	public:
-		b2Body() = default;
-		b2Body(b2BodyId handle) { id = handle; }
-		b2Body(b2World world, const b2BodyDef& def) { Create(world, def); }
+		Body() = default;
+		Body(b2BodyId handle) { id = handle; }
+		Body(World world, const b2BodyDef& def) { Create(world, def); }
 
 		operator b2BodyId& () { return id; }
 		operator const b2BodyId& () const { return id; }
 		//operator bool() const { return id != b2_nullBodyId; }
 
-		inline void Create(b2World world, const b2BodyDef& def) { id = b2CreateBody(world, &def); }
+		inline void Create(World world, const b2BodyDef& def) { id = b2CreateBody(world, &def); }
 
 		inline void Destroy()
 		{
@@ -441,17 +441,17 @@ namespace wc
 		inline auto ComputeAABB() { return b2Body_ComputeAABB(id); }
 	};
 
-	struct b2Shape
+	struct Shape
 	{
 	private:
 		b2ShapeId id = b2_nullShapeId;
 	public:
-		b2Shape() = default;
-		b2Shape(b2ShapeId handle) { id = handle; }
-		b2Shape(b2Body body, const b2ShapeDef& def, const b2Circle& circle) { CreateCircleShape(body, def, circle); }
-		b2Shape(b2Body body, const b2ShapeDef& def, const b2Segment& segment) { CreateSegmentShape(body, def, segment); }
-		b2Shape(b2Body body, const b2ShapeDef& def, const b2Capsule& capsule) { CreateCapsuleShape(body, def, capsule); }
-		b2Shape(b2Body body, const b2ShapeDef& def, const b2Polygon& polygon) { CreatePolygonShape(body, def, polygon); }
+		Shape() = default;
+		Shape(b2ShapeId handle) { id = handle; }
+		Shape(Body body, const b2ShapeDef& def, const b2Circle& circle) { CreateCircleShape(body, def, circle); }
+		Shape(Body body, const b2ShapeDef& def, const b2Segment& segment) { CreateSegmentShape(body, def, segment); }
+		Shape(Body body, const b2ShapeDef& def, const b2Capsule& capsule) { CreateCapsuleShape(body, def, capsule); }
+		Shape(Body body, const b2ShapeDef& def, const b2Polygon& polygon) { CreatePolygonShape(body, def, polygon); }
 
 		operator b2ShapeId& () { return id; }
 		operator const b2ShapeId& () const { return id; }

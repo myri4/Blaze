@@ -6,7 +6,7 @@
 #include <wc/vk/Image.h>
 #include <wc/vk/SyncContext.h>
 
-namespace wc 
+namespace blaze 
 {
     struct TextureSpecification
     {

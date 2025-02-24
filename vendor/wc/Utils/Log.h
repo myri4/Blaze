@@ -133,12 +133,20 @@ inline OStream& operator<<(OStream& os, glm::qua<T, Q> quaternion)
 //#define WC_CORE_LOG(...)		wc::Log::GetCoreLogger()->debug(__VA_ARGS__);
 #define WC_CORE_TODO WC_CORE_INFO("@TODO: Implement!")
 
-#define WC_TRACE(...)         wc::Log::GetAppLogger()->trace(__VA_ARGS__);
-#define WC_INFO(...)          wc::Log::GetAppLogger()->info(__VA_ARGS__);
-#define WC_WARN(...)          wc::Log::GetAppLogger()->warn(__VA_ARGS__);
-#define WC_ERROR(...)         wc::Log::GetAppLogger()->error(__VA_ARGS__);
-#define WC_CRITICAL(...)      wc::Log::GetAppLogger()->critical(__VA_ARGS__);
-#define WC_DEBUG(...)         wc::Log::GetAppLogger()->debug(__VA_ARGS__);
+#define WC_APP_TRACE(...)         wc::Log::GetAppLogger()->trace(__VA_ARGS__);
+#define WC_APP_INFO(...)          wc::Log::GetAppLogger()->info(__VA_ARGS__);
+#define WC_APP_WARN(...)          wc::Log::GetAppLogger()->warn(__VA_ARGS__);
+#define WC_APP_ERROR(...)         wc::Log::GetAppLogger()->error(__VA_ARGS__);
+#define WC_APP_CRITICAL(...)      wc::Log::GetAppLogger()->critical(__VA_ARGS__);
+#define WC_APP_DEBUG(...)         wc::Log::GetAppLogger()->debug(__VA_ARGS__);
+
+
+#define WC_TRACE(...)         WC_CORE_TRACE(__VA_ARGS__) WC_APP_TRACE(__VA_ARGS__) 
+#define WC_INFO(...)          WC_CORE_INFO(__VA_ARGS__) WC_APP_INFO(__VA_ARGS__) 
+#define WC_WARN(...)          WC_CORE_WARN(__VA_ARGS__) WC_APP_WARN(__VA_ARGS__) 
+#define WC_ERROR(...)         WC_CORE_ERROR(__VA_ARGS__) WC_APP_ERROR(__VA_ARGS__) 
+#define WC_CRITICAL(...)      WC_CORE_CRITICAL(__VA_ARGS__) WC_APP_CRITICAL(__VA_ARGS__) 
+#define WC_DEBUG(...)         WC_CORE_TRACE(__VA_ARGS__) WC_APP_TRACE(__VA_ARGS__) 
 
 #define WC_ENABLE_ASSERTS
 

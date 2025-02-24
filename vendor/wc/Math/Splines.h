@@ -4,7 +4,7 @@
 
 #include <glm/glm.hpp>
 
-namespace wc
+namespace blaze
 {
 	inline glm::vec2 bezierLerp(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, float t)
 	{

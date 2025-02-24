@@ -15,11 +15,11 @@
 
 #include "Globals.h"
 #include "Project/Settings.h"
-#include "Scripting/Script.h"
 
 #include <wc/Math/Camera.h>
 
 using namespace wc;
+using namespace blaze;
 namespace gui = ImGui;
 
 glm::vec4 decompress(uint32_t num)
@@ -207,11 +207,6 @@ struct Editor
 		};
 
 		m_Renderer.CreateScreen(Globals.window.GetSize());
-
-		//blaze::Script script;
-		//script.LoadFromFile("test.lua");
-		//script.SetVariable("a", "guz");
-		//script.Execute("printSmth");
 	}
 
 	void Resize(glm::vec2 size)
@@ -366,12 +361,12 @@ struct Editor
 
 		if (newState == SceneState::Play || newState == SceneState::Simulate)
 		{
-			m_Scene.CreatePhysicsWorld();
+			m_Scene.Start();
 			m_TempScene.Copy(m_Scene);
 		}
 		else if (newState == SceneState::Edit)
 		{
-			m_Scene.PhysicsWorld.Destroy();
+			m_Scene.Stop();
 			m_Scene.Copy(m_TempScene);
 		}
 
@@ -547,6 +542,8 @@ struct Editor
 		gui::End();
 	}
 
+	float cNear = -1.f, cFar = 1.f;
+
 	void UI_SceneProperties()
 	{
 		if (gui::Begin("Scene Properties", &showSceneProperties))
@@ -555,6 +552,11 @@ struct Editor
 			{
 				auto& worldData = m_Scene.PhysicsWorldData;
 				ui::DragButton2("Gravity", worldData.Gravity);
+
+				ui::Drag("Near", cNear, 0.1f);
+				ui::Drag("Far", cFar, 0.1f);
+				ui::Drag3("Camera position", glm::value_ptr(camera.Position));
+				camera.Update(m_Renderer.GetHalfSize(camera.Zoom), cNear, cFar);
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
 				//	UI::Drag("Restitution Threshold", rt);
@@ -999,7 +1001,7 @@ struct Editor
 					}
 				}
 				const float widgetSize = gui::GetItemRectSize().y;
-				static enum { None, Transform, Render, Rigid } menu = None;
+				static enum { None, Transform, Render, Rigid, Script } menu = None;
 				static bool showAddComponent = false;
 				//TODO - add icon
 				gui::SameLine();  if (gui::Button("Add Component")) { showAddComponent = true; menu = None; }
@@ -1051,6 +1053,7 @@ struct Editor
 						case Transform: menuText = "Transform"; break;
 						case Render: menuText = "Render"; break;
 						case Rigid: menuText = "Rigid Body"; break;
+						case Script: menuText = "Script"; break;
 						}
 						gui::SetCursorPosX((gui::GetWindowSize().x - gui::CalcTextSize(menuText).x) * 0.5f);
 						gui::Text("%s", menuText);
@@ -1064,6 +1067,7 @@ struct Editor
 							if (gui::MenuItem("Transform")) { menu = Transform; } ui::RenderArrowIcon(ImGuiDir_Right);
 							if (gui::MenuItem("Render")) { menu = Render; } ui::RenderArrowIcon(ImGuiDir_Right);
 							if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon(ImGuiDir_Right);
+							if (gui::MenuItem("Script")) { menu = Script; } ui::RenderArrowIcon(ImGuiDir_Right);
 							break;
 						}
 						case Transform:
@@ -1085,6 +1089,11 @@ struct Editor
 							bool hasCollider = m_SelectedEntity.has<BoxCollider2DComponent>() || m_SelectedEntity.has<CircleCollider2DComponent>();
 							if (ItemAutoClose("Box Collider Component", hasCollider))	m_SelectedEntity.add<BoxCollider2DComponent>();
 							if (ItemAutoClose("Circle Collider Component", hasCollider))	m_SelectedEntity.add<CircleCollider2DComponent>();
+							break;
+						}
+						case Script:
+						{
+							if (ItemAutoClose("Script Component", m_SelectedEntity.has<ScriptComponent>()))	m_SelectedEntity.add<ScriptComponent>();
 							break;
 						}
 						}
@@ -1167,7 +1176,6 @@ struct Editor
 									if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
 									{
 										const char* fontPath = static_cast<const char*>(payload->Data);
-										WC_CORE_INFO(fontPath);
 
 										component.FontID = assetManager.LoadFont(fontPath);
 									}
@@ -1309,6 +1317,69 @@ struct Editor
 
 						UI_PhysicsMaterial(component.MaterialID);
 						});
+
+					EditComponent<ScriptComponent>("Script editor", [&](auto& component) {
+						auto& script = component.ScriptInstance;
+						gui::Button("Script");
+						
+						if (ui::MatchPayloadType("DND_PATH"))
+						{
+							std::filesystem::path path = static_cast<const char*>(gui::GetDragDropPayload()->Data);
+							if (path.extension() == ".lua" || path.extension() == ".luau")
+							{
+								if (gui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("DND_PATH"))
+									{
+										const char* scriptPath = static_cast<const char*>(payload->Data);
+										
+										component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(scriptPath)]);
+									}
+									gui::EndDragDropTarget();
+								}
+							}
+						}
+
+						gui::SameLine();
+						if (gui::Button("Reload script"))
+							component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(component.ScriptInstance.Name, true)]);
+
+						if (script.L)
+						{
+							ui::Text(std::format("Stack size: {}", script.GetTop()));
+							auto it = ScriptBinaryCache.find(script.Name);
+							if (it != ScriptBinaryCache.end())
+							{
+								const auto& binID = it->second;
+								for (const auto& variableName : ScriptBinaries[binID].VariableNames)
+								{
+									script.GetGlobal(variableName);
+									if (script.IsString() && !script.IsNumber())
+									{
+										auto temp = script.To<std::string>();
+										if (gui::InputText(variableName.c_str(), &temp))
+											script.SetVariable(variableName, temp);
+									}
+									else if (script.IsNumber())
+									{
+										auto temp = script.To<double>();
+										if (ui::Drag(variableName, temp))
+											script.SetVariable(variableName, temp);
+									}
+									else if (script.IsBool())
+									{
+										auto temp = script.To<bool>();
+										if (ui::Checkbox(variableName, temp))
+											script.SetVariable(variableName, temp);
+									}
+									else
+										ui::Text("Unknown type: " + variableName);
+
+									script.Pop();
+								}
+							}
+						}
+					});
 				}
 				gui::EndChild();
 			}
@@ -1421,8 +1492,8 @@ struct Editor
 		{
 			if (gui::BeginMenuBar())
 			{
-				if (gui::MenuItem("Import"))
-					WC_INFO("TODO - Implement Import");
+				//if (gui::MenuItem("Import"))
+				//	WC_INFO("TODO - Implement Import");
 
 			    if (gui::MenuItem("Open Path"))
 			        FileDialogs::OpenInFileExplorer(selectedFolderPath.string());

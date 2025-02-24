@@ -5,7 +5,7 @@
 #include "../Globals.h"
 #include <wc/Utils/YAML.h>
 
-namespace wc
+namespace blaze
 {
 	struct PhysicsWorldData
 	{
@@ -13,9 +13,15 @@ namespace wc
 		float TimeStep = 1.f / 60.f;
 	};
 
-	inline std::unordered_map<std::string, uint32_t> PhysicsMaterialNames;
-	inline std::vector<PhysicsMaterial> PhysicsMaterials;
+	using Cache = std::unordered_map<std::string, uint32_t>;
+
+	template<typename T>
+	using Storage = std::vector<T>;
+
 	inline AssetManager assetManager;
+
+	inline Storage<PhysicsMaterial> PhysicsMaterials;
+	inline Cache PhysicsMaterialNames;
 
 	inline void SavePhysicsMaterials(const std::string& filepath)
 	{
@@ -81,10 +87,42 @@ namespace wc
 		}
 	}
 
+	inline Storage<ScriptBinary> ScriptBinaries;
+	inline Cache ScriptBinaryCache;
+
+	inline uint32_t LoadScriptBinary(const std::string& filepath, bool reload = false)
+	{
+		if (ScriptBinaryCache.find(filepath) != ScriptBinaryCache.end())
+		{
+			auto scriptID = ScriptBinaryCache[filepath];
+			if (reload)
+			{
+				auto& script = ScriptBinaries[scriptID];
+				script.VariableNames.clear();
+				script.CompileScript(filepath);
+			}
+			
+			return scriptID;
+		}
+		
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("{} does not exist", filepath);
+			return 0;
+		}
+
+		auto& binary = ScriptBinaries.emplace_back();
+		binary.CompileScript(filepath);
+
+		ScriptBinaryCache[filepath] = ScriptBinaries.size() - 1;
+
+		return ScriptBinaries.size() - 1;
+	}
+
 	struct Scene
 	{
 		flecs::world EntityWorld;
-		b2World PhysicsWorld;
+		b2::World PhysicsWorld;
 		PhysicsWorldData PhysicsWorldData;
 
 		std::vector<std::string> EntityOrder; // only parents
@@ -184,9 +222,9 @@ namespace wc
 			return EntityWorld.entity(name.c_str()).add<EntityTag>();
 		}
 
-		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
+		void CloneEntity(const flecs::entity& ent, const flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
 
-		void KillEntity(flecs::entity& ent)
+		void KillEntity(const flecs::entity& ent)
 		{
 			auto it = std::remove(EntityOrder.begin(), EntityOrder.end(), ent.name().c_str());
 			if (it != EntityOrder.end())
@@ -209,7 +247,7 @@ namespace wc
 			ent.destruct();
 		}
 
-		void RemoveChild(flecs::entity& child)
+		void RemoveChild(const flecs::entity& child)
 		{
 			if (child.parent() == flecs::entity::null())
 				return;
@@ -246,7 +284,7 @@ namespace wc
 			EntityOrder.push_back(child.name().c_str());
 		}
 
-		void SetChild(flecs::entity& parent, flecs::entity& child)
+		void SetChild(const flecs::entity& parent, const flecs::entity& child)
 		{
 			if (child.parent() != flecs::entity::null())
 				RemoveChild(child);
@@ -272,11 +310,32 @@ namespace wc
 			EntityOrder.clear();
 		}
 
+		void Start()
+		{
+			CreatePhysicsWorld();
+
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L)
+						script.ScriptInstance.Execute("Create");
+				});
+		}
+
+		void Stop()
+		{
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L)
+						script.ScriptInstance.Execute("Destroy");
+				});
+			PhysicsWorld.Destroy();
+		}
+
 		void UpdatePhysics()
 		{
 			PhysicsWorld.SetGravity(PhysicsWorldData.Gravity);
 
-			AccumulatedTime += Globals.deltaTime;
+			AccumulatedTime += wc::Globals.deltaTime;
 
 			EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
 				if (!p.body.IsValid())
@@ -317,14 +376,20 @@ namespace wc
 
 		void Update()
 		{
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L) 
+						script.ScriptInstance.Execute("Update");
+				});
+
 			UpdatePhysics();
 		}
 
-		void SerializeEntity(flecs::entity& entity, YAML::Node& entityData) const
+		YAML::Node SerializeEntity(const flecs::entity& entity) const
 		{
-			if (entity.name() != "null") entityData["Name"] = std::string(entity.name().c_str());
-			else entityData["Name"] = std::string("null[5ws78@!12]");
-			entityData["ID"] = entity.id();
+			YAML::Node entityData;
+
+			entityData["Name"] = (entity.name() != "null") ? std::string(entity.name().c_str()) : std::string("null[5ws78@!12]");
 
 			if (entity.has<TransformComponent>())
 			{
@@ -437,40 +502,45 @@ namespace wc
 
 				entityData["CircleCollider2DComponent"] = componentData;
 			}
-		}
 
-		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData) const
-		{
-			if (!parent.has<EntityOrderComponent>()) return;
-			YAML::Node childrenData;
-
-			/*EntityWorld.query_builder<EntityTag>()
-			.with(flecs::ChildOf, parent)
-			.each([&](flecs::entity child, EntityTag) {
-				YAML::Node childData;
-
-				SerializeEntity(child, childData);
-
-				SerializeChildEntity(child, childData);
-
-				childrenData.push_back(childData);
-			});*/
-
-			for (const auto& name : parent.get_ref<EntityOrderComponent>()->EntityOrder)
+			if (entity.has<ScriptComponent>())
 			{
-				auto child = EntityWorld.lookup(name.c_str());
+				auto component = entity.get_ref<ScriptComponent>();
+				YAML::Node componentData;
+				componentData["Path"] = component->ScriptInstance.Name;
 
-				YAML::Node childData;
+				entityData["ScriptComponent"] = componentData;
+			}
 
-				SerializeEntity(child, childData);
+			if (entity.has<EntityOrderComponent>())
+			{
+				/*EntityWorld.query_builder<EntityTag>()
+				.with(flecs::ChildOf, parent)
+				.each([&](flecs::entity child, EntityTag) {
+					YAML::Node childData;
 
-				SerializeChildEntity(child, childData);
+					SerializeEntity(child, childData);
 
-				childrenData.push_back(childData);
-			}			
+					SerializeChildEntity(child, childData);
 
-			if (childrenData.size() != 0)
-				entityData["Children"] = childrenData;
+					childrenData.push_back(childData);
+				});*/
+
+				YAML::Node childrenData;
+				for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
+				{
+					auto child = EntityWorld.lookup(name.c_str());
+
+					YAML::Node childData = SerializeEntity(child);
+
+					childrenData.push_back(childData);
+				}
+
+				if (childrenData.size() != 0)
+					entityData["Children"] = childrenData;
+			}
+
+			return entityData;
 		}
 
 		YAML::Node toYAML() const
@@ -482,13 +552,7 @@ namespace wc
 			{
 				auto entity = EntityWorld.lookup(name.c_str());
 
-				YAML::Node entityData;
-
-				SerializeEntity(entity, entityData);
-
-				SerializeChildEntity(entity, entityData);
-
-				entitiesData.push_back(entityData);
+				entitiesData.push_back(SerializeEntity(entity));
 			}
 
 			if (PhysicsWorld.IsValid())
@@ -508,20 +572,14 @@ namespace wc
 			if (entities)
 			{
 				for (const auto& entity : entities)
-				{
-					flecs::entity deserializedEntity;
-
-					DeserializeEntity(deserializedEntity, entity);
-				}
+					DeserializeEntity(entity);
 			}
 		}
 
-		void DeserializeEntity(flecs::entity& entity, const YAML::Node& entityData)
+		flecs::entity DeserializeEntity(const YAML::Node& entityData)
 		{
+			flecs::entity entity;
 			std::string name = entityData["Name"].as<std::string>();
-			std::string id = entityData["ID"].as<std::string>();
-
-			WC_CORE_INFO("Deserialized entity with name = {}, ID = {}", name, id);
 
 			if (name == "null[5ws78@!12]") entity = AddEntity("null");
 			else if (name != "null") entity = AddEntity(name);
@@ -616,18 +674,23 @@ namespace wc
 				}
 			}
 
-			auto childEntities = entityData["Children"];
-			if (childEntities)
 			{
-				for (const auto& child : childEntities)
+				auto componentData = entityData["ScriptComponent"];
+				if (componentData)
 				{
-					flecs::entity deserializedChildEntity;
+					ScriptComponent component;
+					component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(componentData["Path"].as<std::string>())]);
 
-					DeserializeEntity(deserializedChildEntity, child);
-
-					SetChild(entity, deserializedChildEntity);
+					entity.set<ScriptComponent>(component);
 				}
 			}
+
+			auto childEntities = entityData["Children"];
+			if (childEntities)
+				for (const auto& child : childEntities)
+					SetChild(entity, DeserializeEntity(child));
+
+			return entity;
 		}
 
 		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }

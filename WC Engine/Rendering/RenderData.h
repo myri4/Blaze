@@ -15,7 +15,7 @@
 
 #undef LoadImage
 
-namespace wc
+namespace blaze
 {
 	struct Vertex
 	{
