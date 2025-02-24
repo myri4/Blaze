@@ -5,8 +5,10 @@
 #include <glm/gtx/quaternion.hpp>
 #include "box2d.h"
 #include "../Rendering/Font.h"
+#include "../Scripting/Script.h"
 
-namespace wc
+
+namespace blaze
 {
 	struct EntityTag
 	{
@@ -75,7 +77,7 @@ namespace wc
 	struct RigidBodyComponent
 	{
 		// Don't expose in the ui
-		b2Body body;
+		b2::Body body;
 		glm::vec2 prevPos;
 		float previousRotation = 0.f;
 
@@ -144,7 +146,7 @@ namespace wc
 
 		uint32_t MaterialID = 0; // @NOTE: This may need to be PhysMatID or something like that
 
-		b2Shape Shape;
+		b2::Shape Shape;
 	};
 
 	struct CircleCollider2DComponent
@@ -154,6 +156,13 @@ namespace wc
 
 		uint32_t MaterialID = 0;
 
-		b2Shape Shape;
+		b2::Shape Shape;
+	};
+
+	// Scripting
+
+	struct ScriptComponent
+	{
+		ScriptState ScriptInstance;
 	};
 }

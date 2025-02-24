@@ -4,7 +4,7 @@
 
 namespace Settings
 {
-	inline float ZoomSpeed = 2.f;
+	inline float ZoomSpeed = 1.f;
 
 	inline void Save()
 	{

@@ -10,13 +10,13 @@
 
 #include "Rendergraph.h"
 
-namespace wc
+namespace blaze
 {
 	uint32_t m_ComputeWorkGroupSize = 4; // @TODO: REMOVE!!!?
 
 	struct BloomPass
 	{
-		Shader m_Shader;
+		wc::Shader m_Shader;
 		vk::Sampler m_Sampler;
 
 		std::vector<VkDescriptorSet> m_DescriptorSets;
@@ -156,7 +156,7 @@ namespace wc
 				GenerateDescriptor(m_Buffers[2].imageViews[currentMip], m_Buffers[0].imageViews[0]);
 		}
 
-		void Execute(CommandEncoder& cmd, float Threshold = 1.f, float Knee = 0.6f)
+		void Execute(wc::CommandEncoder& cmd, float Threshold = 1.f, float Knee = 0.6f)
 		{
 			cmd.BindShader(m_Shader);
 			uint32_t counter = 0;
@@ -240,7 +240,7 @@ namespace wc
 
 	struct CompositePass
 	{
-		Shader m_Shader;
+		wc::Shader m_Shader;
 		VkDescriptorSet m_DescriptorSet;
 
 		void Init()
@@ -257,7 +257,7 @@ namespace wc
 				.BindImage(2, sampler, bloomInput, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		}
 
-		void Execute(CommandEncoder& cmd, glm::ivec2 size)
+		void Execute(wc::CommandEncoder& cmd, glm::ivec2 size)
 		{
 			cmd.BindShader(m_Shader);
 			cmd.BindDescriptorSet(m_DescriptorSet);
@@ -278,7 +278,7 @@ namespace wc
 
 	struct CRTPass
 	{
-		Shader m_Shader;
+		wc::Shader m_Shader;
 		VkDescriptorSet m_DescriptorSet;
 
 		void Init()
@@ -294,7 +294,7 @@ namespace wc
 				.BindImage(1, sampler, input, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		}
 
-		void Execute(CommandEncoder& cmd, glm::ivec2 size, float time)
+		void Execute(wc::CommandEncoder& cmd, glm::ivec2 size, float time)
 		{
 			cmd.BindShader(m_Shader);
 			cmd.BindDescriptorSet(m_DescriptorSet);
@@ -334,11 +334,11 @@ namespace wc
 		vk::ImageView m_EntityImageView;
 
 
-		Shader m_Shader;
+		wc::Shader m_Shader;
 		VkDescriptorSet m_DescriptorSet;
 		uint32_t TextureCapacity = 0;
 
-		Shader m_LineShader;
+		wc::Shader m_LineShader;
 
 
 
@@ -461,9 +461,9 @@ namespace wc
 			VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 			{
-				ShaderCreateInfo createInfo;
-				ReadBinary("assets/shaders/Renderer2D.vert", createInfo.binaries[0]);
-				ReadBinary("assets/shaders/Renderer2D.frag", createInfo.binaries[1]);
+				wc::ShaderCreateInfo createInfo;
+				wc::ReadBinary("assets/shaders/Renderer2D.vert", createInfo.binaries[0]);
+				wc::ReadBinary("assets/shaders/Renderer2D.frag", createInfo.binaries[1]);
 				createInfo.renderPass = m_RenderPass;
 
 				VkDescriptorBindingFlags flags[1];
@@ -477,23 +477,23 @@ namespace wc
 
 				createInfo.dynamicStateCount = std::size(dynamicStates);
 				createInfo.dynamicState = dynamicStates;
-				createInfo.blendAttachments.push_back(CreateBlendAttachment());
-				createInfo.blendAttachments.push_back(CreateBlendAttachment(false));
+				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment());
+				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment(false));
 
 				m_Shader.Create(createInfo);
 			}
 
 			{
-				ShaderCreateInfo createInfo;
-				ReadBinary("assets/shaders/Line.vert", createInfo.binaries[0]);
-				ReadBinary("assets/shaders/Line.frag", createInfo.binaries[1]);
+				wc::ShaderCreateInfo createInfo;
+				wc::ReadBinary("assets/shaders/Line.vert", createInfo.binaries[0]);
+				wc::ReadBinary("assets/shaders/Line.frag", createInfo.binaries[1]);
 				createInfo.renderSize = m_RenderSize;
 				createInfo.renderPass = m_RenderPass;
 				createInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 				createInfo.dynamicStateCount = std::size(dynamicStates);
 				createInfo.dynamicState = dynamicStates;
-				createInfo.blendAttachments.push_back(CreateBlendAttachment());
-				createInfo.blendAttachments.push_back(CreateBlendAttachment(false));
+				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment());
+				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment(false));
 
 				m_LineShader.Create(createInfo);
 			}
@@ -753,7 +753,7 @@ namespace wc
 			}
 
 			{
-				CommandEncoder cmd;
+				wc::CommandEncoder cmd;
 				bloom.Execute(cmd);
 				composite.Execute(cmd, m_RenderSize);
 				crt.Execute(cmd, m_RenderSize, 0.f);

@@ -148,7 +148,7 @@ struct ImGui_ImplVulkan_Data
 {
 	VkRenderPass RenderPass = VK_NULL_HANDLE;
 	wc::Shader   Shader;
-	wc::Texture  FontTexture;
+	blaze::Texture  FontTexture;
 
 	// Render buffers for main window
 	ImGui_ImplVulkan_WindowRenderBuffers MainWindowRenderBuffers;
@@ -339,7 +339,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     // Create the Image:
-    wc::TextureSpecification texSpec = 
+    blaze::TextureSpecification texSpec = 
     {
         .format = VK_FORMAT_R8G8B8A8_UNORM,
         .width = (uint32_t)width,

@@ -1,7 +1,7 @@
 #include "Font.h"
 #include "RenderData.h"
 
-namespace wc
+namespace blaze
 {
 	void Font::Load(const std::string filepath, AssetManager& assetManager)
     {

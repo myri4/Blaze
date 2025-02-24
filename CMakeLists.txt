@@ -117,8 +117,12 @@ freetype-interface
 msdfgen
 msdf-atlas-gen::msdf-atlas-gen
 flecs::flecs_static
-Luau.VM
+Luau.Analysis
+Luau.Ast
 Luau.Compiler
+Luau.Config
+Luau.Common
+Luau.VM
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -131,6 +135,13 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 "vendor/"
 "vendor/box2d/include" # mad funny box2d
 "vendor/imgui"
+"vendor/luau/Analysis/include"
+"vendor/luau/Ast/include"
+"vendor/luau/CodeGen/include"
+"vendor/luau/Common/include"
+"vendor/luau/Compiler/include"
+"vendor/luau/Config/include"
+"vendor/luau/VM/include"
 "vendor/flecs/include"
 )
 target_link_directories(${PROJECT_NAME} PUBLIC ${VULKAN_LIBRARY_DIRS})

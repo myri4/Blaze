@@ -6,7 +6,7 @@
 #include <stb_image/stb_image.h>
 #include <stb_image/stb_write.h>
 
-namespace wc
+namespace blaze
 {
 	struct Image
 	{

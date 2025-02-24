@@ -6,7 +6,7 @@
 #include "../Project/Project.h"
 #include <wc/Utils/YAML.h>
 
-namespace wc
+namespace blaze
 {
 	struct PhysicsWorldData
 	{
@@ -14,9 +14,15 @@ namespace wc
 		float TimeStep = 1.f / 60.f;
 	};
 
-	inline std::unordered_map<std::string, uint32_t> PhysicsMaterialNames;
-	inline std::vector<PhysicsMaterial> PhysicsMaterials;
+	using Cache = std::unordered_map<std::string, uint32_t>;
+
+	template<typename T>
+	using Storage = std::vector<T>;
+
 	inline AssetManager assetManager;
+
+	inline Storage<PhysicsMaterial> PhysicsMaterials;
+	inline Cache PhysicsMaterialNames;
 
 	inline void SavePhysicsMaterials(const std::string& filepath)
 	{
@@ -82,10 +88,42 @@ namespace wc
 		}
 	}
 
+	inline Storage<ScriptBinary> ScriptBinaries;
+	inline Cache ScriptBinaryCache;
+
+	inline uint32_t LoadScriptBinary(const std::string& filepath, bool reload = false)
+	{
+		if (ScriptBinaryCache.find(filepath) != ScriptBinaryCache.end())
+		{
+			auto scriptID = ScriptBinaryCache[filepath];
+			if (reload)
+			{
+				auto& script = ScriptBinaries[scriptID];
+				script.VariableNames.clear();
+				script.CompileScript(filepath);
+			}
+			
+			return scriptID;
+		}
+		
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("{} does not exist", filepath);
+			return 0;
+		}
+
+		auto& binary = ScriptBinaries.emplace_back();
+		binary.CompileScript(filepath);
+
+		ScriptBinaryCache[filepath] = ScriptBinaries.size() - 1;
+
+		return ScriptBinaries.size() - 1;
+	}
+
 	struct Scene
 	{
 		flecs::world EntityWorld;
-		b2World PhysicsWorld;
+		b2::World PhysicsWorld;
 		PhysicsWorldData PhysicsWorldData;
 
 		std::vector<std::string> EntityOrder; // only parents
@@ -93,94 +131,51 @@ namespace wc
 		float AccumulatedTime = 0.f;
 		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
 
-
-		auto AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
-
-		auto AddEntity(const std::string& name)
+		void Create()
 		{
-			EntityOrder.push_back(name);
-			return EntityWorld.entity(name.c_str()).add<EntityTag>();
-		}
+			PhysicsWorld.Create(b2DefaultWorldDef());
 
-		void CloneEntity(flecs::entity& ent, flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
+			EntityWorld.observer<BoxCollider2DComponent, RigidBodyComponent, TransformComponent>()
+				.event(flecs::Monitor).each([&](flecs::iter& it, size_t i, BoxCollider2DComponent& collider, RigidBodyComponent& rigidBody, TransformComponent& transform) {
+					if (it.event() == flecs::OnAdd) 
+					{
+						b2BodyDef bodyDef = rigidBody.GetBodyDef();
 
-		void KillEntity(flecs::entity& ent)
-		{
-			auto it = std::remove(EntityOrder.begin(), EntityOrder.end(), ent.name().c_str());
-			if (it != EntityOrder.end())
-				EntityOrder.erase(it, EntityOrder.end());
+						bodyDef.position = b2Vec2(transform.Translation.x + collider.Offset.x, transform.Translation.y + collider.Offset.y);
+						bodyDef.rotation = b2MakeRot(transform.Rotation);
+						rigidBody.body.Create(PhysicsWorld, bodyDef);
+						collider.Shape.CreatePolygonShape(rigidBody.body, PhysicsMaterials[collider.MaterialID].GetShapeDef(), b2MakeBox(collider.Size.x * 0.5f, collider.Size.y * 0.5f));
+					}
+					else if (it.event() == flecs::OnSet)
+					{
+						rigidBody.body.SetTransform(glm::vec2(transform.Translation) + collider.Offset, b2MakeRot(transform.Rotation));
+					}
+					else if (it.event() == flecs::OnRemove) 
+					{
+						rigidBody.body.Destroy();
+					}
+				});
 
-			auto parent = ent.parent();
-			if (parent != flecs::entity::null() && parent.has<EntityOrderComponent>())
-			{
-				auto& order = parent.get_ref<EntityOrderComponent>()->EntityOrder;
-				auto childIt = std::remove(order.begin(), order.end(), ent.name().c_str());
-				if (childIt != order.end())
-				{
-					order.erase(childIt, order.end());
+			EntityWorld.observer<CircleCollider2DComponent, RigidBodyComponent, TransformComponent>()
+				.event(flecs::Monitor).each([&](flecs::iter& it, size_t i, CircleCollider2DComponent& collider, RigidBodyComponent& rigidBody, TransformComponent& transform) {
+					if (it.event() == flecs::OnAdd)
+					{
+						b2BodyDef bodyDef = rigidBody.GetBodyDef();
 
-					if (order.empty())
-						parent.remove<EntityOrderComponent>();
-				}
-			}
-
-			ent.destruct();
-		}
-
-		void RemoveChild(flecs::entity& child)
-		{
-			if (child.parent() == flecs::entity::null())
-				return;
-
-			auto parent = child.parent();
-
-			{
-				if (parent.has<TransformComponent>() && child.has<TransformComponent>())
-				{
-					auto parentTransform = parent.get_ref<TransformComponent>();
-					auto& childTransform = *child.get_mut<TransformComponent>();
-					childTransform.Translation += parentTransform->Translation;
-					childTransform.Scale *= parentTransform->Scale;
-				}
-			}
-
-			child.remove(flecs::ChildOf, parent);
-
-			auto orderData = parent.get_ref<EntityOrderComponent>();
-
-			if (orderData)
-			{
-				auto& order = orderData->EntityOrder;
-				auto it = std::remove(order.begin(), order.end(), child.name().c_str());
-				if (it != order.end())
-				{
-					order.erase(it, order.end());
-
-					if (order.empty())
-						parent.remove<EntityOrderComponent>();
-				}
-			}
-			EntityOrder.push_back(child.name().c_str());
-		}
-
-		void SetChild(flecs::entity& parent, flecs::entity& child)
-		{
-			if (child.parent() != flecs::entity::null())
-				RemoveChild(child);
-
-			parent.add<EntityOrderComponent>();
-			parent.get_ref<EntityOrderComponent>()->EntityOrder.push_back(child.name().c_str());
-			child.add(flecs::ChildOf, parent);
-
-			if (parent.has<TransformComponent>() && child.has<TransformComponent>())
-			{
-				auto parentTransform = parent.get_ref<TransformComponent>();
-				auto& childTransform = *child.get_mut<TransformComponent>();
-				childTransform.Translation -= parentTransform->Translation;
-				childTransform.Scale /= parentTransform->Scale;
-			}
-
-			EntityOrder.erase(std::remove(EntityOrder.begin(), EntityOrder.end(), child.name().c_str()), EntityOrder.end());
+						bodyDef.position = b2Vec2(transform.Translation.x + collider.Offset.x, transform.Translation.y + collider.Offset.y);
+						bodyDef.rotation = b2MakeRot(transform.Rotation);
+						rigidBody.body.Create(PhysicsWorld, bodyDef);
+						collider.Shape.CreateCircleShape(rigidBody.body, PhysicsMaterials[collider.MaterialID].GetShapeDef(), { {0.f, 0.f}, collider.Radius });
+					}
+					else if (it.event() == flecs::OnSet)
+					{
+						rigidBody.body.SetTransform(glm::vec2(transform.Translation) + collider.Offset, b2MakeRot(transform.Rotation));
+					}
+					else if (it.event() == flecs::OnRemove)
+					{
+						rigidBody.body.Destroy();
+					}
+				});
 		}
 
 		void CreatePhysicsWorld()
@@ -216,23 +211,145 @@ namespace wc
 
 		void Destroy()
 		{
-			if (PhysicsWorld) PhysicsWorld.Destroy();
 			DeleteAllEntities();
+			if (PhysicsWorld) PhysicsWorld.Destroy();
+		}
+
+		flecs::entity AddEntity() { return EntityWorld.entity().add<EntityTag>(); }
+
+		flecs::entity AddEntity(const std::string& name)
+		{
+			EntityOrder.push_back(name);
+			return EntityWorld.entity(name.c_str()).add<EntityTag>();
+		}
+
+		void CloneEntity(const flecs::entity& ent, const flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
+
+		void KillEntity(const flecs::entity& ent)
+		{
+			auto it = std::remove(EntityOrder.begin(), EntityOrder.end(), ent.name().c_str());
+			if (it != EntityOrder.end())
+				EntityOrder.erase(it, EntityOrder.end());
+
+			auto parent = ent.parent();
+			if (parent != flecs::entity::null() && parent.has<EntityOrderComponent>())
+			{
+				auto& order = parent.get_ref<EntityOrderComponent>()->EntityOrder;
+				auto childIt = std::remove(order.begin(), order.end(), ent.name().c_str());
+				if (childIt != order.end())
+				{
+					order.erase(childIt, order.end());
+
+					if (order.empty())
+						parent.remove<EntityOrderComponent>();
+				}
+			}
+
+			ent.destruct();
+		}
+
+		void RemoveChild(const flecs::entity& child)
+		{
+			if (child.parent() == flecs::entity::null())
+				return;
+
+			auto parent = child.parent();
+
+			{
+				if (parent.has<TransformComponent>() && child.has<TransformComponent>())
+				{
+					auto parentTransform = parent.get_ref<TransformComponent>();
+					auto& childTransform = *child.get_mut<TransformComponent>();
+					childTransform.Translation += parentTransform->Translation;
+					childTransform.Scale *= parentTransform->Scale;
+				}
+			}
+
+			child.remove(flecs::ChildOf, parent);
+
+			auto orderData = parent.get_ref<EntityOrderComponent>();
+
+			if (orderData)
+			{
+				auto& order = orderData->EntityOrder;
+				auto it = std::remove(order.begin(), order.end(), child.name().c_str());
+				if (it != order.end())
+				{
+					order.erase(it, order.end());
+
+					if (order.empty())
+						parent.remove<EntityOrderComponent>();
+				}
+			}
+			EntityOrder.push_back(child.name().c_str());
+		}
+
+		void SetChild(const flecs::entity& parent, const flecs::entity& child)
+		{
+			if (child.parent() != flecs::entity::null())
+				RemoveChild(child);
+
+			parent.add<EntityOrderComponent>();
+			parent.get_ref<EntityOrderComponent>()->EntityOrder.push_back(child.name().c_str());
+			child.add(flecs::ChildOf, parent);
+
+			if (parent.has<TransformComponent>() && child.has<TransformComponent>())
+			{
+				auto parentTransform = parent.get_ref<TransformComponent>();
+				auto& childTransform = *child.get_mut<TransformComponent>();
+				childTransform.Translation -= parentTransform->Translation;
+				childTransform.Scale /= parentTransform->Scale;
+			}
+
+			EntityOrder.erase(std::remove(EntityOrder.begin(), EntityOrder.end(), child.name().c_str()), EntityOrder.end());
+		}
+
+		void DeleteAllEntities()
+		{
+			EntityWorld.reset();
+			EntityOrder.clear();
+		}
+
+		void Start()
+		{
+			CreatePhysicsWorld();
+
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L)
+						script.ScriptInstance.Execute("Create");
+				});
+		}
+
+		void Stop()
+		{
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L)
+						script.ScriptInstance.Execute("Destroy");
+				});
+			PhysicsWorld.Destroy();
 		}
 
 		void UpdatePhysics()
 		{
 			PhysicsWorld.SetGravity(PhysicsWorldData.Gravity);
 
-			AccumulatedTime += Globals.deltaTime;
+			AccumulatedTime += wc::Globals.deltaTime;
+
+			EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
+				if (!p.body.IsValid())
+				{
+					WC_CORE_ERROR("Body is invalid!");
+					return;
+				}
+
+				p.prevPos = p.body.GetPosition();
+				p.previousRotation = p.body.GetAngle();
+				});
 
 			while (AccumulatedTime >= SimulationTime)
 			{
-				EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
-					p.prevPos = p.body.GetPosition();
-					p.previousRotation = p.body.GetAngle();
-					});
-
 				PhysicsWorld.Step(SimulationTime, 4);
 
 				AccumulatedTime -= SimulationTime;
@@ -242,6 +359,11 @@ namespace wc
 
 			EntityWorld.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
 				{
+					if (!p.body.IsValid())
+					{
+						WC_CORE_ERROR("Body is invalid!");
+						return;
+					}
 					pc.Translation = { glm::mix(p.prevPos, p.body.GetPosition(), alpha), pc.Translation.z };
 
 					float start = p.previousRotation;
@@ -254,14 +376,20 @@ namespace wc
 
 		void Update()
 		{
+			EntityWorld.each([this](ScriptComponent& script)
+				{
+					if (script.ScriptInstance.L) 
+						script.ScriptInstance.Execute("Update");
+				});
+
 			UpdatePhysics();
 		}
 
-		void SerializeEntity(flecs::entity& entity, YAML::Node& entityData) const
+		YAML::Node SerializeEntity(const flecs::entity& entity) const
 		{
-			if (entity.name() != "null") entityData["Name"] = std::string(entity.name().c_str());
-			else entityData["Name"] = std::string("null[5ws78@!12]");
-			entityData["ID"] = entity.id();
+			YAML::Node entityData;
+
+			entityData["Name"] = (entity.name() != "null") ? std::string(entity.name().c_str()) : std::string("null[5ws78@!12]");
 
 			if (entity.has<TransformComponent>())
 			{
@@ -374,40 +502,45 @@ namespace wc
 
 				entityData["CircleCollider2DComponent"] = componentData;
 			}
-		}
 
-		void SerializeChildEntity(flecs::entity& parent, YAML::Node& entityData) const
-		{
-			if (!parent.has<EntityOrderComponent>()) return;
-			YAML::Node childrenData;
-
-			/*EntityWorld.query_builder<EntityTag>()
-			.with(flecs::ChildOf, parent)
-			.each([&](flecs::entity child, EntityTag) {
-				YAML::Node childData;
-
-				SerializeEntity(child, childData);
-
-				SerializeChildEntity(child, childData);
-
-				childrenData.push_back(childData);
-			});*/
-
-			for (const auto& name : parent.get_ref<EntityOrderComponent>()->EntityOrder)
+			if (entity.has<ScriptComponent>())
 			{
-				auto child = EntityWorld.lookup(name.c_str());
+				auto component = entity.get_ref<ScriptComponent>();
+				YAML::Node componentData;
+				componentData["Path"] = component->ScriptInstance.Name;
 
-				YAML::Node childData;
+				entityData["ScriptComponent"] = componentData;
+			}
 
-				SerializeEntity(child, childData);
+			if (entity.has<EntityOrderComponent>())
+			{
+				/*EntityWorld.query_builder<EntityTag>()
+				.with(flecs::ChildOf, parent)
+				.each([&](flecs::entity child, EntityTag) {
+					YAML::Node childData;
 
-				SerializeChildEntity(child, childData);
+					SerializeEntity(child, childData);
 
-				childrenData.push_back(childData);
-			}			
+					SerializeChildEntity(child, childData);
 
-			if (childrenData.size() != 0)
-				entityData["Children"] = childrenData;
+					childrenData.push_back(childData);
+				});*/
+
+				YAML::Node childrenData;
+				for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
+				{
+					auto child = EntityWorld.lookup(name.c_str());
+
+					YAML::Node childData = SerializeEntity(child);
+
+					childrenData.push_back(childData);
+				}
+
+				if (childrenData.size() != 0)
+					entityData["Children"] = childrenData;
+			}
+
+			return entityData;
 		}
 
 		YAML::Node toYAML() const
@@ -419,13 +552,7 @@ namespace wc
 			{
 				auto entity = EntityWorld.lookup(name.c_str());
 
-				YAML::Node entityData;
-
-				SerializeEntity(entity, entityData);
-
-				SerializeChildEntity(entity, entityData);
-
-				entitiesData.push_back(entityData);
+				entitiesData.push_back(SerializeEntity(entity));
 			}
 
 			if (PhysicsWorld.IsValid())
@@ -445,20 +572,14 @@ namespace wc
 			if (entities)
 			{
 				for (const auto& entity : entities)
-				{
-					flecs::entity deserializedEntity;
-
-					DeserializeEntity(deserializedEntity, entity);
-				}
+					DeserializeEntity(entity);
 			}
 		}
 
-		void DeserializeEntity(flecs::entity& entity, const YAML::Node& entityData)
+		flecs::entity DeserializeEntity(const YAML::Node& entityData)
 		{
+			flecs::entity entity;
 			std::string name = entityData["Name"].as<std::string>();
-			std::string id = entityData["ID"].as<std::string>();
-
-			WC_CORE_INFO("Deserialized entity with name = {}, ID = {}", name, id);
 
 			if (name == "null[5ws78@!12]") entity = AddEntity("null");
 			else if (name != "null") entity = AddEntity(name);
@@ -553,24 +674,23 @@ namespace wc
 				}
 			}
 
-			auto childEntities = entityData["Children"];
-			if (childEntities)
 			{
-				for (const auto& child : childEntities)
+				auto componentData = entityData["ScriptComponent"];
+				if (componentData)
 				{
-					flecs::entity deserializedChildEntity;
+					ScriptComponent component;
+					component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(componentData["Path"].as<std::string>())]);
 
-					DeserializeEntity(deserializedChildEntity, child);
-
-					SetChild(entity, deserializedChildEntity);
+					entity.set<ScriptComponent>(component);
 				}
 			}
-		}
 
-		void DeleteAllEntities()
-		{
-			EntityWorld.reset();
-			EntityOrder.clear();
+			auto childEntities = entityData["Children"];
+			if (childEntities)
+				for (const auto& child : childEntities)
+					SetChild(entity, DeserializeEntity(child));
+
+			return entity;
 		}
 
 		void Save(const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML()); }

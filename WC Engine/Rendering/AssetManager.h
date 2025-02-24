@@ -7,7 +7,7 @@
 #include <../../vendor/wc/Utils/Image.h>
 #include "Font.h"
 
-namespace wc
+namespace blaze
 {
     struct AssetManager
     {

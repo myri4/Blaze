@@ -867,6 +867,26 @@ namespace wc
 			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Float, v, 4, v_speed, &v_min, &v_max, format, flags);
 		}
 
+		inline bool Drag(const std::string& label, double& v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::DragScalar(label.c_str(), ImGuiDataType_Double, &v, v_speed, &v_min, &v_max, format, flags);
+		}
+
+		inline bool Drag2(const std::string& label, double* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Double, v, 2, v_speed, &v_min, &v_max, format, flags);
+		}
+
+		inline bool Drag3(const std::string& label, double* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Double, v, 3, v_speed, &v_min, &v_max, format, flags);
+		}
+
+		inline bool Drag4(const std::string& label, double* v, float v_speed = 1.f, float v_min = 0.f, float v_max = 0.f, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+		{
+			return ImGui::DragScalarN(label.c_str(), ImGuiDataType_Double, v, 4, v_speed, &v_min, &v_max, format, flags);
+		}
+
 		//bool DragFloatRange2(const char* label, float* v_current_min, float* v_current_max, float v_speed = 1.0f, float v_min = 0.0f, float v_max = 0.0f, const char* format = "%.3f", const char* format_max = NULL, ImGuiSliderFlags flags = 0);
 		inline bool Drag(const std::string& label, int& v, float v_speed = 1.f, int v_min = 0, int v_max = 0, const char* format = "%d", ImGuiSliderFlags flags = 0)
 		{
