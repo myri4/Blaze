@@ -755,8 +755,7 @@ struct Editor
 					    if (!exportPath.empty())
                         {
 					        // TODO - FIX THIS
-                            YAML::Node entityData;
-					        m_Scene.SerializeEntity(entity); // TODO - fix with merge
+                            YAML::Node entityData = m_Scene.SerializeEntity(entity); // TODO - fix with merge
 					        YAMLUtils::SaveFile(exportPath + "\\" +  std::string(entity.name().c_str()) + ".blzent", entityData);
                         }
 
@@ -1666,11 +1665,16 @@ struct Editor
 	            const float widgetWidth = gui::GetItemRectSize().x;
 	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 	            {
-	                Project::AddSceneToList(filePath.string());
 	                if (m_ScenePath != filePath.string())
 	                {
 	                    //WC_INFO("Assets: Opening scene: {0}", filePath.string());
+	                    //save old scene
 	                    m_Scene.Save(m_ScenePath);
+	                    m_Scene.Destroy();
+
+	                    //load new scene
+	                    Project::AddSceneToList(filePath.string());
+	                    m_SelectedEntity = flecs::entity::null();
 	                    m_ScenePath = filePath.string();
 	                    m_Scene.Load(filePath.string());
 	                }
@@ -1695,8 +1699,7 @@ struct Editor
 	                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 	                {
 	                    YAML::Node node = YAML::LoadFile(filePath.string());
-	                    flecs::entity entity;
-                        m_Scene.DeserializeEntity(node); // TODO - fix with merge
+	                    m_Scene.DeserializeEntity(node); // TODO - fix with merge
 	                    name = "#@#";
 	                    gui::CloseCurrentPopup();
 	                }
@@ -2765,12 +2768,6 @@ struct Editor
 
 				if (gui::BeginMenuBar())
 				{
-					// TODO - add Dragging and Turn of GLFW tab bar -> make custom / get from The Cherno
-					if (gui::IsWindowHovered() && !gui::IsAnyItemHovered())
-					{
-						//WC_CORE_INFO("Empty space on main menu bar is hovered)"
-					}
-
 					if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.f_Default.Menu))
 					{
 						if (gui::MenuItem("Change", "CTRL + P")) Project::Reset();
@@ -2844,9 +2841,14 @@ struct Editor
 						std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath, true, ".scene");
 						if (!newScenePath.empty())
 						{
+						    //save old scene
+						    m_Scene.Save(m_ScenePath);
 						    m_Scene.Destroy();
-						    m_ScenePath = newScenePath;
+
+						    //create new scene
+						    Project::AddSceneToList(newScenePath);
 						    m_SelectedEntity = flecs::entity::null();
+						    m_ScenePath = newScenePath;
 						    m_Scene.Save(m_ScenePath);
 						}
 
