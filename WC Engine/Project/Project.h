@@ -39,10 +39,10 @@ namespace Project
 
     inline void RemoveSceneFromList(const std::string& filepath) { std::erase(savedProjectScenes, filepath); }
 
-    inline bool SceneExistInList(const std::string& pName)
+    inline bool SceneExistInList(const std::string& path)
     {
         for (auto& each : savedProjectScenes)
-            if (std::filesystem::path(each).filename().string() == pName)
+            if (std::filesystem::path(each).string() == path)
                 return true;
 
         return false;
