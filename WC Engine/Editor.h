@@ -1601,8 +1601,32 @@ struct Editor
 		gui::End();
 	}
 
+    // Load file content into a string
+    std::string LoadFileToString(const std::filesystem::path& filePath) {
+	    std::ifstream file(filePath);
+	    /*if (!file.is_open()) {
+	        throw std::runtime_error("Failed to open: " + filePath.string());
+	    }*/
+
+	    // Read entire file content
+	    return std::string(
+            (std::istreambuf_iterator<char>(file)),
+            std::istreambuf_iterator<char>()
+        );
+	}
+
+    // Save modified content back to file
+    void SaveStringToFile(const std::filesystem::path& filePath, const std::string& content) {
+	    std::ofstream file(filePath);
+	    /*if (!file.is_open()) {
+	        throw std::runtime_error("Failed to save: " + filePath.string());
+	    }*/
+	    file << content;
+	}
+
 	void UI_Assets()
     {
+	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua"};
         auto assetsPath = std::filesystem::path(Project::rootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
@@ -1611,6 +1635,7 @@ struct Editor
         static bool showFolders = true;
         static bool showIcons = true;
         static bool previewAsset = true;
+	    ImGuiID dockId;
 
         // reset variables every time root changes
         static std::filesystem::path prevRootPath;
@@ -1880,6 +1905,8 @@ struct Editor
 
         if (gui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
         {
+            dockId = gui::GetWindowDockID();
+
             if (gui::BeginMenuBar())
             {
                 if (gui::MenuItem("Import")) gui::OpenPopup("Import Asset##Assets");
@@ -2224,22 +2251,72 @@ struct Editor
         }
         gui::End();
 
-        // Handle opened files (e.g., as tabs or separate windows)
-        for (auto it = openedFiles.begin(); it != openedFiles.end();)
+	    for (auto it = openedFiles.begin(); it != openedFiles.end(); )
         {
-            //WC_CORE_INFO("Opened file: {}", it->string());
+            static std::unordered_map<std::string, std::string> fileBuffers;
             bool openFile = true;
-            if (gui::Begin(it->filename().string().c_str(), &openFile, ImGuiWindowFlags_NoSavedSettings))
-                gui::Text("File: %s", it->string().c_str());
+            std::string fileKey = it->string();
+
+            // Determine the initial flags before creating the window.
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+
+            // For text-editable files, check if unsaved.
+            if (textEditorExt.contains(it->extension().string()))
+            {
+                if (fileBuffers.find(fileKey) == fileBuffers.end())
+                    fileBuffers[fileKey] = LoadFileToString(*it);
+
+                // Compare the file on disk with the in-memory buffer.
+                const std::string fileContent = LoadFileToString(*it);
+                if (fileContent != fileBuffers[fileKey])
+                    flags |= ImGuiWindowFlags_UnsavedDocument;
+            }
+
+	        ImGui::SetNextWindowDockID(dockId, ImGuiCond_Appearing); // Dock to target
+            if (gui::Begin((it->filename().string() + "##" + fileKey).c_str(), &openFile, flags))
+            {
+                if (textEditorExt.contains(it->extension().string()))
+                {
+                    std::string tempChange = fileBuffers[fileKey];
+
+                    if (gui::BeginMenuBar())
+                    {
+                        if (gui::Button(("Save##" + fileKey).c_str()))
+                            SaveStringToFile(*it, fileBuffers[fileKey]);
+
+                        const std::string content = LoadFileToString(*it);
+                        gui::BeginDisabled(content == tempChange);
+                        if (gui::Button(("Revert All##" + fileKey).c_str()))
+                        {
+                            tempChange = content;
+                            fileBuffers[fileKey] = content;
+                        }
+                        gui::EndDisabled();
+                        gui::EndMenuBar();
+                    }
+
+                    if (gui::InputTextMultiline(("##" + fileKey).c_str(), &tempChange, gui::GetContentRegionAvail(), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine))
+                    {
+                        fileBuffers[fileKey] = tempChange;
+                    }
+                }
+                else
+                {
+                    gui::Text("File: %s", it->string().c_str());
+                }
+            }
             gui::End();
 
             if (!openFile)
             {
-                openedFileNames.erase(it->string());
+                openedFileNames.erase(fileKey);
+                fileBuffers.erase(fileKey);
                 it = openedFiles.erase(it);
             }
             else
+            {
                 ++it;
+            }
         }
     }
 
