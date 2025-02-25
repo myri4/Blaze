@@ -389,6 +389,9 @@ struct Editor
 
 		if (gui::Begin("Editor", &showEditor))
 		{
+		    //gui::Spacing();
+
+		    gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
 		    if (gui::BeginTabBar("ScenesBar", ImGuiTabBarFlags_NoCloseWithMiddleMouseButton | ImGuiTabBarFlags_DrawSelectedOverline | ImGuiTabBarFlags_Reorderable))
 		    {
 		        gui::TabItemSpacing("##TabSpacing", ImGuiTabItemFlags_Leading | ImGuiTabItemFlags_Invisible, 0.f);
@@ -397,14 +400,8 @@ struct Editor
 		        gui::BeginDisabled(SceneState::Play == m_SceneState || SceneState::Simulate == m_SceneState);
 		        for (const auto& scene : Project::savedProjectScenes)
 		        {
-		            if (scene == m_ScenePath)
-                    {
-                        flags |= ImGuiTabItemFlags_SetSelected;
-                    }
-		            else
-                    {
-                        flags &= ~ImGuiTabItemFlags_SetSelected;
-                    }
+		            if (scene == m_ScenePath) flags |= ImGuiTabItemFlags_SetSelected;
+		            else flags &= ~ImGuiTabItemFlags_SetSelected;
 
 		            bool open = true;
 		            if (gui::BeginTabItem(std::filesystem::path(scene).stem().string().c_str(), &open, flags))
@@ -418,26 +415,26 @@ struct Editor
 		            {
 		                if (true /*changesInCurrentScene*/)
 		                {
-		                    gui::OpenPopup(("Confirm##SceneChange" + scene).c_str());
+		                    if (m_ScenePath != scene) gui::OpenPopup(("Confirm##SceneChange" + scene).c_str());
 		                }
-		                else
+		                /*else
 		                {
-		                    /*if (m_ScenePath != scene)
+		                    if (m_ScenePath != scene)
 		                    {
 		                        //WC_INFO("Opening scene: {0}", scene);
 		                        m_Scene.Save(m_ScenePath);
 		                        m_ScenePath = scene;
 		                        m_Scene.Load(scene);
-		                    }*/
-		                }
+		                    }
+		                }*/
 		            }
 
-		            gui::PopStyleVar();
+		            gui::PopStyleVar(2);
 		            ui::CenterNextWindow();
 		            if (gui::BeginPopupModal(("Confirm##SceneChange" + scene).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 		            {
-		                gui::Text("Save changes to %s before changing", std::filesystem::path(scene).filename().string().c_str());
-		                float textSize = gui::CalcTextSize("Save Changes to ").x + gui::CalcTextSize(std::filesystem::path(scene).filename().string().c_str()).x + gui::CalcTextSize(" before closing?").x;
+		                gui::Text("Save changes to %s before changing", std::filesystem::path(m_ScenePath).filename().string().c_str());
+		                float textSize = gui::CalcTextSize("Save Changes to ").x + gui::CalcTextSize(std::filesystem::path(m_ScenePath).filename().string().c_str()).x + gui::CalcTextSize(" before closing?").x;
 		                float spacing = textSize * 0.05f;
 		                if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 		                {
@@ -465,6 +462,7 @@ struct Editor
 		                gui::EndPopup();
 		            }
 		            gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+		            gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
 
 		            // Handle tab closure
 		            if (!open)
@@ -498,6 +496,7 @@ struct Editor
 
 		        gui::EndTabBar();
 		    }
+		    gui::PopStyleVar();
 
 			allowInput = gui::IsWindowFocused() && gui::IsWindowHovered();
 
@@ -1072,7 +1071,7 @@ struct Editor
 				const float widgetSize = gui::GetItemRectSize().x;
 
 				gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
-				if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
+				if (gui::Button("Create") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 				{
 					m_SelectedEntity = m_Scene.AddEntity(name);
 					name = "Entity";
@@ -1602,8 +1601,32 @@ struct Editor
 		gui::End();
 	}
 
+    // Load file content into a string
+    std::string LoadFileToString(const std::filesystem::path& filePath) {
+	    std::ifstream file(filePath);
+	    /*if (!file.is_open()) {
+	        throw std::runtime_error("Failed to open: " + filePath.string());
+	    }*/
+
+	    // Read entire file content
+	    return std::string(
+            (std::istreambuf_iterator<char>(file)),
+            std::istreambuf_iterator<char>()
+        );
+	}
+
+    // Save modified content back to file
+    void SaveStringToFile(const std::filesystem::path& filePath, const std::string& content) {
+	    std::ofstream file(filePath);
+	    /*if (!file.is_open()) {
+	        throw std::runtime_error("Failed to save: " + filePath.string());
+	    }*/
+	    file << content;
+	}
+
 	void UI_Assets()
     {
+	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua"};
         auto assetsPath = std::filesystem::path(Project::rootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
@@ -1612,6 +1635,7 @@ struct Editor
         static bool showFolders = true;
         static bool showIcons = true;
         static bool previewAsset = true;
+	    ImGuiID dockId;
 
         // reset variables every time root changes
         static std::filesystem::path prevRootPath;
@@ -1696,7 +1720,7 @@ struct Editor
 	                if (name == "#@#") name = filePath.stem().string();
 	                const float widgetWidth = gui::GetItemRectSize().x;
 	                gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
-	                if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                if (gui::Button("Yes##Confirm") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 	                {
 	                    YAML::Node node = YAML::LoadFile(filePath.string());
 	                    m_Scene.DeserializeEntity(node); // TODO - fix with merge
@@ -1763,6 +1787,15 @@ struct Editor
                             }
                             else
                             {
+                                if (Project::SceneExistInList(file))
+                                {
+                                    if (m_ScenePath == file)
+                                    {
+                                        m_ScenePath.clear();
+                                        m_Scene.Destroy();
+                                    }
+                                    Project::RemoveSceneFromList(file);
+                                }
                                 openedFiles.erase(std::remove(openedFiles.begin(), openedFiles.end(), filePath), openedFiles.end());
                                 openedFileNames.erase(filePath.string());
                             }
@@ -1785,7 +1818,7 @@ struct Editor
 	                gui::InputText(filePath.extension().string().empty() ? "Folder" : filePath.extension().string().c_str(), &newName);
 	                const float widgetSize = gui::GetItemRectSize().x;
 	                gui::BeginDisabled(newName.empty());
-	                if (gui::Button("Rename") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                if (gui::Button("Rename") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
                     {
                         std::error_code ec;
 	                    std::filesystem::path newFilePath = filePath.parent_path() / (newName + filePath.extension().string());
@@ -1836,7 +1869,7 @@ struct Editor
 	                gui::InputText("Name", &newName);
 	                const float widgetSize = gui::GetItemRectSize().x;
 	                gui::BeginDisabled(newName.empty());
-	                if (gui::Button("Create") || gui::IsKeyPressed(ImGuiKey_Enter))
+	                if (gui::Button("Create") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 	                {
 	                    std::error_code ec;
 	                    std::filesystem::path newFilePath = filePath / newName;
@@ -1872,6 +1905,8 @@ struct Editor
 
         if (gui::Begin("Assets", &showAssets, ImGuiWindowFlags_MenuBar))
         {
+            dockId = gui::GetWindowDockID();
+
             if (gui::BeginMenuBar())
             {
                 if (gui::MenuItem("Import")) gui::OpenPopup("Import Asset##Assets");
@@ -2216,22 +2251,72 @@ struct Editor
         }
         gui::End();
 
-        // Handle opened files (e.g., as tabs or separate windows)
-        for (auto it = openedFiles.begin(); it != openedFiles.end();)
+	    for (auto it = openedFiles.begin(); it != openedFiles.end(); )
         {
-            //WC_CORE_INFO("Opened file: {}", it->string());
+            static std::unordered_map<std::string, std::string> fileBuffers;
             bool openFile = true;
-            if (gui::Begin(it->filename().string().c_str(), &openFile, ImGuiWindowFlags_NoSavedSettings))
-                gui::Text("File: %s", it->string().c_str());
+            std::string fileKey = it->string();
+
+            // Determine the initial flags before creating the window.
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+
+            // For text-editable files, check if unsaved.
+            if (textEditorExt.contains(it->extension().string()))
+            {
+                if (fileBuffers.find(fileKey) == fileBuffers.end())
+                    fileBuffers[fileKey] = LoadFileToString(*it);
+
+                // Compare the file on disk with the in-memory buffer.
+                const std::string fileContent = LoadFileToString(*it);
+                if (fileContent != fileBuffers[fileKey])
+                    flags |= ImGuiWindowFlags_UnsavedDocument;
+            }
+
+	        ImGui::SetNextWindowDockID(dockId, ImGuiCond_Appearing); // Dock to target
+            if (gui::Begin((it->filename().string() + "##" + fileKey).c_str(), &openFile, flags))
+            {
+                if (textEditorExt.contains(it->extension().string()))
+                {
+                    std::string tempChange = fileBuffers[fileKey];
+
+                    if (gui::BeginMenuBar())
+                    {
+                        if (gui::Button(("Save##" + fileKey).c_str()))
+                            SaveStringToFile(*it, fileBuffers[fileKey]);
+
+                        const std::string content = LoadFileToString(*it);
+                        gui::BeginDisabled(content == tempChange);
+                        if (gui::Button(("Revert All##" + fileKey).c_str()))
+                        {
+                            tempChange = content;
+                            fileBuffers[fileKey] = content;
+                        }
+                        gui::EndDisabled();
+                        gui::EndMenuBar();
+                    }
+
+                    if (gui::InputTextMultiline(("##" + fileKey).c_str(), &tempChange, gui::GetContentRegionAvail(), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine))
+                    {
+                        fileBuffers[fileKey] = tempChange;
+                    }
+                }
+                else
+                {
+                    gui::Text("File: %s", it->string().c_str());
+                }
+            }
             gui::End();
 
             if (!openFile)
             {
-                openedFileNames.erase(it->string());
+                openedFileNames.erase(fileKey);
+                fileBuffers.erase(fileKey);
                 it = openedFiles.erase(it);
             }
             else
+            {
                 ++it;
+            }
         }
     }
 
@@ -2789,7 +2874,7 @@ struct Editor
 					        const float widgetWidth = gui::GetItemRectSize().x;
 
 					        gui::BeginDisabled(newName.empty());
-					        if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
+					        if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
                             {
                                 Project::Rename(newName);
                                 newName = "#@#";

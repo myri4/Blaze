@@ -53,6 +53,11 @@ namespace wc
 			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), once ? ImGuiCond_Once : ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 		}
 
+	    inline bool IsKeyPressedDissabled(ImGuiKey key)
+		{
+		    return !(gui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && gui::IsKeyPressed(key);
+		}
+
 		const std::unordered_map<std::string, std::string> fileTypeExt =
 		{
 			{".*", "All"},
@@ -286,8 +291,8 @@ namespace wc
 			    }
 
 				// Action buttons
-				ImGui::BeginDisabled(selectedPath.empty() || !newFileFilter.empty() ? newFileName.empty() : false);
-				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Enter) && !selectedPath.empty())
+				ImGui::BeginDisabled(selectedPath.empty() || !newFileFilter.empty() ? std::filesystem::path(newFileName).filename().string().empty() : false);
+				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || IsKeyPressedDissabled(ImGuiKey_Enter) && !selectedPath.empty())
 				{
                     if (newFileFilter.empty()) { finalPath = selectedPath; }
 				    else { finalPath = selectedPath + "\\" + newFileName + (newFileFilter != "." ? newFileFilter : ""); }
