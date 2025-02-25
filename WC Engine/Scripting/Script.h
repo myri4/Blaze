@@ -108,6 +108,17 @@ namespace blaze
 
 				Luau::Frontend frontend(&fileResolver, &configResolver, options);
 				Luau::registerBuiltinGlobals(frontend, frontend.globals);
+				{
+					Luau::LoadDefinitionFileResult loadResult = frontend.loadDefinitionFile(frontend.globals, frontend.globals.globalScope, OpenFile("BuiltinDefinitions.luau"), "BuiltinDefinitions", false, false);
+					if (!loadResult.success)
+					{
+						for (const auto& error : loadResult.parseResult.errors)
+						{
+							WC_ERROR("Builtin definitions: [{},{}]: {}", error.getLocation().begin.line + 1, 
+								error.getLocation().begin.column + 1, error.getMessage());
+						}
+					}
+				}
 				Luau::freeze(frontend.globals.globalTypes);
 
 				const char* name = filePath.c_str();
