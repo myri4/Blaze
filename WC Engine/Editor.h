@@ -1601,32 +1601,15 @@ struct Editor
 		gui::End();
 	}
 
-    // Load file content into a string
-    std::string LoadFileToString(const std::filesystem::path& filePath) {
-	    std::ifstream file(filePath);
-	    /*if (!file.is_open()) {
-	        throw std::runtime_error("Failed to open: " + filePath.string());
-	    }*/
-
-	    // Read entire file content
-	    return std::string(
-            (std::istreambuf_iterator<char>(file)),
-            std::istreambuf_iterator<char>()
-        );
-	}
-
-    // Save modified content back to file
-    void SaveStringToFile(const std::filesystem::path& filePath, const std::string& content) {
+    void SaveStringToFile(const std::filesystem::path& filePath, const std::string& content) 
+	{
 	    std::ofstream file(filePath);
-	    /*if (!file.is_open()) {
-	        throw std::runtime_error("Failed to save: " + filePath.string());
-	    }*/
 	    file << content;
 	}
 
 	void UI_Assets()
     {
-	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua"};
+	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua", ".luau", ".luarc" };
         auto assetsPath = std::filesystem::path(Project::rootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
@@ -1758,13 +1741,13 @@ struct Editor
 	            ui::ClosePopupIfCursorFarFromCenter();
                 gui::Text(filePath.filename().string().c_str());
 	            gui::Separator();
-	            if (!is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
+	            if (!std::filesystem::is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
 	            else if (gui::MenuItem("Open in File Explorer")) FileDialogs::OpenInFileExplorer(file);
                 gui::BeginDisabled(filePath == assetsPath);
 	            if (ui::MenuItemButton("Rename")) gui::OpenPopup(("Rename##Rename" + file).c_str());
 	            gui::EndDisabled();
 	            if (filePath == assetsPath) gui::SetItemTooltip("Cannot rename root folder");
-	            if (is_directory(filePath)) if (ui::MenuItemButton("New File")) gui::OpenPopup(("New File##NewFile" + file).c_str());
+	            if (std::filesystem::is_directory(filePath)) if (ui::MenuItemButton("New File")) gui::OpenPopup(("New File##NewFile" + file).c_str());
 	            gui::PushStyleColor(ImGuiCol_HeaderHovered, { 1.f, 0.f, 0.f, 0.5f });
 	            if (ui::MenuItemButton("Delete")) gui::OpenPopup(("Delete Warning##DeleteWarn" + file).c_str());
 	            gui::PopStyleColor();
@@ -1781,7 +1764,7 @@ struct Editor
                         if (ec) {WC_ERROR("Failed to delete file: {}", ec.message());}
                         else
                         {
-                            if (is_directory(filePath))
+                            if (std::filesystem::is_directory(filePath))
                             {
                                 folderStates.erase(filePath.string());
                             }
@@ -1920,7 +1903,7 @@ struct Editor
                     if (ec) { WC_ERROR("Failed to copy file: {}", ec.message()); }
                     else
                     {
-                        if (is_directory(importDestPath))
+                        if (std::filesystem::is_directory(importDestPath))
                         {
                             folderStates[importDestPath.string()] = false;
                         }
@@ -2257,17 +2240,15 @@ struct Editor
             bool openFile = true;
             std::string fileKey = it->string();
 
-            // Determine the initial flags before creating the window.
             ImGuiWindowFlags flags = ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
 
             // For text-editable files, check if unsaved.
             if (textEditorExt.contains(it->extension().string()))
             {
+				const std::string fileContent = OpenFile(fileKey);
                 if (fileBuffers.find(fileKey) == fileBuffers.end())
-                    fileBuffers[fileKey] = LoadFileToString(*it);
+					fileBuffers[fileKey] = fileContent;
 
-                // Compare the file on disk with the in-memory buffer.
-                const std::string fileContent = LoadFileToString(*it);
                 if (fileContent != fileBuffers[fileKey])
                     flags |= ImGuiWindowFlags_UnsavedDocument;
             }
@@ -2277,33 +2258,25 @@ struct Editor
             {
                 if (textEditorExt.contains(it->extension().string()))
                 {
-                    std::string tempChange = fileBuffers[fileKey];
+                    std::string& tempChange = fileBuffers[fileKey];
 
                     if (gui::BeginMenuBar())
                     {
                         if (gui::Button(("Save##" + fileKey).c_str()))
                             SaveStringToFile(*it, fileBuffers[fileKey]);
 
-                        const std::string content = LoadFileToString(*it);
-                        gui::BeginDisabled(content == tempChange);
+                        gui::BeginDisabled((flags& ImGuiWindowFlags_UnsavedDocument) == 0);
                         if (gui::Button(("Revert All##" + fileKey).c_str()))
-                        {
-                            tempChange = content;
-                            fileBuffers[fileKey] = content;
-                        }
-                        gui::EndDisabled();
+                            tempChange = OpenFile(fileKey);
+                        
+						gui::EndDisabled();
                         gui::EndMenuBar();
                     }
 
-                    if (gui::InputTextMultiline(("##" + fileKey).c_str(), &tempChange, gui::GetContentRegionAvail(), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine))
-                    {
-                        fileBuffers[fileKey] = tempChange;
-                    }
+					gui::InputTextMultiline(("##" + fileKey).c_str(), &tempChange, gui::GetContentRegionAvail(), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CtrlEnterForNewLine);
                 }
                 else
-                {
-                    gui::Text("File: %s", it->string().c_str());
-                }
+                    gui::Text("File: %s", fileKey.c_str());
             }
             gui::End();
 
@@ -2314,9 +2287,7 @@ struct Editor
                 it = openedFiles.erase(it);
             }
             else
-            {
                 ++it;
-            }
         }
     }
 

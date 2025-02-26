@@ -53,7 +53,11 @@ namespace blaze
 		std::stringstream fileContents;
 		{
 			std::fstream fileHandle(filePath, std::ios::in);
-			if (!fileHandle) WC_CORE_ERROR("Cant find {}", filePath);
+			if (!fileHandle)
+			{
+				WC_CORE_ERROR("Can't find {}", filePath);
+				return "";
+			}
 			fileContents << fileHandle.rdbuf();
 		}
 		return fileContents.str();
