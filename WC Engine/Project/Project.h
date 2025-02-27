@@ -145,11 +145,10 @@ namespace Project
 			YAML::Node userDataScenes = YAML::LoadFile(GetUserSettingsPath());
 			for (const auto& openedScene : userDataScenes["OpenedScenes"])
 			{
-				savedProjectScenes.push_back(openedScene.as<std::string>());
+				//savedProjectScenes.push_back(openedScene.as<std::string>());
+			    AddSceneToList(openedScene.as<std::string>());
 			}
-
 		}
-
 		return true;
 	}
 
