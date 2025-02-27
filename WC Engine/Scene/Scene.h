@@ -129,7 +129,7 @@ namespace blaze
 		std::vector<std::string> EntityOrder; // only parents
 
 		float AccumulatedTime = 0.f;
-		const float SimulationTime = 1.f / 60.f; // @NOTE: maybe should expose this as an option
+		const float SimulationTime = 1.f / 60.f;
 
 		void Create()
 		{
@@ -308,27 +308,6 @@ namespace blaze
 		{
 			EntityWorld.reset();
 			EntityOrder.clear();
-		}
-
-		void Start()
-		{
-			CreatePhysicsWorld();
-
-			EntityWorld.each([this](ScriptComponent& script)
-				{
-					if (script.ScriptInstance.L)
-						script.ScriptInstance.Execute("Create");
-				});
-		}
-
-		void Stop()
-		{
-			EntityWorld.each([this](ScriptComponent& script)
-				{
-					if (script.ScriptInstance.L)
-						script.ScriptInstance.Execute("Destroy");
-				});
-			PhysicsWorld.Destroy();
 		}
 
 		void UpdatePhysics()

@@ -11,7 +11,7 @@
 
 #include "UI/Widgets.h"
 
-#include "Scene/Scene.h"
+#include "Scene/EditorScene.h"
 
 #include "Globals.h"
 #include "Project/Settings.h"
@@ -98,11 +98,6 @@ void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor color, void* context)
 
 struct Editor
 {
-	// Panning variables
-	glm::vec2 m_StartPan;
-	glm::vec2 m_BeginCameraPosition;
-	bool m_Panning = false;
-
 	// Debug stats
 	float m_DebugTimer = 0.f;
 
@@ -121,7 +116,7 @@ struct Editor
 
 	glm::vec2 ViewPortSize = glm::vec2(1.f);
 
-	OrthographicCamera camera;
+	EditorCamera camera;
 
 	RenderData m_RenderData[FRAME_OVERLAP];
 	Renderer2D m_Renderer;
@@ -156,16 +151,9 @@ struct Editor
 	bool showDebugStats = false;
 	bool showStyleEditor = false;
 
-	flecs::entity m_SelectedEntity = flecs::entity::null();
+	ImGuizmo::OPERATION m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
 
-	enum class SceneState { Edit, Simulate, Play };
-	SceneState m_SceneState = SceneState::Edit;
-
-	ImGuizmo::OPERATION m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
-
-	std::string m_ScenePath;
-	Scene m_Scene;
-	Scene m_TempScene;
+	EditorScene m_Scene;
 
 	void Create()
 	{
@@ -217,7 +205,7 @@ struct Editor
 	{
 		m_Renderer.DestroyScreen();
 		m_Renderer.CreateScreen(size);
-		camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
+		camera.Update(m_Renderer.GetAspectRatio());
 	}
 
 	void Destroy()
@@ -254,11 +242,11 @@ struct Editor
 	{
 		if (allowInput)
 		{
-			if (gui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y;
+			if (gui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
 			else if (gui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
 			else if (gui::IsKeyPressed(ImGuiKey_S)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
 
-			float scroll = Mouse::GetMouseScroll().y;
+			/*float scroll = Mouse::GetMouseScroll().y;
 			if (scroll != 0.f)
 			{
 				camera.Zoom += -scroll * Settings::ZoomSpeed;
@@ -285,6 +273,43 @@ struct Editor
 				m_StartPan = glm::vec2(0.f);
 				m_BeginCameraPosition = camera.Position;
 				m_Panning = false;
+			}*/
+
+			if (Key::GetKey(Key::LeftAlt))
+			{
+				const glm::vec2& mouse = Globals.window.GetCursorPos();
+				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.003f;
+				camera.m_InitialMousePosition = mouse;
+
+				if (Mouse::GetMouse(Mouse::LEFT))
+				{
+					auto panSpeed = camera.PanSpeed(m_Renderer.m_RenderSize);
+					camera.FocalPoint += -camera.GetRightDirection() * delta.x * panSpeed.x * camera.m_Distance;
+					camera.FocalPoint += camera.GetUpDirection() * delta.y * panSpeed.y * camera.m_Distance;
+				}
+				else if (Mouse::GetMouse(Mouse::RIGHT))
+				{
+					float yawSign = camera.GetUpDirection().y < 0 ? -1.f : 1.f;
+					camera.Yaw += yawSign * delta.x * camera.RotationSpeed;
+					camera.Pitch += delta.y * camera.RotationSpeed;
+				}
+
+				camera.UpdateView();
+			}
+
+			float scroll = Mouse::GetMouseScroll().y;
+			if (scroll != 0.f)
+			{
+				float delta = scroll * 0.1f;
+				{
+					camera.m_Distance -= delta * camera.ZoomSpeed();
+					if (camera.m_Distance < 1.f)
+					{
+						camera.FocalPoint += camera.GetForwardDirection();
+						camera.m_Distance = 1.f;
+					}
+				}
+				camera.UpdateView();
 			}
 		}
 	}
@@ -312,7 +337,7 @@ struct Editor
 	            if (data.FontID != UINT32_MAX)
 	                renderData.DrawString(data.Text, assetManager.Fonts[data.FontID], transform, data.Color, data.LineSpacing, data.Kerning, entt.id());
 	        }
-	        m_Scene.EntityWorld.query_builder<TransformComponent, EntityTag>()
+	        m_Scene.m_Scene.EntityWorld.query_builder<TransformComponent, EntityTag>()
                 .with(flecs::ChildOf, entt)
                 .each([&](flecs::entity child, TransformComponent childTransform, EntityTag)
                     {
@@ -336,17 +361,17 @@ struct Editor
 			m_Renderer.UpdateTextures(assetManager);
 		}
 
-		m_Scene.EntityWorld.each([&](flecs::entity entt, TransformComponent& p) {
+		m_Scene.m_Scene.EntityWorld.each([&](flecs::entity entt, TransformComponent& p) {
 			if (entt.parent() != 0) return;
 
 			glm::mat4 transform = p.GetTransform();
 			RenderEntity(entt, transform);
 			});
 
-		if (m_SceneState != SceneState::Edit)
+		if (m_Scene.State != SceneState::Edit)
 		{
 			m_PhysicsDebugDraw.context = &renderData;
-			m_Scene.PhysicsWorld.Draw(&m_PhysicsDebugDraw);
+			m_Scene.m_Scene.PhysicsWorld.Draw(&m_PhysicsDebugDraw);
 		}
 
 		m_Renderer.Flush(renderData, camera.GetViewProjectionMatrix());
@@ -354,34 +379,7 @@ struct Editor
 		renderData.Reset();
 	}
 
-	void Update()
-	{
-		if (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate)
-			m_Scene.Update();
-	}
-
-	void ChangeSceneState(SceneState newState)
-	{
-		std::string selectedEntityName;
-		if (m_SelectedEntity != flecs::entity::null()) selectedEntityName = m_SelectedEntity.name().c_str();
-		//WC_INFO("Changing scene state. Selected Entity: {0}", selectedEntityName);
-
-		m_SceneState = newState;
-
-		if (newState == SceneState::Play || newState == SceneState::Simulate)
-		{
-			m_Scene.Start();
-			m_TempScene.Copy(m_Scene);
-		}
-		else if (newState == SceneState::Edit)
-		{
-			m_Scene.Stop();
-			m_Scene.Copy(m_TempScene);
-		}
-
-		if (m_SelectedEntity != flecs::entity::null()) m_SelectedEntity = m_Scene.EntityWorld.lookup(selectedEntityName.c_str());
-		//WC_INFO("Scene state changed. Selected Entity: {0}", m_SelectedEntity.name().c_str());
-	}
+	void Update() {	m_Scene.Update(); }
 
 	void UI_Editor()
 	{
@@ -397,10 +395,10 @@ struct Editor
 		        gui::TabItemSpacing("##TabSpacing", ImGuiTabItemFlags_Leading | ImGuiTabItemFlags_Invisible, 0.f);
 
 		        ImGuiTabItemFlags flags = ImGuiTabBarFlags_NoTooltip;
-		        gui::BeginDisabled(SceneState::Play == m_SceneState || SceneState::Simulate == m_SceneState);
+		        gui::BeginDisabled(SceneState::Play == m_Scene.State || SceneState::Simulate == m_Scene.State);
 		        for (const auto& scene : Project::savedProjectScenes)
 		        {
-		            if (scene == m_ScenePath) flags |= ImGuiTabItemFlags_SetSelected;
+		            if (scene == m_Scene.Path) flags |= ImGuiTabItemFlags_SetSelected;
 		            else flags &= ~ImGuiTabItemFlags_SetSelected;
 
 		            bool open = true;
@@ -415,15 +413,15 @@ struct Editor
 		            {
 		                if (true /*changesInCurrentScene*/)
 		                {
-		                    if (m_ScenePath != scene) gui::OpenPopup(("Confirm##SceneChange" + scene).c_str());
+		                    if (m_Scene.Path != scene) gui::OpenPopup(("Confirm##SceneChange" + scene).c_str());
 		                }
 		                /*else
 		                {
-		                    if (m_ScenePath != scene)
+		                    if (m_Scene.Path != scene)
 		                    {
 		                        //WC_INFO("Opening scene: {0}", scene);
-		                        m_Scene.Save(m_ScenePath);
-		                        m_ScenePath = scene;
+		                        m_Scene.Save(m_Scene.Path);
+		                        m_Scene.Path = scene;
 		                        m_Scene.Load(scene);
 		                    }
 		                }*/
@@ -433,15 +431,15 @@ struct Editor
 		            ui::CenterNextWindow();
 		            if (gui::BeginPopupModal(("Confirm##SceneChange" + scene).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 		            {
-		                gui::Text("Save changes to %s before changing", std::filesystem::path(m_ScenePath).filename().string().c_str());
-		                float textSize = gui::CalcTextSize("Save Changes to ").x + gui::CalcTextSize(std::filesystem::path(m_ScenePath).filename().string().c_str()).x + gui::CalcTextSize(" before closing?").x;
+		                gui::Text("Save changes to %s before changing", std::filesystem::path(m_Scene.Path).filename().string().c_str());
+		                float textSize = gui::CalcTextSize("Save Changes to ").x + gui::CalcTextSize(std::filesystem::path(m_Scene.Path).filename().string().c_str()).x + gui::CalcTextSize(" before closing?").x;
 		                float spacing = textSize * 0.05f;
 		                if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 		                {
 		                    //WC_CORE_INFO("Save scene before changing");
 		                    //WC_INFO("Opening scene: {0}", scene);
-		                    m_Scene.Save(m_ScenePath);
-		                    m_ScenePath = scene;
+		                    m_Scene.Save(m_Scene.Path);
+		                    m_Scene.Path = scene;
 		                    m_Scene.Load(scene);
 		                    gui::CloseCurrentPopup();
 		                }
@@ -449,7 +447,7 @@ struct Editor
 		                if (gui::Button("No", {textSize * 0.3f, 0}))
 		                {
 		                    //WC_INFO("Opening scene: {0}", scene);
-		                    m_ScenePath = scene;
+		                    m_Scene.Path = scene;
 		                    m_Scene.Load(scene);
 		                    gui::CloseCurrentPopup();
 		                }
@@ -468,11 +466,11 @@ struct Editor
 		            if (!open)
 		            {
 		                //WC_INFO("Closing scene: {0}", scene);
-		                bool wasActive = (m_ScenePath == scene);
+		                bool wasActive = (m_Scene.Path == scene);
 
 		                if (wasActive)
 		                {
-		                    m_Scene.Save(m_ScenePath);
+		                    m_Scene.Save(m_Scene.Path);
 		                    m_Scene.Destroy();
 		                }
 
@@ -482,12 +480,12 @@ struct Editor
 		                {
 		                    if (!Project::savedProjectScenes.empty())
 		                    {
-		                        m_ScenePath = Project::savedProjectScenes.front();
-		                        m_Scene.Load(m_ScenePath);
+		                        m_Scene.Path = Project::savedProjectScenes.front();
+		                        m_Scene.Load(m_Scene.Path);
 		                    }
 		                    else
 		                    {
-		                        m_ScenePath.clear();
+		                        m_Scene.Path.clear();
 		                    }
 		                }
 		            }
@@ -510,8 +508,8 @@ struct Editor
 			}
 
 			bool allowedSelect = !ImGuizmo::IsOver() && !ImGuizmo::IsUsing();
-			//if (m_SelectedEntity == flecs::entity::null()) allowedSelect = true;
-			if (Mouse::GetMouse(Mouse::LEFT) && allowedSelect && allowInput)
+			//if (m_Scene.SelectedEntity == flecs::entity::null()) allowedSelect = true;
+			if (!Key::GetKey(Key::LeftAlt) && Mouse::GetMouse(Mouse::LEFT) && allowedSelect && allowInput)
 			{
 				auto mousePos = (glm::ivec2)(Mouse::GetCursorPosition() - (glm::uvec2)WindowPos);
 
@@ -543,7 +541,7 @@ struct Editor
 
 					auto imagedata = (uint64_t*)stagingBuffer.Map();
 					auto id = imagedata[mousePos.x + mousePos.y * width];
-					m_SelectedEntity = flecs::entity(m_Scene.EntityWorld, id);
+					m_Scene.SelectedEntity = flecs::entity(m_Scene.m_Scene.EntityWorld, id);
 
 					stagingBuffer.Unmap();
 					stagingBuffer.Free();
@@ -565,35 +563,35 @@ struct Editor
 			gui::GetWindowDrawList()->AddImage((ImTextureID)m_Renderer.ImguiImageID, ImVec2(WindowPos.x, WindowPos.y), ImVec2(WindowPos.x + RenderSize.x, WindowPos.y + RenderSize.y));
 
 			gui::SetCursorPosX((gui::GetWindowSize().x - 60 + gui::GetStyle().ItemSpacing.x * 2) * 0.5f);
-			bool isPlayingOrSimulating = (m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
-			bool isPaused = (m_SceneState == SceneState::Edit);
+			bool isPlayingOrSimulating = (m_Scene.State == SceneState::Play || m_Scene.State == SceneState::Simulate);
+			bool isPaused = (m_Scene.State == SceneState::Edit);
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
 			if (isPlayingOrSimulating) gui::BeginDisabled();
-			if (gui::ImageButton("play", t_Play, { 10, 10 }) && isPaused) ChangeSceneState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+			if (gui::ImageButton("play", t_Play, { 10, 10 }) && isPaused) m_Scene.SetState(SceneState::Play); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 
-			if (gui::ImageButton("simulate", t_Simulate, { 10, 10 }) && isPaused) ChangeSceneState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
+			if (gui::ImageButton("simulate", t_Simulate, { 10, 10 }) && isPaused) m_Scene.SetState(SceneState::Simulate); gui::SameLine(0, 0); gui::SeparatorEx(ImGuiSeparatorFlags_Vertical); gui::SameLine(0, 0);
 			if (isPlayingOrSimulating) gui::EndDisabled();
 
 			if (isPaused) gui::BeginDisabled();
-			if (gui::ImageButton("stop", t_Stop, { 10, 10 })) ChangeSceneState(SceneState::Edit);
+			if (gui::ImageButton("stop", t_Stop, { 10, 10 })) m_Scene.SetState(SceneState::Edit);
 			if (isPaused) gui::EndDisabled();
 			ImGui::PopStyleVar();
 
-			glm::mat4 projection = camera.ProjectionMatrix;
+			glm::mat4 projection = camera.Projection;
 			projection[1][1] *= -1;
 
 			ImGuizmo::SetOrthographic(true);
 			ImGuizmo::SetDrawlist();
 			ImGuizmo::SetRect(WindowPos.x, WindowPos.y, RenderSize.x, RenderSize.y);
-			if (m_SelectedEntity != flecs::entity::null() && m_SelectedEntity.has<TransformComponent>())
+			if (m_Scene.SelectedEntity != flecs::entity::null() && m_Scene.SelectedEntity.has<TransformComponent>())
 			{
-				glm::mat4 local_transform = m_SelectedEntity.get<TransformComponent>()->GetTransform();
+				glm::mat4 local_transform = m_Scene.SelectedEntity.get<TransformComponent>()->GetTransform();
 				glm::mat4 world_transform = local_transform;
 				glm::mat4 deltaMatrix;
 
 				// Build the world transform by accumulating parent transforms
-				auto parent = m_SelectedEntity.parent();
+				auto parent = m_Scene.SelectedEntity.parent();
 				while (parent != flecs::entity::null() && parent.has<TransformComponent>())
 				{
 					glm::mat4 parent_transform = parent.get<TransformComponent>()->GetTransform();
@@ -602,7 +600,7 @@ struct Editor
 				}
 
 				ImGuizmo::Manipulate(
-					glm::value_ptr(camera.GetViewMatrix()),
+					glm::value_ptr(camera.ViewMatrix),
 					glm::value_ptr(projection),
 					m_GuizmoOp,
 					ImGuizmo::MODE::WORLD,
@@ -614,7 +612,7 @@ struct Editor
 				{
 					// Convert world transform back to local space
 					glm::mat4 parent_world_transform(1.f);
-					parent = m_SelectedEntity.parent();
+					parent = m_Scene.SelectedEntity.parent();
 					if (parent != flecs::entity::null() && parent.has<TransformComponent>())
 					{
 						// Build parent's world transform
@@ -640,15 +638,15 @@ struct Editor
 					DecomposeTransform(local_matrix, translation, rotation, scale);
 
 					// Update the entity's local transform
-					m_SelectedEntity.set<TransformComponent>({
+					m_Scene.SelectedEntity.set<TransformComponent>({
 						glm::vec3(translation),
 						glm::vec2(scale),
 						rotation.z
 						});
 
-					if (m_SelectedEntity.has<RigidBodyComponent>())
+					if (m_Scene.SelectedEntity.has<RigidBodyComponent>())
 					{
-						auto body = m_SelectedEntity.get_ref<RigidBodyComponent>()->body;
+						auto body = m_Scene.SelectedEntity.get_ref<RigidBodyComponent>()->body;
 						if (body.IsValid())
 						{
 							body.SetLinearVelocity({ 0.f, 0.f });
@@ -663,21 +661,19 @@ struct Editor
 		gui::End();
 	}
 
-	float cNear = -1.f, cFar = 1.f;
-
 	void UI_SceneProperties()
 	{
 		if (gui::Begin("Scene Properties", &showSceneProperties))
 		{
 			if (gui::CollapsingHeader("Physics settings", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				auto& worldData = m_Scene.PhysicsWorldData;
+				auto& worldData = m_Scene.m_Scene.PhysicsWorldData;
 				ui::DragButton2("Gravity", worldData.Gravity);
 
-				ui::Drag("Near", cNear, 0.1f);
-				ui::Drag("Far", cFar, 0.1f);
+				ui::Drag("Near", camera.NearClip, 0.1f);
+				ui::Drag("Far", camera.FarClip, 0.1f);
 				ui::Drag3("Camera position", glm::value_ptr(camera.Position));
-				camera.Update(m_Renderer.GetHalfSize(camera.Zoom), cNear, cFar);
+				camera.Update(m_Renderer.GetAspectRatio());
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
 				//	UI::Drag("Restitution Threshold", rt);
@@ -727,7 +723,7 @@ struct Editor
 
 	void ShowEntities()
 	{
-		if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_SelectedEntity = flecs::entity::null();
+		if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_Scene.SelectedEntity = flecs::entity::null();
 
 		if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 		{
@@ -764,10 +760,10 @@ struct Editor
 							m_Scene.RemoveChild(entity);
 						}
 
-						if (m_SelectedEntity != flecs::entity::null() && entity != m_SelectedEntity)
+						if (m_Scene.SelectedEntity != flecs::entity::null() && entity != m_Scene.SelectedEntity)
 						{
 							if (gui::MenuItem("Set Child of Selected"))
-								m_Scene.SetChild(m_SelectedEntity, entity);
+								m_Scene.SetChild(m_Scene.SelectedEntity, entity);
 						}
 
 						gui::Separator();
@@ -776,7 +772,7 @@ struct Editor
 						if (gui::MenuItem("Delete"))
 						{
 							m_Scene.KillEntity(entity);
-							m_SelectedEntity = flecs::entity::null();
+							m_Scene.SelectedEntity = flecs::entity::null();
 							gui::CloseCurrentPopup();
 						}
 						gui::PopStyleColor();
@@ -812,7 +808,7 @@ struct Editor
 								// for children, use the parent's EntityOrderComponent.
 								std::vector<std::string>* entityOrder = nullptr;
 								if (entity.parent() == flecs::entity::null())
-									entityOrder = &m_Scene.EntityOrder;
+									entityOrder = &m_Scene.m_Scene.EntityOrder;
 								else if (entity.parent().has<EntityOrderComponent>())
 									entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 
@@ -849,7 +845,7 @@ struct Editor
 
 			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
 				{
-					const bool is_selected = (m_SelectedEntity == entity);
+					const bool is_selected = (m_Scene.SelectedEntity == entity);
 
 					std::vector<flecs::entity> children;
 					if (entity.has<EntityOrderComponent>())
@@ -866,7 +862,7 @@ struct Editor
 								fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
 							}
 
-							if (auto childEntityResolved = m_Scene.EntityWorld.lookup(fullChildName.c_str()))
+							if (auto childEntityResolved = m_Scene.m_Scene.EntityWorld.lookup(fullChildName.c_str()))
 								children.push_back(childEntityResolved);
 						}
 					}
@@ -878,9 +874,9 @@ struct Editor
 					if (children.empty())
 						node_flags |= ImGuiTreeNodeFlags_Leaf;
 
-					if (m_SelectedEntity != flecs::entity::null())
+					if (m_Scene.SelectedEntity != flecs::entity::null())
 					{
-						auto parent = m_SelectedEntity.parent();
+						auto parent = m_Scene.SelectedEntity.parent();
 						while (parent != flecs::entity::null())
 						{
 							if (parent == entity)
@@ -909,7 +905,7 @@ struct Editor
 					}
 
 					// Handle selection on click
-					if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_SelectedEntity = entity;
+					if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_Scene.SelectedEntity = entity;
 
 					if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
 					{
@@ -981,20 +977,20 @@ struct Editor
 				};
 
 			ui::DrawBgRows(10);
-			for (const auto& name : m_Scene.EntityOrder)
+			for (const auto& name : m_Scene.m_Scene.EntityOrder)
 			{
-				auto rootEntity = m_Scene.EntityWorld.lookup(name.c_str());
+				auto rootEntity = m_Scene.m_Scene.EntityWorld.lookup(name.c_str());
 				if (rootEntity) displayEntity(rootEntity, displayEntity);
 			}
 
 			if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
 			{
-				if (!gui::IsAnyItemHovered() && m_SelectedEntity != flecs::entity::null())
+				if (!gui::IsAnyItemHovered() && m_Scene.SelectedEntity != flecs::entity::null())
 				{
-					gui::OpenPopup(std::to_string(m_SelectedEntity.id()).c_str());
+					gui::OpenPopup(std::to_string(m_Scene.SelectedEntity.id()).c_str());
 				}
 			}
-			popup(m_SelectedEntity);
+			popup(m_Scene.SelectedEntity);
 		}
 		gui::EndChild();
 	}
@@ -1008,15 +1004,15 @@ struct Editor
 			std::string entityFilter;
 			if (gui::BeginMenuBar())
 			{
-			    gui::BeginDisabled(m_ScenePath.empty());
-				bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_SelectedEntity && m_SelectedEntity.parent();
+			    gui::BeginDisabled(m_Scene.Path.empty());
+				bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_Scene.SelectedEntity && m_Scene.SelectedEntity.parent();
 				//WC_INFO("1: {}", gui::IsDragDropActive());
 				gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
 				gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
 				gui::PushFont(Globals.f_Display.Bold);
 				gui::SetNextItemWidth(gui::GetContentRegionAvail().x - gui::CalcTextSize(buttonDnD ? "Remove Parent" : "Add Entity").x - gui::GetStyle().ItemSpacing.x * 2 + gui::GetStyle().WindowPadding.x - gui::GetStyle().FramePadding.x * 2);
 				static char filterBuff[256];
-				gui::InputTextEx("##Search", m_ScenePath.empty() ? "Select a Scene" : "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_None);
+				gui::InputTextEx("##Search", m_Scene.Path.empty() ? "Select a Scene" : "Filter by Name", filterBuff, IM_ARRAYSIZE(filterBuff), ImVec2(0, 0), ImGuiInputTextFlags_None);
 			    entityFilter = filterBuff;
 
 				gui::BeginDisabled(buttonDnD);
@@ -1070,16 +1066,16 @@ struct Editor
 
 				const float widgetSize = gui::GetItemRectSize().x;
 
-				gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
+				gui::BeginDisabled(name.empty() || m_Scene.m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
 				if (gui::Button("Create") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 				{
-					m_SelectedEntity = m_Scene.AddEntity(name);
+					m_Scene.SelectedEntity = m_Scene.AddEntity(name);
 					name = "Entity";
 					gui::CloseCurrentPopup();
 				}
 				gui::EndDisabled();
 				if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
-			    if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
+			    if (m_Scene.m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
 
 				gui::SameLine();
 				gui::SetCursorPosX(widgetSize);
@@ -1097,15 +1093,15 @@ struct Editor
 	template<typename T, typename UIFunc>
 	void EditComponent(const std::string& name, UIFunc uiFunc)
 	{
-		if (m_SelectedEntity.has<T>())
+		if (m_Scene.SelectedEntity.has<T>())
 		{
 			bool visible = true;
 
-			auto& component = *m_SelectedEntity.get_mut<T>();
-			if (gui::CollapsingHeader((name + "##header").c_str(), m_SceneState == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
+			auto& component = *m_Scene.SelectedEntity.get_mut<T>();
+			if (gui::CollapsingHeader((name + "##header").c_str(), m_Scene.State == SceneState::Edit ? &visible : NULL, ImGuiTreeNodeFlags_DefaultOpen))
 				uiFunc(component);
 
-			if (!visible) m_SelectedEntity.remove<T>(); // add modal popup
+			if (!visible) m_Scene.SelectedEntity.remove<T>(); // add modal popup
 		}
 	}
 
@@ -1113,7 +1109,7 @@ struct Editor
 	{
 		if (gui::Begin("Properties", &showProperties))
 		{
-			if (m_SelectedEntity == flecs::entity::null())
+			if (m_Scene.SelectedEntity == flecs::entity::null())
 			{
 			    ImVec2 textSize = gui::CalcTextSize("Select an Entity to view it's Properties.");
 			    gui::SetCursorPos({(gui::GetWindowSize().x - textSize.x) * 0.5f, (gui::GetWindowSize().y - textSize.y) * 0.5f});
@@ -1121,31 +1117,31 @@ struct Editor
 			}
 		    else
 			{
-				std::string nameBuffer = m_SelectedEntity.name().c_str();
+				std::string nameBuffer = m_Scene.SelectedEntity.name().c_str();
 
 				gui::PushItemWidth(gui::GetContentRegionAvail().x - gui::GetStyle().ItemSpacing.x * 2 - gui::CalcTextSize("Add Component(?)").x - gui::GetStyle().FramePadding.x * 2);
 				if (gui::InputText("##Name", &nameBuffer, ImGuiInputTextFlags_EnterReturnsTrue) || gui::IsItemDeactivatedAfterEdit())
 				{
 					if (!nameBuffer.empty())
 					{
-						if (m_Scene.EntityWorld.lookup(nameBuffer.c_str()) != flecs::entity::null())
+						if (m_Scene.m_Scene.EntityWorld.lookup(nameBuffer.c_str()) != flecs::entity::null())
 							gui::OpenPopup("WarnNameExists");
 						else
 						{
-							if (m_SelectedEntity.parent() == flecs::entity::null())
+							if (m_Scene.SelectedEntity.parent() == flecs::entity::null())
 							{
-								auto& parentNames = m_Scene.EntityOrder;
+								auto& parentNames = m_Scene.m_Scene.EntityOrder;
 								for (auto& name : parentNames)
-									if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
+									if (name == m_Scene.SelectedEntity.name().c_str()) name = nameBuffer;
 							}
 							else
 							{
-								auto& childrenNames = m_SelectedEntity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
+								auto& childrenNames = m_Scene.SelectedEntity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
 								for (auto& name : childrenNames)
-									if (name == m_SelectedEntity.name().c_str()) name = nameBuffer;
+									if (name == m_Scene.SelectedEntity.name().c_str()) name = nameBuffer;
 							}
 
-							m_SelectedEntity.set_name(nameBuffer.c_str());
+							m_Scene.SelectedEntity.set_name(nameBuffer.c_str());
 						}
 					}
 				}
@@ -1220,28 +1216,28 @@ struct Editor
 						}
 						case Transform:
 						{
-							if (ItemAutoClose("Transform", m_SelectedEntity.has<TransformComponent>()))m_SelectedEntity.add<TransformComponent>();
+							if (ItemAutoClose("Transform", m_Scene.SelectedEntity.has<TransformComponent>())) m_Scene.SelectedEntity.add<TransformComponent>();
 							break;
 						}
 						case Render:
 						{
-							bool hasRender = m_SelectedEntity.has<SpriteRendererComponent>() || m_SelectedEntity.has<CircleRendererComponent>() || m_SelectedEntity.has<TextRendererComponent>();
-							if (ItemAutoClose("Sprite Renderer Component", hasRender)) m_SelectedEntity.add<SpriteRendererComponent>();
-							if (ItemAutoClose("Circle Renderer Component", hasRender)) m_SelectedEntity.add<CircleRendererComponent>();
-							if (ItemAutoClose("Text Renderer Component", hasRender))	m_SelectedEntity.add<TextRendererComponent>();
+							bool hasRender = m_Scene.SelectedEntity.has<SpriteRendererComponent>() || m_Scene.SelectedEntity.has<CircleRendererComponent>() || m_Scene.SelectedEntity.has<TextRendererComponent>();
+							if (ItemAutoClose("Sprite Renderer Component", hasRender)) m_Scene.SelectedEntity.add<SpriteRendererComponent>();
+							if (ItemAutoClose("Circle Renderer Component", hasRender)) m_Scene.SelectedEntity.add<CircleRendererComponent>();
+							if (ItemAutoClose("Text Renderer Component", hasRender))   m_Scene.SelectedEntity.add<TextRendererComponent>();
 							break;
 						}
 						case Rigid:
 						{
-							if (ItemAutoClose("Rigid Body Component", m_SelectedEntity.has<RigidBodyComponent>()))		m_SelectedEntity.add<RigidBodyComponent>();
-							bool hasCollider = m_SelectedEntity.has<BoxCollider2DComponent>() || m_SelectedEntity.has<CircleCollider2DComponent>();
-							if (ItemAutoClose("Box Collider Component", hasCollider))	m_SelectedEntity.add<BoxCollider2DComponent>();
-							if (ItemAutoClose("Circle Collider Component", hasCollider))	m_SelectedEntity.add<CircleCollider2DComponent>();
+							if (ItemAutoClose("Rigid Body Component", m_Scene.SelectedEntity.has<RigidBodyComponent>()))		m_Scene.SelectedEntity.add<RigidBodyComponent>();
+							bool hasCollider = m_Scene.SelectedEntity.has<BoxCollider2DComponent>() || m_Scene.SelectedEntity.has<CircleCollider2DComponent>();
+							if (ItemAutoClose("Box Collider Component", hasCollider))	m_Scene.SelectedEntity.add<BoxCollider2DComponent>();
+							if (ItemAutoClose("Circle Collider Component", hasCollider))	m_Scene.SelectedEntity.add<CircleCollider2DComponent>();
 							break;
 						}
 						case Script:
 						{
-							if (ItemAutoClose("Script Component", m_SelectedEntity.has<ScriptComponent>()))	m_SelectedEntity.add<ScriptComponent>();
+							if (ItemAutoClose("Script Component", m_Scene.SelectedEntity.has<ScriptComponent>()))	m_Scene.SelectedEntity.add<ScriptComponent>();
 							break;
 						}
 						}
@@ -1672,17 +1668,16 @@ struct Editor
 	            const float widgetWidth = gui::GetItemRectSize().x;
 	            if (gui::Button("Yes##Confirm") || gui::IsKeyPressed(ImGuiKey_Enter))
 	            {
-	                if (m_ScenePath != filePath.string())
+	                if (m_Scene.Path != filePath.string())
 	                {
 	                    //WC_INFO("Assets: Opening scene: {0}", filePath.string());
 	                    //save old scene
-	                    m_Scene.Save(m_ScenePath);
+	                    m_Scene.Save();
 	                    m_Scene.Destroy();
 
 	                    //load new scene
 	                    Project::AddSceneToList(filePath.string());
-	                    m_SelectedEntity = flecs::entity::null();
-	                    m_ScenePath = filePath.string();
+	                    m_Scene.SelectedEntity = flecs::entity::null();
 	                    m_Scene.Load(filePath.string());
 	                }
 	                gui::CloseCurrentPopup();
@@ -1696,13 +1691,13 @@ struct Editor
 	        ui::CenterNextWindow();
 	        if (gui::BeginPopupModal(("Confirm##Blzent" + filePath.string()).c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 	        {
-	            if (!m_ScenePath.empty())
+	            if (!m_Scene.Path.empty())
 	            {
 	                gui::Text("Are you sure you want to add this entity to the current scene? -> %s", filePath.filename().string().c_str());
 	                static std::string name = "#@#";
 	                if (name == "#@#") name = filePath.stem().string();
 	                const float widgetWidth = gui::GetItemRectSize().x;
-	                gui::BeginDisabled(name.empty() || m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
+	                gui::BeginDisabled(name.empty() || m_Scene.m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
 	                if (gui::Button("Yes##Confirm") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 	                {
 	                    YAML::Node node = YAML::LoadFile(filePath.string());
@@ -1712,7 +1707,7 @@ struct Editor
 	                }
 	                gui::EndDisabled();
 	                if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
-	                if (m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
+	                if (m_Scene.m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null()) gui::SetItemTooltip("Name already exists");
 
 	                gui::SameLine(widgetWidth - gui::CalcTextSize("Cancel").x - gui::GetStyle().FramePadding.x);
 	                if (gui::Button("Cancel##Confirm") || gui::IsKeyPressed(ImGuiKey_Escape))
@@ -1772,9 +1767,9 @@ struct Editor
                             {
                                 if (Project::SceneExistInList(file))
                                 {
-                                    if (m_ScenePath == file)
+                                    if (m_Scene.Path == file)
                                     {
-                                        m_ScenePath.clear();
+                                        m_Scene.Path.clear();
                                         m_Scene.Destroy();
                                     }
                                     Project::RemoveSceneFromList(file);
@@ -2643,8 +2638,8 @@ struct Editor
 	        float spacing = textSize * 0.05f;
 	        if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 	        {
-	            WC_CORE_INFO("Save project before leaving");
-	            m_Scene.Save(m_ScenePath); // Saving scene
+				Project::Save();
+	            m_Scene.Save(); // Saving scene
 	            Globals.window.Close();
 	            gui::CloseCurrentPopup();
 	        }
@@ -2760,8 +2755,8 @@ struct Editor
 				std::string openProjectPath = ui::FileDialog("Open Project", ".");
 				if (!openProjectPath.empty())
 				{
-					Project::Load(openProjectPath);
-					LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+					if (Project::Load(openProjectPath))
+						LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
 				}
 
 				gui::Separator();
@@ -2776,8 +2771,8 @@ struct Editor
 						{
 							if (gui::Button((path.filename().string() + "##" + path.string()).c_str()))
 							{
-								Project::Load(project);
-								LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+								if (Project::Load(project))
+									LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
 							}
 
 							gui::SameLine(0, 100);
@@ -2898,14 +2893,14 @@ struct Editor
 						if (!newScenePath.empty())
 						{
 						    //save old scene
-						    m_Scene.Save(m_ScenePath);
+						    m_Scene.Save(m_Scene.Path);
 						    m_Scene.Destroy();
 
 						    //create new scene
 						    Project::AddSceneToList(newScenePath);
-						    m_SelectedEntity = flecs::entity::null();
-						    m_ScenePath = newScenePath;
-						    m_Scene.Save(m_ScenePath);
+						    m_Scene.SelectedEntity = flecs::entity::null();
+						    m_Scene.Path = newScenePath;
+						    m_Scene.Save();
 						}
 
 						if (ui::MenuItemButton("Open", "CTRL + O", false))
@@ -2916,8 +2911,7 @@ struct Editor
 						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath, true);
 						if (!sOpenPath.empty())
 						{
-							m_ScenePath = sOpenPath;
-							m_Scene.Load(m_ScenePath);
+							m_Scene.Load(m_Scene.Path);
 							gui::CloseCurrentPopup();
 						}
 
@@ -2925,14 +2919,12 @@ struct Editor
 
 						if (gui::MenuItem("Save", "CTRL + S"))
 						{
-							m_Scene.Save(m_ScenePath);
+							m_Scene.Save();
 							SavePhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
 						}
 
 						if (gui::MenuItem("Save As", "CTRL + A + S"))
-						{
-							m_Scene.Save(m_ScenePath);
-						}
+							m_Scene.Save();
 
 						if (gui::MenuItem("Undo", "CTRL + Z"))
 						{

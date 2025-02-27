@@ -17,7 +17,7 @@
 #include <filesystem>
 #include <string>
 
-static int printWrapper(lua_State* L)
+static int lua_Log(lua_State* L, spdlog::level::level_enum level)
 {
 	int args = lua_gettop(L);
 
@@ -25,24 +25,34 @@ static int printWrapper(lua_State* L)
 	{
 		if (lua_isstring(L, -1))
 		{
-			WC_TRACE(lua_tostring(L, -1))
+			WC_LOG(level, lua_tostring(L, -1));
 		}
 		else if (lua_isboolean(L, -1))
 		{
-			WC_TRACE((bool)lua_toboolean(L, -1));
+			WC_LOG(level, (bool)lua_toboolean(L, -1));
 		}
 		else
 		{
 			WC_WARN("Passed argument of unknown type.");
 		}
+		lua_pop(L, 1);
 	}
 
 	return 0;
 }
 
+static int lua_Print(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::trace); }
+static int lua_Info(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::info); }
+static int lua_Warn(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::warn); }
+static int lua_Error(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::err); }
+static int lua_Critical(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::critical); }
+
 static const struct luaL_Reg blazeLib[]
 {
-	{"warn", printWrapper},
+	{"info", lua_Info},
+	{"warn", lua_Warn},
+	{"error", lua_Error},
+	{"critical", lua_Critical},
 	{NULL, NULL}
 };
 
@@ -317,7 +327,7 @@ namespace blaze
 		{
 			L = luaL_newstate();
 			luaL_openlibs(L);
-			PushCFunction(printWrapper, "print");
+			PushCFunction(lua_Print, "print");
 			SetGlobal("print");
 			luaL_register(L, "blaze", blazeLib);
 

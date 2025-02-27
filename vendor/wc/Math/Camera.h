@@ -32,9 +32,9 @@ namespace wc
 
 		void SetProjection(float left, float right, float bottom, float top, float Near = -1.f, float Far = 1.f) 
 		{
-			ProjectionMatrix = glm::ortho(left, right, bottom, top, Near, Far);
-			//ProjectionMatrix = glm::perspective(glm::radians(120.f), 16.f / 9.f, Near, Far);
-			//ProjectionMatrix[1][1] *= -1.f;
+			//ProjectionMatrix = glm::ortho(left, right, bottom, top, Near, Far);
+			ProjectionMatrix = glm::perspective(glm::radians(120.f), 16.f / 9.f, Near, Far);
+			ProjectionMatrix[1][1] *= -1.f;
 		}
 
 		void Update(glm::vec2 halfSize, float Near = -1.f, float Far = 1.f) { SetProjection(-halfSize.x, halfSize.x, halfSize.y, -halfSize.y, Near, Far); }
@@ -85,71 +85,51 @@ namespace wc
 		}
 	};
 
-	/*struct EditorCamera : public Camera
+	struct EditorCamera
 	{
 		EditorCamera() = default;
+		EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
 
-		void Init(float fov, float aspectRatio, float nearClip, float farClip)
-		{
-			m_FOV = fov;
-			m_AspectRatio = aspectRatio;
-			m_NearClip = nearClip;
-			m_FarClip = farClip;
-			Projection = glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip);
-			UpdateView();
-		}
+		inline float GetDistance() const { return m_Distance; }
+		inline void SetDistance(float distance) { m_Distance = distance; }
 
-		//void OnUpdate(Timestep ts);
-		//void OnEvent(Event& e);
-
-		inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
-
-		glm::mat4 GetViewProjection() const { return Projection * m_ViewMatrix; }
-
-		glm::vec3 CalculatePosition() const	{ return m_FocalPoint - GetForwardDirection() * m_Distance; }
+		glm::mat4 GetViewProjectionMatrix() const { return Projection * ViewMatrix; }
 
 		glm::vec3 GetUpDirection() const { return glm::rotate(GetOrientation(), glm::vec3(0.f, 1.f, 0.f)); }
 		glm::vec3 GetRightDirection() const { return glm::rotate(GetOrientation(), glm::vec3(1.f, 0.f, 0.f)); }
-		glm::vec3 GetForwardDirection() const {	return glm::rotate(GetOrientation(), glm::vec3(0.f, 0.f, -1.f));	}
-		glm::quat GetOrientation() const { return glm::quat(glm::vec3(-m_Pitch, -m_Yaw, 0.f)); }
+		glm::vec3 GetForwardDirection() const {	return glm::rotate(GetOrientation(), glm::vec3(0.f, 0.f, -1.f)); }
+		glm::quat GetOrientation() const { return glm::quat(glm::vec3(-Pitch, -Yaw, 0.f));	}
 
-		void UpdateProjection()
+		void Update(float AspectRatio)
 		{
-			m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
-			Projection = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
+			Projection = glm::perspective(glm::radians(m_FOV), AspectRatio, NearClip, FarClip);
+			Projection[1][1] *= -1.f;
 		}
 
 		void UpdateView()
 		{
 			// m_Yaw = m_Pitch = 0.f; // Lock the camera's rotation
-			m_Position = CalculatePosition();
+			Position = CalculatePosition();
 
 			glm::quat orientation = GetOrientation();
-			m_ViewMatrix = glm::translate(glm::mat4(1.f), m_Position) * glm::toMat4(orientation);
-			m_ViewMatrix = glm::inverse(m_ViewMatrix);
+			ViewMatrix = glm::translate(glm::mat4(1.f), Position) * glm::toMat4(orientation);
+			ViewMatrix = glm::inverse(ViewMatrix);
 		}
 
-		//bool OnMouseScroll(MouseScrolledEvent& e);
+		glm::vec3 CalculatePosition() const { return FocalPoint - GetForwardDirection() * m_Distance; }
 
-		void MousePan(const glm::vec2& delta);
-		void MouseRotate(const glm::vec2& delta);
-		void MouseZoom(float delta);
-
-
-		glm::vec2 PanSpeed() const
+		glm::vec2 PanSpeed(glm::vec2 size) const
 		{
-			float x = std::min(m_ViewportWidth / 1000.f, 2.4f); // max = 2.4f
+			float x = std::min(size.x / 1000.f, 2.4f); // max = 2.4f
 			float xFactor = 0.0366f * (x * x) - 0.1778f * x + 0.3021f;
 
-			float y = std::min(m_ViewportHeight / 1000.f, 2.4f); // max = 2.4f
+			float y = std::min(size.y / 1000.f, 2.4f); // max = 2.4f
 			float yFactor = 0.0366f * (y * y) - 0.1778f * y + 0.3021f;
 
 			return { xFactor, yFactor };
 		}
 
-		float RotationSpeed() const { return 0.8f; }
-
-		float ZoomSpeed() const 
+		float ZoomSpeed() const
 		{
 			float distance = m_Distance * 0.2f;
 			distance = std::max(distance, 0.f);
@@ -158,20 +138,20 @@ namespace wc
 			return speed;
 		}
 		
-		float m_FOV = 45.f, m_AspectRatio = 1.778f, m_NearClip = 0.1f, m_FarClip = 1000.f;
+		float m_FOV = 45.f, NearClip = 0.1f, FarClip = 1000.f;
 
-		glm::mat4 Projection;
-		glm::mat4 m_ViewMatrix;
-		glm::vec3 m_Position = { 0.f, 0.f, 0.f };
-		glm::vec3 m_FocalPoint = { 0.f, 0.f, 0.f };
+		glm::mat4 Projection = glm::mat4(1.f);
+		glm::mat4 ViewMatrix = glm::mat4(1.f);
+		glm::vec3 Position = { 0.f, 0.f, 0.f };
+		glm::vec3 FocalPoint = { 0.f, 0.f, 0.f };
 
 		glm::vec2 m_InitialMousePosition = { 0.f, 0.f };
 
-		float m_Distance = 10.f;
-		float m_Pitch = 0.f, m_Yaw = 0.f;
+		float Pitch = 0.f, Yaw = 0.f;
+		float RotationSpeed = 0.8f;
 
-		float m_ViewportWidth = 1280, m_ViewportHeight = 720;
-	};*/
+		float m_Distance = 10.f;
+	};
 
 	bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale) 
 	{

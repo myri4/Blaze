@@ -7,6 +7,7 @@
 #include <wc/Utils/YAML.h>
 
 #define PROJECT_SETTINGS_EXTENSION ".blzproj"
+#define PROJECT_USER_SETTINGS_EXTENSION ".blzproj.user"
 
 namespace Project
 {
@@ -65,7 +66,17 @@ namespace Project
 		return false;
 	}
 
+	inline void Reset()
+	{
+		name = "";
+		rootPath = "";
+		firstScene = "";
+		savedProjectScenes.clear();
+	}
+
 	inline bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + PROJECT_SETTINGS_EXTENSION); }
+	inline std::string GetSettingsPath() { return rootPath + "\\settings" + PROJECT_SETTINGS_EXTENSION; }
+	inline std::string GetUserSettingsPath() { return rootPath + "\\settings" + PROJECT_USER_SETTINGS_EXTENSION; }
 
 	inline void Save()
 	{
@@ -84,7 +95,62 @@ namespace Project
 		YAML_SAVE_VAR(data, scriptsPath);
 		YAML_SAVE_VAR(data, entitiesPath);
 
-		YAMLUtils::SaveFile(rootPath + "\\settings" + PROJECT_SETTINGS_EXTENSION, data);
+		YAML::Node openedScenes;
+		for (auto& scene : savedProjectScenes)
+			openedScenes.push_back(scene);
+		
+		YAML::Node userData;
+		userData["OpenedScenes"] = openedScenes;
+
+		YAMLUtils::SaveFile(GetSettingsPath(), data);
+		YAMLUtils::SaveFile(GetUserSettingsPath(), userData);
+	}
+
+	inline bool Load(const std::string& filepath)
+	{
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("{} does not exist", filepath);
+			return false;
+		}
+
+		if (!IsProject(filepath))
+		{
+			WC_CORE_ERROR("{} is not a Blaze project", filepath);
+			return false;
+		}
+
+		name = std::filesystem::path(filepath).stem().string();
+		rootPath = filepath;
+
+		YAML::Node data = YAML::LoadFile(GetSettingsPath());
+		if (data)
+		{
+			YAML_LOAD_VAR(data, texturePath);
+			YAML_LOAD_VAR(data, fontPath);
+			YAML_LOAD_VAR(data, soundPath);
+
+			YAML_LOAD_VAR(data, lightMaterialsPath);
+			YAML_LOAD_VAR(data, physicsMaterialsPath);
+			YAML_LOAD_VAR(data, soundMaterialsPath);
+
+			YAML_LOAD_VAR(data, scenesPath);
+			YAML_LOAD_VAR(data, scriptsPath);
+			YAML_LOAD_VAR(data, entitiesPath);
+		}
+		AddProjectToList(rootPath);
+
+		if (std::filesystem::exists(GetUserSettingsPath()))
+		{
+			YAML::Node userDataScenes = YAML::LoadFile(GetUserSettingsPath());
+			for (const auto& openedScene : userDataScenes["OpenedScenes"])
+			{
+				savedProjectScenes.push_back(openedScene.as<std::string>());
+			}
+
+		}
+
+		return true;
 	}
 
 	inline void Create(const std::string& filepath, const std::string& pName)
@@ -129,35 +195,6 @@ namespace Project
 		Save();
 	}
 
-	inline bool Load(const std::string& filepath)
-	{
-		if (!std::filesystem::exists(filepath))
-		{
-			WC_CORE_ERROR("{} does not exist", filepath);
-			return false;
-		}
-
-		if (!IsProject(filepath))
-		{
-			WC_CORE_ERROR("{} is not a Blaze project", filepath);
-			return false;
-		}
-
-		name = std::filesystem::path(filepath).stem().string();
-		rootPath = filepath;
-		AddProjectToList(rootPath);
-
-		return true;
-	}
-
-	inline void Reset()
-	{
-		name = "";
-		rootPath = "";
-		firstScene = "";
-        savedProjectScenes.clear();
-	}
-
 	inline void Delete(const std::string& filepath) // @TODO: This function should accept project index from savedProjectPaths
 	{
 		if (std::filesystem::exists(filepath))
@@ -177,7 +214,7 @@ namespace Project
 
     inline void Rename(const std::string& newName)
 	{
-	            if (newName.empty())
+	    if (newName.empty())
         {
             WC_CORE_WARN("Project name cannot be empty");
             return;

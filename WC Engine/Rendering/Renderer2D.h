@@ -355,6 +355,7 @@ namespace blaze
 		VkCommandBuffer m_ComputeCmd[FRAME_OVERLAP];
 		VkDescriptorSet ImguiImageID = VK_NULL_HANDLE;
 
+		auto GetAspectRatio() { return m_RenderSize.x / m_RenderSize.y; }
 		auto GetHalfSize(glm::vec2 size, float Zoom) const { return size * Zoom; }
 		auto GetHalfSize(float Zoom) const { return GetHalfSize(m_RenderSize / 128.f, Zoom); }
 
