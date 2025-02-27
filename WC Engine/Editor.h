@@ -1736,7 +1736,7 @@ struct Editor
 	            ui::ClosePopupIfCursorFarFromCenter();
                 gui::Text(filePath.filename().string().c_str());
 	            gui::Separator();
-	            if (!std::filesystem::is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
+	            if (!std::filesystem::is_directory(filePath)) { if (ui::MenuItemButton("Open File")) openFileOnDoubleClick(filePath); }
 	            else if (gui::MenuItem("Open in File Explorer")) FileDialogs::OpenInFileExplorer(file);
                 gui::BeginDisabled(filePath == assetsPath);
 	            if (ui::MenuItemButton("Rename")) gui::OpenPopup(("Rename##Rename" + file).c_str());
@@ -1877,6 +1877,7 @@ struct Editor
 	                gui::EndPopup();
 	            }
 
+	            openFilePopups(filePath);
 	            gui::EndPopup();
             }
 	    };
