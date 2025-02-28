@@ -281,7 +281,7 @@ namespace blaze
 						parent.remove<EntityOrderComponent>();
 				}
 			}
-			EntityOrder.push_back(child.name().c_str());
+			EntityOrder.push_back(std::string(child.name().c_str()));
 		}
 
 		void SetChild(const flecs::entity& parent, const flecs::entity& child)
@@ -493,27 +493,23 @@ namespace blaze
 
 			if (entity.has<EntityOrderComponent>())
 			{
-				/*EntityWorld.query_builder<EntityTag>()
-				.with(flecs::ChildOf, parent)
+				YAML::Node childrenData;
+				EntityWorld.query_builder<EntityTag>()
+				.with(flecs::ChildOf, entity)
 				.each([&](flecs::entity child, EntityTag) {
-					YAML::Node childData;
-
-					SerializeEntity(child, childData);
-
-					SerializeChildEntity(child, childData);
+					YAML::Node childData = SerializeEntity(child);
 
 					childrenData.push_back(childData);
-				});*/
+				});
 
-				YAML::Node childrenData;
-				for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
+				/*for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
 				{
 					auto child = EntityWorld.lookup(name.c_str());
 
 					YAML::Node childData = SerializeEntity(child);
 
 					childrenData.push_back(childData);
-				}
+				}*/
 
 				if (childrenData.size() != 0)
 					entityData["Children"] = childrenData;

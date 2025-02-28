@@ -278,7 +278,7 @@ struct Editor
 			if (Key::GetKey(Key::LeftAlt))
 			{
 				const glm::vec2& mouse = Globals.window.GetCursorPos();
-				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.003f;
+				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.03f;
 				camera.m_InitialMousePosition = mouse;
 
 				if (Mouse::GetMouse(Mouse::LEFT))
@@ -721,279 +721,245 @@ struct Editor
 		gui::End();
 	}
 
-	void ShowEntities()
+	void EntityRightClickMenu(const flecs::entity& entity)
 	{
-		if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_Scene.SelectedEntity = flecs::entity::null();
-
-		if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
+		// Display the popup menu
+		gui::PopStyleVar(); // pop window padding
+		if (gui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoSavedSettings))
 		{
-			auto popup = [&](flecs::entity entity) -> void
-				{
-					// Display the popup menu
-			        gui::PopStyleVar(); // pop window padding
-					if (gui::BeginPopup(std::to_string(entity.id()).c_str(), ImGuiWindowFlags_NoSavedSettings))
-					{
-						gui::Text("%s", entity.name().c_str());
-						gui::Separator();
+			gui::Text("%s", entity.name().c_str());
+			gui::Separator();
 
-						if (gui::MenuItem("Clone"))
-						{
-							WC_CORE_INFO("Implement Clone");
-							gui::CloseCurrentPopup();
-						}
-
-						if (ui::MenuItemButton("Export"))
-						{
-						    gui::OpenPopup("Export Entity");
-						}
-					    std::string exportPath = ui::FileDialog("Export Entity", ".", Project::rootPath);
-					    if (!exportPath.empty())
-                        {
-					        // TODO - FIX THIS
-                            YAML::Node entityData = m_Scene.SerializeEntity(entity); // TODO - fix with merge
-					        YAMLUtils::SaveFile(exportPath + "\\" +  std::string(entity.name().c_str()) + ".blzent", entityData);
-                        }
-
-						if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-						{
-							//auto parent = entity.parent();
-							m_Scene.RemoveChild(entity);
-						}
-
-						if (m_Scene.SelectedEntity != flecs::entity::null() && entity != m_Scene.SelectedEntity)
-						{
-							if (gui::MenuItem("Set Child of Selected"))
-								m_Scene.SetChild(m_Scene.SelectedEntity, entity);
-						}
-
-						gui::Separator();
-
-						gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
-						if (gui::MenuItem("Delete"))
-						{
-							m_Scene.KillEntity(entity);
-							m_Scene.SelectedEntity = flecs::entity::null();
-							gui::CloseCurrentPopup();
-						}
-						gui::PopStyleColor();
-
-						gui::EndPopup();
-					}
-                    gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-				};
-
-			// Reorder
-			auto separator = [&](flecs::entity entity) -> void
-				{
-			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
-                    gui::PushStyleColor(ImGuiCol_Separator, ImVec4(0, 0, 0, 0));
-			        gui::PushStyleColor(ImGuiCol_SeparatorHovered, gui::GetStyle().Colors[ImGuiCol_DragDropTarget]);
-					ui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4, ui::MatchPayloadType("ENTITY"));
-			        gui::PopStyleColor(2);
-                    gui::PopStyleVar();
-
-			        gui::PushStyleColor(ImGuiCol_DragDropTarget, ImVec4(0, 0, 0, 0));
-			        if (gui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-						{
-							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-							flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
-
-							// Only allow reordering if both entities share the same parent.
-							if (droppedEntity.parent() == entity.parent())
-							{
-								// Get the list of names from the proper container.
-								// For top-level entities, use the scene's parent names;
-								// for children, use the parent's EntityOrderComponent.
-								std::vector<std::string>* entityOrder = nullptr;
-								if (entity.parent() == flecs::entity::null())
-									entityOrder = &m_Scene.m_Scene.EntityOrder;
-								else if (entity.parent().has<EntityOrderComponent>())
-									entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
-
-								if (entityOrder)
-								{
-									// Find the positions of the target (the entity associated with the separator)
-									// and the dropped entity.
-									auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
-									auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
-
-									if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
-									{
-										// Remove the dropped entity from its current position.
-										std::string droppedName = *droppedIt;
-										entityOrder->erase(droppedIt);
-
-										// Recalculate the target's index (in case removal shifted it).
-										int newTargetIndex = std::distance(entityOrder->begin(),
-											std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
-
-										// Insert the dropped entity immediately after the target.
-										int insertIndex = newTargetIndex + 1;
-										if (insertIndex > static_cast<int>(entityOrder->size()))
-											insertIndex = static_cast<int>(entityOrder->size());
-										entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
-									}
-								}
-							}
-						}
-						gui::EndDragDropTarget();
-					}
-			        gui::PopStyleColor();
-				};
-
-			auto displayEntity = [&](flecs::entity entity, auto& displayEntityRef) -> void
-				{
-					const bool is_selected = (m_Scene.SelectedEntity == entity);
-
-					std::vector<flecs::entity> children;
-					if (entity.has<EntityOrderComponent>())
-					{
-						auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
-						for (const auto& childName : entityOrder)
-						{
-							std::string fullChildName = std::string(entity.name()) + "::" + childName;
-
-							flecs::entity childEntity = entity;
-							while (childEntity.parent() != flecs::entity::null())
-							{
-								childEntity = childEntity.parent();
-								fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
-							}
-
-							if (auto childEntityResolved = m_Scene.m_Scene.EntityWorld.lookup(fullChildName.c_str()))
-								children.push_back(childEntityResolved);
-						}
-					}
-
-					ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
-					if (is_selected)
-						node_flags |= ImGuiTreeNodeFlags_Selected;
-
-					if (children.empty())
-						node_flags |= ImGuiTreeNodeFlags_Leaf;
-
-					if (m_Scene.SelectedEntity != flecs::entity::null())
-					{
-						auto parent = m_Scene.SelectedEntity.parent();
-						while (parent != flecs::entity::null())
-						{
-							if (parent == entity)
-							{
-								gui::SetNextItemOpen(true);
-								break;
-							}
-							parent = parent.parent();
-						}
-					}
-
-					// Render the entity
-			        //gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 14);
-			        gui::SetNextItemAllowOverlap();
-					bool is_open = gui::TreeNodeEx(entity.name().c_str(), node_flags);
-			        float height = gui::GetItemRectSize().y;
-
-			        static bool openPopup = false;
-					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
-					{
-						if (gui::IsItemHovered())
-						{
-							//WC_INFO("Hovered {}", entity.name().c_str());
-							openPopup = true;
-						}
-					}
-
-					// Handle selection on click
-					if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_Scene.SelectedEntity = entity;
-
-					if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
-					{
-						if (entity.has<TransformComponent>()) camera.Position = entity.get<TransformComponent>()->Translation;
-					}
-
-			        gui::PopStyleVar();
-					if (gui::BeginDragDropSource())
-					{
-						gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
-						gui::Text("Dragging %s", entity.name().c_str());
-						gui::EndDragDropSource();
-					}
-			        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-
-					// Bond
-					if (gui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
-						{
-							IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
-							flecs::entity droppedEntity = *static_cast<const flecs::entity *>(payload->Data);
-
-							// Check if the drop target is empty space
-							if (droppedEntity != entity.parent())
-								m_Scene.SetChild(entity, droppedEntity);
-						}
-						gui::EndDragDropTarget();
-					}
-
-
-			        gui::SameLine(gui::GetContentRegionMax().x - 20.f - gui::GetStyle().ItemSpacing.x);
-			        gui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-			        gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
-		    	    gui::PushStyleColor(ImGuiCol_Button, {0, 0, 0, 0});
-		    	    //gui::PushStyleColor(ImGuiCol_ButtonHovered, {0, 0, 0, 0});
-		    	    gui::PushStyleColor(ImGuiCol_ButtonActive, {0, 0, 0, 0});
-		    	    if (gui::ImageButton(("Show##" + std::string(entity.name())).c_str(), entity.get<EntityTag>()->showEntity ? t_Eye : t_EyeClosed, {height, height}))
-	    		    {
-    			        entity.set<EntityTag>({!entity.get<EntityTag>()->showEntity});
-    			        //WC_INFO("Set to: {}", entity.get<EntityTag>()->showEntity);
-			        }
-			        gui::PopStyleVar(2);
-			        gui::PopStyleColor(2); // 3
-
-		    	    if (openPopup)
-			        {
-	    		        gui::OpenPopup(std::to_string(entity.id()).c_str());
-    			        openPopup = false;
-			        }
-			        popup(entity);
-
-			        // If the node is open, recursively display children
-					if (is_open)
-					{
-						gui::TreePop(); // Pop before separator
-
-					    separator(entity);
-
-						gui::TreePush(entity.name().c_str());
-						for (const auto& child : children)
-							displayEntityRef(child, displayEntityRef);
-						gui::TreePop(); // Ensure proper pairing of TreeNodeEx and TreePop
-					}
-					else
-					{
-					    separator(entity);
-					}
-				};
-
-			ui::DrawBgRows(10);
-			for (const auto& name : m_Scene.m_Scene.EntityOrder)
+			if (gui::MenuItem("Clone"))
 			{
-				auto rootEntity = m_Scene.m_Scene.EntityWorld.lookup(name.c_str());
-				if (rootEntity) displayEntity(rootEntity, displayEntity);
+				WC_CORE_INFO("Implement Clone");
+				gui::CloseCurrentPopup();
 			}
 
-			if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+			if (ui::MenuItemButton("Export"))
 			{
-				if (!gui::IsAnyItemHovered() && m_Scene.SelectedEntity != flecs::entity::null())
+				gui::OpenPopup("Export Entity");
+			}
+			std::string exportPath = ui::FileDialog("Export Entity", ".", Project::rootPath);
+			if (!exportPath.empty())
+			{
+				YAML::Node entityData = m_Scene.SerializeEntity(entity); // TODO - fix with merge
+				YAMLUtils::SaveFile(exportPath + "\\" + std::string(entity.name().c_str()) + ".blzent", entityData);
+			}
+
+			if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
+			{
+				//auto parent = entity.parent();
+				m_Scene.RemoveChild(entity);
+			}
+
+			gui::Separator();
+
+			gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
+			if (gui::MenuItem("Delete"))
+			{
+				m_Scene.KillEntity(entity);
+				m_Scene.SelectedEntity = flecs::entity::null();
+				gui::CloseCurrentPopup();
+			}
+			gui::PopStyleColor();
+
+			gui::EndPopup();
+		}
+		gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	}
+
+	void EntityReorderSeparator(const flecs::entity& entity)
+	{
+		gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
+		gui::PushStyleColor(ImGuiCol_Separator, ImVec4(0, 0, 0, 0));
+		gui::PushStyleColor(ImGuiCol_SeparatorHovered, gui::GetStyle().Colors[ImGuiCol_DragDropTarget]);
+		ui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 4, ui::MatchPayloadType("ENTITY"));
+		gui::PopStyleColor(2);
+		gui::PopStyleVar();
+
+		gui::PushStyleColor(ImGuiCol_DragDropTarget, ImVec4(0, 0, 0, 0));
+		if (gui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+			{
+				IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+				flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
+
+				// Only allow reordering if both entities share the same parent.
+				if (droppedEntity.parent() == entity.parent())
 				{
-					gui::OpenPopup(std::to_string(m_Scene.SelectedEntity.id()).c_str());
+					// Get the list of names from the proper container.
+					// For top-level entities, use the scene's parent names;
+					// for children, use the parent's EntityOrderComponent.
+					std::vector<std::string>* entityOrder = nullptr;
+					if (entity.parent() == flecs::entity::null())
+						entityOrder = &m_Scene.m_Scene.EntityOrder;
+					else if (entity.parent().has<EntityOrderComponent>())
+						entityOrder = &entity.parent().get_ref<EntityOrderComponent>()->EntityOrder;
+
+					if (entityOrder)
+					{
+						// Find the positions of the target (the entity associated with the separator)
+						// and the dropped entity.
+						auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
+						auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
+
+						if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
+						{
+							// Remove the dropped entity from its current position.
+							std::string droppedName = *droppedIt;
+							entityOrder->erase(droppedIt);
+
+							// Recalculate the target's index (in case removal shifted it).
+							int newTargetIndex = std::distance(entityOrder->begin(),
+								std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
+
+							// Insert the dropped entity immediately after the target.
+							int insertIndex = newTargetIndex + 1;
+							if (insertIndex > static_cast<int>(entityOrder->size()))
+								insertIndex = static_cast<int>(entityOrder->size());
+							entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
+						}
+					}
 				}
 			}
-			popup(m_Scene.SelectedEntity);
+			gui::EndDragDropTarget();
 		}
-		gui::EndChild();
+		gui::PopStyleColor();
 	}
+
+	void DisplayEntity(const flecs::entity& entity)
+	{
+		const bool is_selected = (m_Scene.SelectedEntity == entity);
+
+		std::vector<flecs::entity> children;
+		if (entity.has<EntityOrderComponent>())
+		{
+			auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
+			for (const auto& childName : entityOrder)
+			{
+				std::string fullChildName = std::string(entity.name()) + "::" + childName;
+
+				flecs::entity childEntity = entity;
+				while (childEntity.parent() != flecs::entity::null())
+				{
+					childEntity = childEntity.parent();
+					fullChildName = std::string(childEntity.name()) + "::" + fullChildName;
+				}
+
+				if (auto childEntityResolved = m_Scene.m_Scene.EntityWorld.lookup(fullChildName.c_str()))
+					children.push_back(childEntityResolved);
+			}
+		}
+
+		ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+		if (is_selected)
+			node_flags |= ImGuiTreeNodeFlags_Selected;
+
+		if (children.empty())
+			node_flags |= ImGuiTreeNodeFlags_Leaf;
+
+		if (m_Scene.SelectedEntity != flecs::entity::null())
+		{
+			auto parent = m_Scene.SelectedEntity.parent();
+			while (parent != flecs::entity::null())
+			{
+				if (parent == entity)
+				{
+					gui::SetNextItemOpen(true);
+					break;
+				}
+				parent = parent.parent();
+			}
+		}
+
+		// Render the entity
+		//gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, ui::MatchPayloadType("ENTITY") ? (10 - 4) * 0.5f : 14);
+		gui::SetNextItemAllowOverlap();
+		bool isOpen = gui::TreeNodeEx(entity.name().c_str(), node_flags);
+		float height = gui::GetItemRectSize().y;
+
+		static bool openPopup = false;
+		if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+		{
+			if (gui::IsItemHovered())
+			{
+				//WC_INFO("Hovered {}", entity.name().c_str());
+				openPopup = true;
+			}
+		}
+
+		// Handle selection on click
+		if (gui::IsItemClicked() && !gui::IsItemToggledOpen()) m_Scene.SelectedEntity = entity;
+
+		if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
+			if (entity.has<TransformComponent>())
+			{
+				// @TODO: Make the camera look directly into the entity
+				camera.Position = entity.get<TransformComponent>()->Translation;
+			}
+
+		gui::PopStyleVar();
+		if (gui::BeginDragDropSource())
+		{
+			gui::SetDragDropPayload("ENTITY", &entity, sizeof(flecs::entity));
+			gui::Text("Dragging %s", entity.name().c_str());
+			gui::EndDragDropSource();
+		}
+		gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
+		// Bond
+		if (gui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+			{
+				IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
+				flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
+
+				// Check if the drop target is empty space
+				if (droppedEntity != entity.parent())
+					m_Scene.SetChild(entity, droppedEntity);
+			}
+			gui::EndDragDropTarget();
+		}
+
+		gui::SameLine(gui::GetContentRegionMax().x - 20.f - gui::GetStyle().ItemSpacing.x);
+		gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
+		gui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 3);
+		gui::PushStyleColor(ImGuiCol_Button, { 0, 0, 0, 0 });
+		//gui::PushStyleColor(ImGuiCol_ButtonHovered, {0, 0, 0, 0});
+		gui::PushStyleColor(ImGuiCol_ButtonActive, { 0, 0, 0, 0 });
+		if (gui::ImageButton(("Show##" + std::string(entity.name())).c_str(), entity.get<EntityTag>()->showEntity ? t_Eye : t_EyeClosed, { height, height }))
+		{
+			entity.set<EntityTag>({ !entity.get<EntityTag>()->showEntity });
+			//WC_INFO("Set to: {}", entity.get<EntityTag>()->showEntity);
+		}
+		gui::PopStyleVar(2);
+		gui::PopStyleColor(2); // 3
+
+		if (openPopup)
+		{
+			gui::OpenPopup(std::to_string(entity.id()).c_str());
+			openPopup = false;
+		}
+		EntityRightClickMenu(entity);
+
+		// If the node is open, recursively display children
+		if (isOpen)
+		{
+			gui::TreePop();
+
+			EntityReorderSeparator(entity);
+
+			gui::TreePush(entity.name().c_str());
+			for (const auto& child : children)
+				DisplayEntity(child);
+			gui::TreePop();
+		}
+		else
+			EntityReorderSeparator(entity);
+	};
 
 	void UI_Entities()
 	{
@@ -1043,7 +1009,30 @@ struct Editor
 		    gui::Spacing();
             //WC_INFO(entityFilter);
 		    //TODO - Implement search
-			ShowEntities();
+			// Display entities
+			{
+				if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_Scene.SelectedEntity = flecs::entity::null();
+
+				if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
+				{
+					ui::DrawBgRows(10);
+					// This is not an iterator because 'DisplayEntity' function changes the size of the entity order vector
+					for (uint32_t i = 0; i < m_Scene.m_Scene.EntityOrder.size(); i++)
+					{
+						const auto& name = m_Scene.m_Scene.EntityOrder[i];
+						auto rootEntity = m_Scene.m_Scene.EntityWorld.lookup(name.c_str());
+						if (rootEntity) DisplayEntity(rootEntity);
+					}
+
+					if (gui::IsWindowHovered() && gui::IsMouseClicked(ImGuiMouseButton_Right))
+					{
+						if (!gui::IsAnyItemHovered() && m_Scene.SelectedEntity != flecs::entity::null())
+							gui::OpenPopup(std::to_string(m_Scene.SelectedEntity.id()).c_str());
+					}
+					EntityRightClickMenu(m_Scene.SelectedEntity);
+				}
+				gui::EndChild();
+			}
 
 			if (showPopup)
 			{
