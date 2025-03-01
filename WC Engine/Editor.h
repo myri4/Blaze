@@ -278,7 +278,7 @@ struct Editor
 			if (Key::GetKey(Key::LeftAlt))
 			{
 				const glm::vec2& mouse = Globals.window.GetCursorPos();
-				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.03f;
+				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.01f;
 				camera.m_InitialMousePosition = mouse;
 
 				if (Mouse::GetMouse(Mouse::LEFT))
@@ -1725,7 +1725,7 @@ struct Editor
 	            ui::ClosePopupIfCursorFarFromCenter();
                 gui::Text(filePath.filename().string().c_str());
 	            gui::Separator();
-	            if (!std::filesystem::is_directory(filePath)) { if (gui::MenuItem("Open File")) openFileOnDoubleClick(filePath); }
+	            if (!std::filesystem::is_directory(filePath)) { if (ui::MenuItemButton("Open File")) openFileOnDoubleClick(filePath); }
 	            else if (gui::MenuItem("Open in File Explorer")) FileDialogs::OpenInFileExplorer(file);
                 gui::BeginDisabled(filePath == assetsPath);
 	            if (ui::MenuItemButton("Rename")) gui::OpenPopup(("Rename##Rename" + file).c_str());
@@ -1866,6 +1866,7 @@ struct Editor
 	                gui::EndPopup();
 	            }
 
+	            openFilePopups(filePath);
 	            gui::EndPopup();
             }
 	    };
@@ -2666,10 +2667,10 @@ struct Editor
 			}
 		}
 		if (dragging && ImGui::IsMouseDown(0))
-		{
 			Globals.window.SetPosition({ mousePos.x - mouseCur.x, mousePos.y - mouseCur.y });
-		}
-		if (ImGui::IsMouseReleased(0)) dragging = false;
+
+		if (ImGui::IsMouseReleased(0)) 
+			dragging = false;
 	}
 
 	void UI()

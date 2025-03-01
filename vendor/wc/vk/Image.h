@@ -172,26 +172,25 @@ namespace vk
 
         VkResult Create(const ImageSpecification& imageSpec, VmaMemoryUsage usage = VMA_MEMORY_USAGE_GPU_ONLY, VkMemoryPropertyFlags requiredFlags = 0)
         {
-            VkImageCreateInfo imageCreateInfo = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			return Create({
+				.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 
-                .imageType = VK_IMAGE_TYPE_2D,
+				.imageType = VK_IMAGE_TYPE_2D,
 
-                .format = imageSpec.format,
+				.format = imageSpec.format,
 
-                .extent = {
-                    .width = imageSpec.width,
-                    .height = imageSpec.height,
-                    .depth = 1,
-                },
+				.extent = {
+					.width = imageSpec.width,
+					.height = imageSpec.height,
+					.depth = 1,
+				},
 
-                .mipLevels = imageSpec.mipLevels,
-                .arrayLayers = 1,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .tiling = VK_IMAGE_TILING_OPTIMAL,
-                .usage = imageSpec.usage
-            };
-            return Create(imageCreateInfo, usage, requiredFlags);
+				.mipLevels = imageSpec.mipLevels,
+				.arrayLayers = 1,
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.tiling = VK_IMAGE_TILING_OPTIMAL,
+				.usage = imageSpec.usage
+				}, usage, requiredFlags);
         }
 
         void Destroy() 
@@ -218,15 +217,17 @@ namespace vk
             VkPipelineStageFlags dstStageMask,
             VkImageSubresourceRange subresourceRange)
         {
-            VkImageMemoryBarrier imageMemoryBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-            imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            imageMemoryBarrier.srcAccessMask = srcAccessMask;
-            imageMemoryBarrier.dstAccessMask = dstAccessMask;
-            imageMemoryBarrier.oldLayout = oldImageLayout;
-            imageMemoryBarrier.newLayout = newImageLayout;
-            imageMemoryBarrier.image = m_Handle;
-            imageMemoryBarrier.subresourceRange = subresourceRange;
+            VkImageMemoryBarrier imageMemoryBarrier = { 
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .srcAccessMask = srcAccessMask,
+                .dstAccessMask = dstAccessMask,
+                .oldLayout = oldImageLayout,
+                .newLayout = newImageLayout,
+                .image = m_Handle,
+                .subresourceRange = subresourceRange,
+            };
 
             vkCmdPipelineBarrier(cmd, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
         }
@@ -241,11 +242,11 @@ namespace vk
             VkPipelineStageFlags srcStageMask,
             VkPipelineStageFlags dstStageMask)
         {
-            VkImageSubresourceRange subresourceRange = {};
-            subresourceRange.aspectMask = aspectMask;
-            subresourceRange.levelCount = mipLevels;
-            subresourceRange.layerCount = layers;
-            InsertMemoryBarrier(cmd, srcAccessMask, dstAccessMask, oldImageLayout, newImageLayout, srcStageMask, dstStageMask, subresourceRange);
+			InsertMemoryBarrier(cmd, srcAccessMask, dstAccessMask, oldImageLayout, newImageLayout, srcStageMask, dstStageMask, {
+				.aspectMask = aspectMask,
+				.levelCount = mipLevels,
+				.layerCount = layers,
+			});
         }
 
         void SetLayout(
@@ -270,10 +271,11 @@ namespace vk
             const VkPipelineStageFlags& srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
             const VkPipelineStageFlags& dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
         {
-            VkImageSubresourceRange subresourceRange = {};
-            subresourceRange.aspectMask = aspectMask;
-            subresourceRange.levelCount = mipLevels;
-            subresourceRange.layerCount = layers;
+            VkImageSubresourceRange subresourceRange = {
+                .aspectMask = aspectMask,
+                .levelCount = mipLevels,
+                .layerCount = layers,
+            };
 			SetLayout(cmd, oldImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
         }
 
@@ -289,7 +291,8 @@ namespace vk
 
         bool HasDepth() const
         {
-			VkFormat formats[] = {
+			VkFormat formats[] = 
+            {
 		        VK_FORMAT_D16_UNORM,
 		        VK_FORMAT_X8_D24_UNORM_PACK32,
 		        VK_FORMAT_D32_SFLOAT,
@@ -323,27 +326,24 @@ namespace vk
 
         VkResult Create(const Image& image)
         {
-            //build a image-view for the depth image to use for rendering
-            VkImageViewCreateInfo info = { 
-                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
+			return Create({
+				.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 
-                .image = image,
-                .viewType = image.layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
-                .format = image.format,
-                .components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
-                .subresourceRange = {
-                    .aspectMask = VkImageAspectFlags(image.HasDepth() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
-                    .levelCount = image.mipLevels,
-                    .layerCount = image.layers,
-                },
-            };
-
-            return Create(info);
+				.image = image,
+				.viewType = image.layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
+				.format = image.format,
+				.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+				.subresourceRange = {
+					.aspectMask = VkImageAspectFlags(image.HasDepth() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
+					.levelCount = image.mipLevels,
+					.layerCount = image.layers,
+				},
+			});
         }
 
         void Destroy() 
         {
-            vkDestroyImageView(VulkanContext::GetLogicalDevice(), m_Handle, nullptr);
+            vkDestroyImageView(VulkanContext::GetLogicalDevice(), m_Handle, VulkanContext::GetAllocator());
             m_Handle = VK_NULL_HANDLE;
         }
     };
@@ -405,35 +405,34 @@ namespace vk
         Sampler(const VkSampler& sampler) { m_Handle = sampler; }
 
         VkResult Create(const VkSamplerCreateInfo& create_info) 
-        { return vkCreateSampler(VulkanContext::GetLogicalDevice(), &create_info, nullptr, &m_Handle); }
+        { return vkCreateSampler(VulkanContext::GetLogicalDevice(), &create_info, VulkanContext::GetAllocator(), &m_Handle); }
 
         VkResult Create(const SamplerSpecification& spec)
         {
-            VkSamplerCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			return Create({
+				.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 
-                .magFilter = (VkFilter)spec.magFilter,
-                .minFilter = (VkFilter)spec.minFilter,
-                .mipmapMode = (VkSamplerMipmapMode)spec.mipmapMode,
-                .addressModeU = (VkSamplerAddressMode)spec.addressModeU,
-                .addressModeV = (VkSamplerAddressMode)spec.addressModeV,
-                .addressModeW = (VkSamplerAddressMode)spec.addressModeW,
-                .mipLodBias = spec.mipLodBias,
-                .anisotropyEnable = spec.anisotropyEnable,
-                .maxAnisotropy = spec.maxAnisotropy,
-                .compareEnable = false,
-                .compareOp = VK_COMPARE_OP_NEVER,
-                .minLod = spec.minLod,
-                .maxLod = spec.maxLod,
-                .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
-                .unnormalizedCoordinates = false
-            };
-            return Create(createInfo);
+				.magFilter = (VkFilter)spec.magFilter,
+				.minFilter = (VkFilter)spec.minFilter,
+				.mipmapMode = (VkSamplerMipmapMode)spec.mipmapMode,
+				.addressModeU = (VkSamplerAddressMode)spec.addressModeU,
+				.addressModeV = (VkSamplerAddressMode)spec.addressModeV,
+				.addressModeW = (VkSamplerAddressMode)spec.addressModeW,
+				.mipLodBias = spec.mipLodBias,
+				.anisotropyEnable = spec.anisotropyEnable,
+				.maxAnisotropy = spec.maxAnisotropy,
+				.compareEnable = false,
+				.compareOp = VK_COMPARE_OP_NEVER,
+				.minLod = spec.minLod,
+				.maxLod = spec.maxLod,
+				.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
+				.unnormalizedCoordinates = false
+			});
         }
 
         void Destroy() 
         {
-            vkDestroySampler(VulkanContext::GetLogicalDevice(), m_Handle, nullptr);
+            vkDestroySampler(VulkanContext::GetLogicalDevice(), m_Handle, VulkanContext::GetAllocator());
             m_Handle = VK_NULL_HANDLE;
         }
     };

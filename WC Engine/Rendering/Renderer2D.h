@@ -321,7 +321,7 @@ namespace blaze
 
 	struct Renderer2D
 	{
-		glm::vec2 m_RenderSize;
+		glm::vec2 m_RenderSize; // @NOTE: why is this a float vec2?
 
 		// Rendering
 		VkFramebuffer m_Framebuffer;
@@ -329,6 +329,9 @@ namespace blaze
 
 		vk::Image m_OutputImage;
 		vk::ImageView m_OutputImageView;
+
+		vk::Image m_DepthImage;
+		vk::ImageView m_DepthImageView;
 
 		vk::Image m_EntityImage;
 		vk::ImageView m_EntityImageView;
@@ -339,7 +342,6 @@ namespace blaze
 		uint32_t TextureCapacity = 0;
 
 		wc::Shader m_LineShader;
-
 
 
 		// Post processing
@@ -409,6 +411,16 @@ namespace blaze
 						.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 						.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 						.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+					},
+					{
+						.format = VK_FORMAT_D32_SFLOAT, // @WARNING: if the image format is changed this should also be changed
+						.samples = VK_SAMPLE_COUNT_1_BIT,
+						.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+						.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+						.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+						.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+						.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+						.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 					}
 				};
 
@@ -417,33 +429,44 @@ namespace blaze
 
 				colorReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 				colorReferences.push_back({ 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+
+				VkAttachmentReference depthAttachmentRef = { 2, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 				VkSubpassDescription subpass = {
 					.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 					.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size()),
 					.pColorAttachments = colorReferences.data(),
+
+					.pDepthStencilAttachment = &depthAttachmentRef,
 				};
 
 				// Use subpass dependencies for attachment layout transitions
-				std::array<VkSubpassDependency, 2> dependencies;
-
-				dependencies[0] = {
-					.srcSubpass = VK_SUBPASS_EXTERNAL,
-					.dstSubpass = 0,
-					.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-					.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-					.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-					.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-					.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-				};
-
-				dependencies[1] = {
-					.srcSubpass = 0,
-					.dstSubpass = VK_SUBPASS_EXTERNAL,
-					.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-					.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-					.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-					.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-					.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+				VkSubpassDependency dependencies[] = {
+					{
+						.srcSubpass = VK_SUBPASS_EXTERNAL,
+						.dstSubpass = 0,
+						.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+						.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+						.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+						.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+					},
+					{
+						.srcSubpass = 0,
+						.dstSubpass = VK_SUBPASS_EXTERNAL,
+						.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+						.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+						.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+						.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+					},
+					{
+						.srcSubpass = VK_SUBPASS_EXTERNAL,
+						.dstSubpass = 0,
+						.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+						.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+						.srcAccessMask = 0,
+						.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+					},
 				};
 
 				// Create render pass
@@ -453,8 +476,8 @@ namespace blaze
 					.pAttachments = attachmentDescriptions,
 					.subpassCount = 1,
 					.pSubpasses = &subpass,
-					.dependencyCount = dependencies.size(),
-					.pDependencies = dependencies.data(),
+					.dependencyCount = std::size(dependencies),
+					.pDependencies = dependencies,
 				};
 				vkCreateRenderPass(VulkanContext::GetLogicalDevice(), &renderPassInfo, VulkanContext::GetAllocator(), &m_RenderPass);
 			}
@@ -462,39 +485,44 @@ namespace blaze
 			VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 			{
-				wc::ShaderCreateInfo createInfo;
-				wc::ReadBinary("assets/shaders/Renderer2D.vert", createInfo.binaries[0]);
-				wc::ReadBinary("assets/shaders/Renderer2D.frag", createInfo.binaries[1]);
-				createInfo.renderPass = m_RenderPass;
-
 				VkDescriptorBindingFlags flags[1];
 				memset(flags, 0, sizeof(VkDescriptorBindingFlags) * (std::size(flags) - 1));
 				flags[std::size(flags) - 1] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
-				createInfo.bindingFlags = flags;
-				createInfo.bindingFlagCount = (uint32_t)std::size(flags);
+				wc::ShaderCreateInfo createInfo = {
+					.renderPass = m_RenderPass,
+					.bindingFlags = flags,
+					.bindingFlagCount = (uint32_t)std::size(flags),
 
-				createInfo.dynamicDescriptorCount = true;
+					.depthTest = true,
+					.dynamicDescriptorCount = true,
 
-				createInfo.dynamicStateCount = std::size(dynamicStates);
-				createInfo.dynamicState = dynamicStates;
+					.dynamicState = dynamicStates,
+					.dynamicStateCount = std::size(dynamicStates),
+				};
 				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment());
 				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment(false));
+				wc::ReadBinary("assets/shaders/Renderer2D.vert", createInfo.binaries[0]);
+				wc::ReadBinary("assets/shaders/Renderer2D.frag", createInfo.binaries[1]);
 
 				m_Shader.Create(createInfo);
 			}
 
 			{
-				wc::ShaderCreateInfo createInfo;
-				wc::ReadBinary("assets/shaders/Line.vert", createInfo.binaries[0]);
-				wc::ReadBinary("assets/shaders/Line.frag", createInfo.binaries[1]);
-				createInfo.renderSize = m_RenderSize;
-				createInfo.renderPass = m_RenderPass;
-				createInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-				createInfo.dynamicStateCount = std::size(dynamicStates);
-				createInfo.dynamicState = dynamicStates;
+				wc::ShaderCreateInfo createInfo = {
+					.renderPass = m_RenderPass,
+
+					.depthTest = true,
+
+					.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+
+					.dynamicState = dynamicStates,
+					.dynamicStateCount = std::size(dynamicStates),
+				};
 				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment());
 				createInfo.blendAttachments.push_back(wc::CreateBlendAttachment(false));
+				wc::ReadBinary("assets/shaders/Line.vert", createInfo.binaries[0]);
+				wc::ReadBinary("assets/shaders/Line.frag", createInfo.binaries[1]);
 
 				m_LineShader.Create(createInfo);
 			}
@@ -532,34 +560,45 @@ namespace blaze
 			m_RenderSize = size;
 
 			{
-				vk::ImageSpecification imageInfo;
-				imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-				imageInfo.width = m_RenderSize.x;
-				imageInfo.height = m_RenderSize.y;
-				imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT/*| VK_IMAGE_USAGE_STORAGE_BIT*/;
-
-				m_OutputImage.Create(imageInfo);
-				m_OutputImage.SetName(std::format("Renderer2D::OutputImage"));
+				m_OutputImage.Create({
+					.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+					.width = (uint32_t)m_RenderSize.x,
+					.height = (uint32_t)m_RenderSize.y,
+					.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT/*| VK_IMAGE_USAGE_STORAGE_BIT*/,
+					});
+				m_OutputImage.SetName("Renderer2D::OutputImage");
 
 				m_OutputImageView.Create(m_OutputImage);
-				m_OutputImageView.SetName(std::format("Renderer2D::OutputImageView"));
+				m_OutputImageView.SetName("Renderer2D::OutputImageView");
 			}
 
 			{
-				vk::ImageSpecification imageInfo;
-				imageInfo.format = VK_FORMAT_R32G32_SINT;
-				imageInfo.width = m_RenderSize.x;
-				imageInfo.height = m_RenderSize.y;
-				imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+				m_DepthImage.Create({
+					.format = VK_FORMAT_D32_SFLOAT,
+					.width = (uint32_t)m_RenderSize.x,
+					.height = (uint32_t)m_RenderSize.y,
+					.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+					});
+				m_DepthImage.SetName("Renderer2D::DepthImage");
 
-				m_EntityImage.Create(imageInfo);
-				m_EntityImage.SetName(std::format("Renderer2D::EntityImage"));
-
-				m_EntityImageView.Create(m_EntityImage);
-				m_EntityImageView.SetName(std::format("Renderer2D::EntityImageView"));
+				m_DepthImageView.Create(m_DepthImage);
+				m_DepthImageView.SetName("Renderer2D::DepthImageView");
 			}
 
-			VkImageView attachments[] = { m_OutputImageView,m_EntityImageView };
+			{
+				m_EntityImage.Create({
+					.format = VK_FORMAT_R32G32_SINT,
+					.width = (uint32_t)m_RenderSize.x,
+					.height = (uint32_t)m_RenderSize.y,
+					.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+					});
+				m_EntityImage.SetName("Renderer2D::EntityImage");
+
+				m_EntityImageView.Create(m_EntityImage);
+				m_EntityImageView.SetName("Renderer2D::EntityImageView");
+			}
+
+			VkImageView attachments[] = { m_OutputImageView,m_EntityImageView, m_DepthImageView };
 			VkFramebufferCreateInfo framebufferInfo = {
 				.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass = m_RenderPass,
@@ -573,13 +612,12 @@ namespace blaze
 
 			for (int i = 0; i < ARRAYSIZE(m_FinalImage); i++)
 			{
-				vk::ImageSpecification imageInfo;
-				imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-				imageInfo.width = m_RenderSize.x;
-				imageInfo.height = m_RenderSize.y;
-				imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-
-				m_FinalImage[i].Create(imageInfo);
+				m_FinalImage[i].Create({
+					.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+					.width = (uint32_t)m_RenderSize.x,
+					.height = (uint32_t)m_RenderSize.y,
+					.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+					});
 				m_FinalImage[i].SetName(std::format("Renderer2D::FinalImage[{}]", i));
 
 				m_FinalImageView[i].Create(m_FinalImage[i]);
@@ -594,15 +632,14 @@ namespace blaze
 			bloom.CreateImages(m_RenderSize, m_OutputImage.GetMipLevelCount());
 
 			// For now we are using the same sampler for sampling the screen and the bloom images but maybe it should be separated
-			vk::SamplerSpecification sampler;
-			sampler.magFilter = vk::Filter::LINEAR;
-			sampler.minFilter = vk::Filter::LINEAR;
-			sampler.mipmapMode = vk::SamplerMipmapMode::LINEAR;
-			sampler.addressModeU = vk::SamplerAddressMode::CLAMP_TO_EDGE;
-			sampler.addressModeV = vk::SamplerAddressMode::CLAMP_TO_EDGE;
-			sampler.addressModeW = vk::SamplerAddressMode::CLAMP_TO_EDGE;
-
-			m_ScreenSampler.Create(sampler);
+			m_ScreenSampler.Create({
+				.magFilter = vk::Filter::LINEAR,
+				.minFilter = vk::Filter::LINEAR,
+				.mipmapMode = vk::SamplerMipmapMode::LINEAR,
+				.addressModeU = vk::SamplerAddressMode::CLAMP_TO_EDGE,
+				.addressModeV = vk::SamplerAddressMode::CLAMP_TO_EDGE,
+				.addressModeW = vk::SamplerAddressMode::CLAMP_TO_EDGE,
+				});
 
 			int m_PassCount = 0; // @NOTE: Not sure if this is working properly
 			int m_FinalPass = 0;
@@ -638,6 +675,9 @@ namespace blaze
 
 			m_OutputImage.Destroy();
 			m_OutputImageView.Destroy();
+
+			m_DepthImage.Destroy();
+			m_DepthImageView.Destroy();
 
 			m_EntityImage.Destroy();
 			m_EntityImageView.Destroy();
@@ -688,7 +728,10 @@ namespace blaze
 				rpInfo.framebuffer = m_Framebuffer;
 				VkClearValue clearValues[] = {
 					{.color = {0.f, 0.f, 0.f, 1.f}},
-					{.color = {0, 0, 0, 0}}
+					{.color = {0, 0, 0, 0}},
+					{.depthStencil = {
+						.depth = 1.f
+					}},
 				};
 				rpInfo.clearValueCount = std::size(clearValues);
 				rpInfo.pClearValues = clearValues;
