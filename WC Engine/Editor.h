@@ -9,8 +9,6 @@
 
 #include "Rendering/Renderer2D.h"
 
-#include "UI/Widgets.h"
-
 #include "Scene/EditorScene.h"
 
 #include "Globals.h"
@@ -116,8 +114,6 @@ struct Editor
 
 	glm::vec2 ViewPortSize = glm::vec2(1.f);
 
-	EditorCamera camera;
-
 	RenderData m_RenderData[FRAME_OVERLAP];
 	Renderer2D m_Renderer;
 
@@ -142,7 +138,6 @@ struct Editor
 	bool allowInput = true;
 
 	bool showEditor = true;
-    bool showDemo = false;
 	bool showSceneProperties = true;
 	bool showEntities = true;
 	bool showProperties = true;
@@ -150,8 +145,6 @@ struct Editor
 	bool showAssets = true;
 	bool showDebugStats = false;
 	bool showStyleEditor = false;
-
-	ImGuizmo::OPERATION m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
 
 	EditorScene m_Scene;
 
@@ -205,7 +198,7 @@ struct Editor
 	{
 		m_Renderer.DestroyScreen();
 		m_Renderer.CreateScreen(size);
-		camera.Update(m_Renderer.GetAspectRatio());
+		m_Scene.camera.Update(m_Renderer.GetAspectRatio());
 	}
 
 	void Destroy()
@@ -242,75 +235,7 @@ struct Editor
 	{
 		if (allowInput)
 		{
-			if (gui::IsKeyPressed(ImGuiKey_G)) m_GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_R)) m_GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_S)) m_GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
-
-			/*float scroll = Mouse::GetMouseScroll().y;
-			if (scroll != 0.f)
-			{
-				camera.Zoom += -scroll * Settings::ZoomSpeed;
-				camera.Zoom = glm::max(camera.Zoom, 0.05f);
-				camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
-			}
-
-			glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPosition()) - WindowPos;
-			glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos, camera.Zoom);
-
-			if (Mouse::GetMouse(Mouse::RIGHT))
-			{
-				if (!m_Panning)
-				{
-					m_StartPan = mouseFinal;
-					m_BeginCameraPosition = camera.Position;
-				}
-
-				camera.Position = glm::vec3(m_BeginCameraPosition + (m_StartPan - mouseFinal), camera.Position.z);
-				m_Panning = true;
-			}
-			else
-			{
-				m_StartPan = glm::vec2(0.f);
-				m_BeginCameraPosition = camera.Position;
-				m_Panning = false;
-			}*/
-
-			if (Key::GetKey(Key::LeftAlt))
-			{
-				const glm::vec2& mouse = Globals.window.GetCursorPos();
-				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.01f;
-				camera.m_InitialMousePosition = mouse;
-
-				if (Mouse::GetMouse(Mouse::LEFT))
-				{
-					auto panSpeed = camera.PanSpeed(m_Renderer.m_RenderSize);
-					camera.FocalPoint += -camera.GetRightDirection() * delta.x * panSpeed.x * camera.m_Distance;
-					camera.FocalPoint += camera.GetUpDirection() * delta.y * panSpeed.y * camera.m_Distance;
-				}
-				else if (Mouse::GetMouse(Mouse::RIGHT))
-				{
-					float yawSign = camera.GetUpDirection().y < 0 ? -1.f : 1.f;
-					camera.Yaw += yawSign * delta.x * camera.RotationSpeed;
-					camera.Pitch += delta.y * camera.RotationSpeed;
-				}
-
-				camera.UpdateView();
-			}
-
-			float scroll = Mouse::GetMouseScroll().y;
-			if (scroll != 0.f)
-			{
-				float delta = scroll * 0.1f;
-				{
-					camera.m_Distance -= delta * camera.ZoomSpeed();
-					if (camera.m_Distance < 1.f)
-					{
-						camera.FocalPoint += camera.GetForwardDirection();
-						camera.m_Distance = 1.f;
-					}
-				}
-				camera.UpdateView();
-			}
+			m_Scene.EditorInput(m_Renderer.m_RenderSize);
 		}
 	}
 
@@ -374,7 +299,7 @@ struct Editor
 			m_Scene.m_Scene.PhysicsWorld.Draw(&m_PhysicsDebugDraw);
 		}
 
-		m_Renderer.Flush(renderData, camera.GetViewProjectionMatrix());
+		m_Renderer.Flush(renderData, m_Scene.camera.GetViewProjectionMatrix());
 
 		renderData.Reset();
 	}
@@ -438,7 +363,7 @@ struct Editor
 		                {
 		                    //WC_CORE_INFO("Save scene before changing");
 		                    //WC_INFO("Opening scene: {0}", scene);
-		                    m_Scene.Save(m_Scene.Path);
+		                    m_Scene.Save();
 		                    m_Scene.Path = scene;
 		                    m_Scene.Load(scene);
 		                    gui::CloseCurrentPopup();
@@ -470,7 +395,7 @@ struct Editor
 
 		                if (wasActive)
 		                {
-		                    m_Scene.Save(m_Scene.Path);
+		                    m_Scene.Save();
 		                    m_Scene.Destroy();
 		                }
 
@@ -519,9 +444,8 @@ struct Editor
 				if (mousePos.x > 0 && mousePos.y > 0 && mousePos.x < width && mousePos.y < height)
 				{
 					VulkanContext::GetLogicalDevice().WaitIdle();
-					// @TODO: Optimize this to download only 1 pixel
 					vk::StagingBuffer stagingBuffer;
-					stagingBuffer.Allocate(sizeof(uint64_t) * width * height, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+					stagingBuffer.Allocate(sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 					vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd) {
 						auto image = m_Renderer.m_EntityImage;
 						image.SetLayout(cmd, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -531,7 +455,8 @@ struct Editor
 								.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 								.layerCount = 1,
 							},
-							.imageExtent = { width, height, 1 },
+							.imageExtent = { 1, 1, 1 },
+							.imageOffset = { mousePos.x, mousePos.y, 0},
 						};
 
 						vkCmdCopyImageToBuffer(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &copyRegion);
@@ -540,7 +465,7 @@ struct Editor
 						});
 
 					auto imagedata = (uint64_t*)stagingBuffer.Map();
-					auto id = imagedata[mousePos.x + mousePos.y * width];
+					auto id = imagedata[0];
 					m_Scene.SelectedEntity = flecs::entity(m_Scene.m_Scene.EntityWorld, id);
 
 					stagingBuffer.Unmap();
@@ -578,7 +503,7 @@ struct Editor
 			if (isPaused) gui::EndDisabled();
 			ImGui::PopStyleVar();
 
-			glm::mat4 projection = camera.Projection;
+			glm::mat4 projection = m_Scene.camera.Projection;
 			projection[1][1] *= -1;
 
 			ImGuizmo::SetOrthographic(true);
@@ -600,9 +525,9 @@ struct Editor
 				}
 
 				ImGuizmo::Manipulate(
-					glm::value_ptr(camera.ViewMatrix),
+					glm::value_ptr(m_Scene.camera.ViewMatrix),
 					glm::value_ptr(projection),
-					m_GuizmoOp,
+					m_Scene.GuizmoOp,
 					ImGuizmo::MODE::WORLD,
 					glm::value_ptr(world_transform),
 					glm::value_ptr(deltaMatrix)
@@ -670,10 +595,11 @@ struct Editor
 				auto& worldData = m_Scene.m_Scene.PhysicsWorldData;
 				ui::DragButton2("Gravity", worldData.Gravity);
 
-				ui::Drag("Near", camera.NearClip, 0.1f);
-				ui::Drag("Far", camera.FarClip, 0.1f);
-				ui::Drag3("Camera position", glm::value_ptr(camera.Position));
-				camera.Update(m_Renderer.GetAspectRatio());
+				ui::Drag("Near", m_Scene.camera.NearClip, 0.1f);
+				ui::Drag("Far", m_Scene.camera.FarClip, 0.1f);
+				ui::Drag3("Camera position", glm::value_ptr(m_Scene.camera.Position));
+				ui::Drag3("Focal point", glm::value_ptr(m_Scene.camera.FocalPoint));
+				m_Scene.camera.Update(m_Renderer.GetAspectRatio());
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
 				//	UI::Drag("Restitution Threshold", rt);
@@ -732,7 +658,7 @@ struct Editor
 
 			if (gui::MenuItem("Clone"))
 			{
-				WC_CORE_INFO("Implement Clone");
+				m_Scene.DuplicateEntity(entity);
 				gui::CloseCurrentPopup();
 			}
 
@@ -747,19 +673,12 @@ struct Editor
 				YAMLUtils::SaveFile(exportPath + "\\" + std::string(entity.name().c_str()) + ".blzent", entityData);
 			}
 
-			if (entity.parent() != flecs::entity::null() && gui::MenuItem("Remove Child"))
-			{
-				//auto parent = entity.parent();
-				m_Scene.RemoveChild(entity);
-			}
-
 			gui::Separator();
 
 			gui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.92, 0.25f, 0.2f, 1.f));
 			if (gui::MenuItem("Delete"))
 			{
 				m_Scene.KillEntity(entity);
-				m_Scene.SelectedEntity = flecs::entity::null();
 				gui::CloseCurrentPopup();
 			}
 			gui::PopStyleColor();
@@ -786,12 +705,8 @@ struct Editor
 				IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
 				flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
 
-				// Only allow reordering if both entities share the same parent.
 				if (droppedEntity.parent() == entity.parent())
 				{
-					// Get the list of names from the proper container.
-					// For top-level entities, use the scene's parent names;
-					// for children, use the parent's EntityOrderComponent.
 					std::vector<std::string>* entityOrder = nullptr;
 					if (entity.parent() == flecs::entity::null())
 						entityOrder = &m_Scene.m_Scene.EntityOrder;
@@ -800,23 +715,15 @@ struct Editor
 
 					if (entityOrder)
 					{
-						// Find the positions of the target (the entity associated with the separator)
-						// and the dropped entity.
 						auto targetIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()));
 						auto droppedIt = std::find(entityOrder->begin(), entityOrder->end(), std::string(droppedEntity.name()));
 
 						if (targetIt != entityOrder->end() && droppedIt != entityOrder->end() && targetIt != droppedIt)
 						{
-							// Remove the dropped entity from its current position.
 							std::string droppedName = *droppedIt;
 							entityOrder->erase(droppedIt);
 
-							// Recalculate the target's index (in case removal shifted it).
-							int newTargetIndex = std::distance(entityOrder->begin(),
-								std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name())));
-
-							// Insert the dropped entity immediately after the target.
-							int insertIndex = newTargetIndex + 1;
+							int insertIndex = std::distance(entityOrder->begin(), std::find(entityOrder->begin(), entityOrder->end(), std::string(entity.name()))) + 1;
 							if (insertIndex > static_cast<int>(entityOrder->size()))
 								insertIndex = static_cast<int>(entityOrder->size());
 							entityOrder->insert(entityOrder->begin() + insertIndex, droppedName);
@@ -896,8 +803,11 @@ struct Editor
 		if (gui::IsMouseDoubleClicked(0) && gui::IsItemHovered())
 			if (entity.has<TransformComponent>())
 			{
-				// @TODO: Make the camera look directly into the entity
-				camera.Position = entity.get<TransformComponent>()->Translation;
+				auto& camera = m_Scene.camera;
+				camera.FocalPoint = glm::vec3(glm::vec2(entity.get<TransformComponent>()->Translation), camera.FocalPoint.z); // @TODO: its still kinda buggy
+				camera.Yaw = 0.f;
+				camera.Pitch = 0.f;
+				camera.UpdateView();
 			}
 
 		gui::PopStyleVar();
@@ -945,17 +855,20 @@ struct Editor
 		}
 		EntityRightClickMenu(entity);
 
-		// If the node is open, recursively display children
 		if (isOpen)
 		{
 			gui::TreePop();
 
 			EntityReorderSeparator(entity);
 
-			gui::TreePush(entity.name().c_str());
-			for (const auto& child : children)
-				DisplayEntity(child);
-			gui::TreePop();
+			if (entity.is_alive())
+			{
+				gui::TreePush(entity.name().c_str());
+
+				for (const auto& child : children)
+					DisplayEntity(child);
+				gui::TreePop();
+			}
 		}
 		else
 			EntityReorderSeparator(entity);
@@ -972,7 +885,6 @@ struct Editor
 			{
 			    gui::BeginDisabled(m_Scene.Path.empty());
 				bool buttonDnD = ui::MatchPayloadType("ENTITY") && m_Scene.SelectedEntity && m_Scene.SelectedEntity.parent();
-				//WC_INFO("1: {}", gui::IsDragDropActive());
 				gui::SetCursorPosX(gui::GetStyle().ItemSpacing.x);
 				gui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
 				gui::PushFont(Globals.f_Display.Bold);
@@ -1182,11 +1094,11 @@ struct Editor
 						const char* menuText = "";
 						switch (menu)
 						{
-						case None: menuText = "Components"; break;
-						case Transform: menuText = "Transform"; break;
-						case Render: menuText = "Render"; break;
-						case Rigid: menuText = "Rigid Body"; break;
-						case Script: menuText = "Script"; break;
+							case None: menuText = "Components"; break;
+							case Transform: menuText = "Transform"; break;
+							case Render: menuText = "Render"; break;
+							case Rigid: menuText = "Rigid Body"; break;
+							case Script: menuText = "Script"; break;
 						}
 						gui::SetCursorPosX((gui::GetWindowSize().x - gui::CalcTextSize(menuText).x) * 0.5f);
 						gui::Text("%s", menuText);
@@ -1195,40 +1107,40 @@ struct Editor
 
 						switch (menu)
 						{
-						case None:
-						{
-							if (gui::MenuItem("Transform")) { menu = Transform; } ui::RenderArrowIcon(ImGuiDir_Right);
-							if (gui::MenuItem("Render")) { menu = Render; } ui::RenderArrowIcon(ImGuiDir_Right);
-							if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon(ImGuiDir_Right);
-							if (gui::MenuItem("Script")) { menu = Script; } ui::RenderArrowIcon(ImGuiDir_Right);
-							break;
-						}
-						case Transform:
-						{
-							if (ItemAutoClose("Transform", m_Scene.SelectedEntity.has<TransformComponent>())) m_Scene.SelectedEntity.add<TransformComponent>();
-							break;
-						}
-						case Render:
-						{
-							bool hasRender = m_Scene.SelectedEntity.has<SpriteRendererComponent>() || m_Scene.SelectedEntity.has<CircleRendererComponent>() || m_Scene.SelectedEntity.has<TextRendererComponent>();
-							if (ItemAutoClose("Sprite Renderer Component", hasRender)) m_Scene.SelectedEntity.add<SpriteRendererComponent>();
-							if (ItemAutoClose("Circle Renderer Component", hasRender)) m_Scene.SelectedEntity.add<CircleRendererComponent>();
-							if (ItemAutoClose("Text Renderer Component", hasRender))   m_Scene.SelectedEntity.add<TextRendererComponent>();
-							break;
-						}
-						case Rigid:
-						{
-							if (ItemAutoClose("Rigid Body Component", m_Scene.SelectedEntity.has<RigidBodyComponent>()))		m_Scene.SelectedEntity.add<RigidBodyComponent>();
-							bool hasCollider = m_Scene.SelectedEntity.has<BoxCollider2DComponent>() || m_Scene.SelectedEntity.has<CircleCollider2DComponent>();
-							if (ItemAutoClose("Box Collider Component", hasCollider))	m_Scene.SelectedEntity.add<BoxCollider2DComponent>();
-							if (ItemAutoClose("Circle Collider Component", hasCollider))	m_Scene.SelectedEntity.add<CircleCollider2DComponent>();
-							break;
-						}
-						case Script:
-						{
-							if (ItemAutoClose("Script Component", m_Scene.SelectedEntity.has<ScriptComponent>()))	m_Scene.SelectedEntity.add<ScriptComponent>();
-							break;
-						}
+							case None:
+							{
+								if (gui::MenuItem("Transform"))  { menu = Transform; } ui::RenderArrowIcon(ImGuiDir_Right);
+								if (gui::MenuItem("Render"))     { menu = Render; } ui::RenderArrowIcon(ImGuiDir_Right);
+								if (gui::MenuItem("Rigid Body")) { menu = Rigid; } ui::RenderArrowIcon(ImGuiDir_Right);
+								if (gui::MenuItem("Script"))     { menu = Script; } ui::RenderArrowIcon(ImGuiDir_Right);
+								break;
+							}
+							case Transform:
+							{
+								if (ItemAutoClose("Transform", m_Scene.SelectedEntity.has<TransformComponent>())) m_Scene.SelectedEntity.add<TransformComponent>();
+								break;
+							}
+							case Render:
+							{
+								bool hasRender = m_Scene.SelectedEntity.has<SpriteRendererComponent>() || m_Scene.SelectedEntity.has<CircleRendererComponent>() || m_Scene.SelectedEntity.has<TextRendererComponent>();
+								if (ItemAutoClose("Sprite Renderer Component", hasRender)) m_Scene.SelectedEntity.add<SpriteRendererComponent>();
+								if (ItemAutoClose("Circle Renderer Component", hasRender)) m_Scene.SelectedEntity.add<CircleRendererComponent>();
+								if (ItemAutoClose("Text Renderer Component", hasRender))   m_Scene.SelectedEntity.add<TextRendererComponent>();
+								break;
+							}
+							case Rigid:
+							{
+								if (ItemAutoClose("Rigid Body Component", m_Scene.SelectedEntity.has<RigidBodyComponent>()))		m_Scene.SelectedEntity.add<RigidBodyComponent>();
+								bool hasCollider = m_Scene.SelectedEntity.has<BoxCollider2DComponent>() || m_Scene.SelectedEntity.has<CircleCollider2DComponent>();
+								if (ItemAutoClose("Box Collider Component", hasCollider))	m_Scene.SelectedEntity.add<BoxCollider2DComponent>();
+								if (ItemAutoClose("Circle Collider Component", hasCollider))	m_Scene.SelectedEntity.add<CircleCollider2DComponent>();
+								break;
+							}
+							case Script:
+							{
+								if (ItemAutoClose("Script Component", m_Scene.SelectedEntity.has<ScriptComponent>()))	m_Scene.SelectedEntity.add<ScriptComponent>();
+								break;
+							}
 						}
 					}
 					gui::End();
@@ -1632,7 +1544,6 @@ struct Editor
         // Lambda to handle file double click logic
         auto openFileOnDoubleClick = [&](const std::filesystem::path& filePath)
         {
-
             if (filePath.extension() == ".scene")
             {
                 gui::OpenPopup(("Confirm##Scene" + filePath.string()).c_str());
@@ -2883,7 +2794,7 @@ struct Editor
 						if (!newScenePath.empty())
 						{
 						    //save old scene
-						    m_Scene.Save(m_Scene.Path);
+						    m_Scene.Save();
 						    m_Scene.Destroy();
 
 						    //create new scene
@@ -2939,7 +2850,6 @@ struct Editor
 						gui::MenuItem("Assets", nullptr, &showAssets);
 						gui::MenuItem("Debug Statistics", nullptr, &showDebugStats);
 						gui::MenuItem("Style Editor", nullptr, &showStyleEditor);
-					    gui::MenuItem("Demo Window", nullptr, &showDemo);
 
 						if (gui::BeginMenu("Theme"))
 						{
@@ -2986,7 +2896,6 @@ struct Editor
 					if (showAssets) UI_Assets();
 					if (showDebugStats) UI_DebugStats();
 					if (showStyleEditor) UI_StyleEditor();
-				    if (showDemo) gui::ShowDemoWindow();
 				}
 			}
 		}

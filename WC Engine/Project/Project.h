@@ -19,10 +19,6 @@ namespace Project
 	inline std::string fontPath;
 	inline std::string soundPath;
 
-	inline std::string lightMaterialsPath;
-	inline std::string physicsMaterialsPath;
-	inline std::string soundMaterialsPath;
-
 	inline std::string scenesPath;
 	inline std::string scriptsPath;
 	inline std::string entitiesPath;
@@ -87,10 +83,6 @@ namespace Project
 		YAML_SAVE_VAR(data, fontPath);
 		YAML_SAVE_VAR(data, soundPath);
 
-		YAML_SAVE_VAR(data, lightMaterialsPath);
-		YAML_SAVE_VAR(data, physicsMaterialsPath);
-		YAML_SAVE_VAR(data, soundMaterialsPath);
-
 		YAML_SAVE_VAR(data, scenesPath);
 		YAML_SAVE_VAR(data, scriptsPath);
 		YAML_SAVE_VAR(data, entitiesPath);
@@ -130,10 +122,6 @@ namespace Project
 			YAML_LOAD_VAR(data, fontPath);
 			YAML_LOAD_VAR(data, soundPath);
 
-			YAML_LOAD_VAR(data, lightMaterialsPath);
-			YAML_LOAD_VAR(data, physicsMaterialsPath);
-			YAML_LOAD_VAR(data, soundMaterialsPath);
-
 			YAML_LOAD_VAR(data, scenesPath);
 			YAML_LOAD_VAR(data, scriptsPath);
 			YAML_LOAD_VAR(data, entitiesPath);
@@ -168,10 +156,6 @@ namespace Project
 		fontPath = rootPath + "\\Fonts";
 		soundPath = rootPath + "\\Sounds";
 
-		lightMaterialsPath = rootPath + "\\Light Materials";
-		physicsMaterialsPath = rootPath + "\\Physics Materials";
-		soundMaterialsPath = rootPath + "\\Sound Materials";
-
 		scenesPath = rootPath + "\\Scenes";
 		scriptsPath = rootPath + "\\Scripts";
 		entitiesPath = rootPath + "\\Entities";
@@ -183,10 +167,6 @@ namespace Project
 		std::filesystem::create_directory(texturePath);
 		std::filesystem::create_directory(fontPath);
 		std::filesystem::create_directory(soundPath);
-
-		std::filesystem::create_directory(lightMaterialsPath);
-		std::filesystem::create_directory(physicsMaterialsPath);
-		std::filesystem::create_directory(soundMaterialsPath);
 
 		std::filesystem::create_directory(scenesPath);
 		std::filesystem::create_directory(scriptsPath);
