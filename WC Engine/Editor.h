@@ -123,22 +123,35 @@ struct Editor
 
 	b2DebugDraw m_PhysicsDebugDraw;
 
+    // Window Buttons
 	Texture t_Close;
 	Texture t_Minimize;
 	Texture t_Collapse;
+
+    // Assets
 	Texture t_FolderOpen;
 	Texture t_FolderClosed;
 	Texture t_File;
 	Texture t_FolderEmpty;
 	Texture t_Folder;
-	Texture t_Reorder;
-	Texture t_Bond;
+
+    // Scene Editor Buttons
 	Texture t_Play;
 	Texture t_Simulate;
 	Texture t_Stop;
-	Texture t_Add;
+
+    // Entities
     Texture t_Eye;
     Texture t_EyeClosed;
+
+    // Console
+    Texture t_Debug;
+    Texture t_Info;
+    Texture t_Warning;
+    Texture t_Error;
+    Texture t_Critical;
+
+
 	bool allowInput = true;
 
 	bool showEditor = true;
@@ -168,19 +181,25 @@ struct Editor
 		t_Close.Load(assetPath + "close.png");
 		t_Minimize.Load(assetPath + "minimize.png");
 		t_Collapse.Load(assetPath + "collapse.png");
+
 		t_FolderOpen.Load(assetPath + "folder-open.png");
 		t_FolderClosed.Load(assetPath + "folder-closed.png");
 		t_File.Load(assetPath + "file.png");
 		t_FolderEmpty.Load(assetPath + "folder-empty.png");
 		t_Folder.Load(assetPath + "folder-fill.png");
-		t_Reorder.Load(assetPath + "reorder.png");
-		t_Bond.Load(assetPath + "bond.png");
+
 		t_Play.Load(assetPath + "play.png");
 		t_Simulate.Load(assetPath + "simulate.png");
 		t_Stop.Load(assetPath + "stop.png");
-		t_Add.Load(assetPath + "add.png");
+
 		t_Eye.Load(assetPath + "eye.png");
 		t_EyeClosed.Load(assetPath + "eye-slash.png");
+
+	    t_Debug.Load(assetPath + "debug.png");
+	    t_Info.Load(assetPath + "info.png");
+	    t_Warning.Load(assetPath + "warning.png");
+	    t_Error.Load(assetPath + "error.png");
+	    t_Critical.Load(assetPath + "critical.png");
 
 		PhysicsMaterials.emplace_back(PhysicsMaterial()); // @NOTE: Index 0 is the default material
 		PhysicsMaterialNames["Default"] = PhysicsMaterials.size() - 1;
@@ -217,19 +236,25 @@ struct Editor
 		t_Close.Destroy();
 		t_Collapse.Destroy();
 		t_Minimize.Destroy();
+
 		t_FolderClosed.Destroy();
 		t_FolderOpen.Destroy();
 		t_File.Destroy();
 		t_Folder.Destroy();
 		t_FolderEmpty.Destroy();
-		t_Reorder.Destroy();
-		t_Bond.Destroy();
+
 		t_Play.Destroy();
 		t_Simulate.Destroy();
 		t_Stop.Destroy();
-		t_Add.Destroy();
+
 		t_Eye.Destroy();
 		t_EyeClosed.Destroy();
+
+	    t_Debug.Destroy();
+	    t_Info.Destroy();
+	    t_Warning.Destroy();
+	    t_Error.Destroy();
+	    t_Critical.Destroy();
 
 		assetManager.Free();
 		m_Renderer.Deinit();
@@ -738,7 +763,11 @@ struct Editor
 
 						if (gui::MenuItem("Clone"))
 						{
-							WC_CORE_INFO("Implement Clone");
+						    WC_DEBUG("Implement Clone");
+							WC_INFO("Implement Clone");
+						    WC_WARN("Implement Clone");
+						    WC_ERROR("Implement Clone");
+						    WC_CRITICAL("Implement Clone");
 							gui::CloseCurrentPopup();
 						}
 
@@ -1111,9 +1140,9 @@ struct Editor
 		{
 			if (m_Scene.SelectedEntity == flecs::entity::null())
 			{
-			    ImVec2 textSize = gui::CalcTextSize("Select an Entity to view it's Properties.");
+			    ImVec2 textSize = gui::CalcTextSize("Select an Entity to view it's Properties");
 			    gui::SetCursorPos({(gui::GetWindowSize().x - textSize.x) * 0.5f, (gui::GetWindowSize().y - textSize.y) * 0.5f});
-			    gui::TextDisabled("Select an Entity to view it's Properties.");
+			    gui::TextDisabled("Select an Entity to view it's Properties");
 			}
 		    else
 			{
@@ -1533,67 +1562,131 @@ struct Editor
 	}
 
 	const std::unordered_map<spdlog::level::level_enum, std::pair<glm::vec4, std::string>> level_colors = { //@TODO: This could be deduced to just an array of colors
-		{spdlog::level::debug, {glm::vec4(58.f, 150.f, 221.f, 255.f) / 255.f, "[debug] "}},
-		{spdlog::level::info, {glm::vec4(19.f, 161.f, 14.f, 255.f) / 255.f, "[info] "}},
-		{spdlog::level::warn, {glm::vec4(249.f, 241.f, 165.f, 255.f) / 255.f, "[warn!] "}},
-		{spdlog::level::err, {glm::vec4(231.f, 72.f, 86.f, 255.f) / 255.f, "[-ERROR-] "}},
-		{spdlog::level::critical, {glm::vec4(139.f, 0.f, 0.f, 255.f) / 255.f, "[!CRITICAL!] "}}
+		{spdlog::level::trace,    {glm::vec4(0.f  , 184.f, 217.f, 255.f) / 255.f, "Debug"}}, // trace = debug
+		{spdlog::level::info,     {glm::vec4(34.f , 197.f, 94.f , 255.f) / 255.f, "Info"}},
+		{spdlog::level::warn,     {glm::vec4(255.f, 214.f, 102.f, 255.f) / 255.f, "Warn"}},
+		{spdlog::level::err,      {glm::vec4(255.f, 86.f , 48.f , 255.f) / 255.f, "ERROR"}},
+		{spdlog::level::critical, {glm::vec4(183.f, 29.f , 24.f , 255.f) / 255.f, "CRITICAL"}}
 	};
 
 	void UI_Console()
 	{
-		if (gui::Begin("Console", &showConsole))
+		if (gui::Begin("Console", &showConsole, ImGuiWindowFlags_MenuBar))
 		{
-			if (gui::Button("Clear"))
-			{
-				//Globals.console.Clear();
-				Log::GetConsoleSink()->messages.clear();
-			}
+		    static bool showDebug = true;
+		    static bool showInfo = true;
+		    static bool showWarn = true;
+		    static bool showError = true;
+		    static bool showCritical = true;
 
-			gui::SameLine();
-			if (gui::Button("Copy"))
-			{
-				std::string logData;
-				for (const auto& msg : Log::GetConsoleSink()->messages)
-				{
-					auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
-					std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
-					logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
-				}
-				gui::SetClipboardText(logData.c_str());
-			}
+		    if (gui::BeginMenuBar())
+		    {
+			    if (gui::MenuItem("Clear"))
+			    {
+			    	Log::GetConsoleSink()->messages.clear();
+			    }
+		        
+			    if (gui::MenuItem("Copy"))
+			    {
+			    	std::string logData;
+			    	for (const auto& msg : Log::GetConsoleSink()->messages)
+			    	{
+			    		auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+			    		std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
+			    		logData += timeStr + msg.payload + "\n"; // Assuming msg.payload is a string
+			    	}
+			    	gui::SetClipboardText(logData.c_str());
+			    }
 
-			// TODO - make work
-			gui::SameLine();
-			gui::PushItemWidth(ImGui::GetContentRegionAvail().x - gui::CalcTextSize("Filter").x - gui::GetStyle().ItemSpacing.x);
-			gui::InputText("Input", const_cast<char*>(""), 0);
+		        if (gui::BeginMenu("Show"))
+		        {
+                    gui::MenuItem("Debug", nullptr, &showDebug);
+                    gui::MenuItem("Info", nullptr, &showInfo);
+                    gui::MenuItem("Warning", nullptr, &showWarn);
+                    gui::MenuItem("Errors", nullptr, &showError);
+                    gui::MenuItem("Critical", nullptr, &showCritical);
 
-			gui::Separator();
+		            gui::EndMenu();
+		        }
 
-			const float footer_height_to_reserve = gui::GetStyle().ItemSpacing.y + gui::GetFrameHeightWithSpacing();
-			if (gui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
-			{
-				for (auto& msg : Log::GetConsoleSink()->messages)
-				{
-					auto it = level_colors.find(msg.level);
-					if (it != level_colors.end())
-					{
-						const auto& [color, prefix] = it->second;
-						auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
-						std::string timeStr = std::format("[{:%H:%M:%S}] ", std::chrono::floor<std::chrono::seconds>(local_time));
-						gui::PushStyleColor(ImGuiCol_Text, { color.r, color.g, color.b, color.a });
-						ui::Text(timeStr + prefix + msg.payload);
-						gui::PopStyleColor();
-					}
-					else
-						ui::Text(msg.payload);
-				}
+		        gui::EndMenuBar();
+		    }
 
-				if (/*ScrollToBottom ||*/
-					(/*m_ConsoleAutoScroll && */ gui::GetScrollY() >= gui::GetScrollMaxY()))
-					gui::SetScrollHereY(1.f);
-			}
-			gui::EndChild();
+		    if (!Log::GetConsoleSink()->messages.empty())
+		    {
+		        if (gui::BeginTable("ConsoleTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit))
+		        {
+		            ImGui::TableSetupColumn("");
+		            ImGui::TableSetupColumn("Level");
+		            ImGui::TableSetupColumn("Time");
+		            ImGui::TableSetupColumn("Message");
+		            ImGui::TableHeadersRow();
+
+		            for (auto& msg : Log::GetConsoleSink()->messages)
+		            {
+		                bool showMsg = true;
+		                switch (msg.level)
+		                {
+		                    case spdlog::level::trace: showMsg = showDebug; break;
+		                    case spdlog::level::info: showMsg = showInfo; break;
+		                    case spdlog::level::warn: showMsg = showWarn; break;
+		                    case spdlog::level::err: showMsg = showError; break;
+		                    case spdlog::level::critical: showMsg = showCritical; break;
+		                    default: showMsg = true; break;
+		                }
+
+		                if (showMsg)
+		                {
+		                    gui::TableNextRow();
+		                    auto it = level_colors.find(msg.level);
+		                    ImVec4 color;
+		                    std::string prefix;
+		                    std::string timeStr;
+		                    Texture texture;
+		                    if (it != level_colors.end())
+		                    {
+		                        color = conv::GlmToImVec4(it->second.first);
+		                        prefix = it->second.second;
+		                        auto local_time = msg.time + std::chrono::hours(2); // TODO - fix so it checks timezone
+		                        timeStr = std::format("{:%H:%M:%S}", std::chrono::floor<std::chrono::seconds>(local_time));
+		                        switch (msg.level)
+		                        {
+		                            case spdlog::level::trace: texture = t_Debug; break;
+		                            case spdlog::level::info: texture = t_Info; break;
+		                            case spdlog::level::warn: texture = t_Warning; break;
+		                            case spdlog::level::err: texture = t_Error; break;
+		                            case spdlog::level::critical: texture = t_Critical; break;
+		                            default: texture = t_Info; break;
+		                        }
+		                    }
+
+		                    gui::PushFont(Globals.f_Default.Menu);
+		                    gui::TableSetColumnIndex(0);
+		                    gui::Image(texture, { 20, 20 }, {0, 0}, {1, 1}, color); gui::SameLine();
+		                    /*gui::SetItemTooltip(prefix.c_str());*/
+
+		                    gui::TableSetColumnIndex(1);
+		                    gui::TextColored(color, prefix.c_str());
+
+		                    gui::TableSetColumnIndex(2);
+		                    gui::TextColored(color, timeStr.c_str());
+
+		                    gui::TableSetColumnIndex(3);
+		                    gui::TextColored(color, msg.payload.c_str());
+		                    gui::PopFont();
+		                }
+
+		            }
+
+		            gui::EndTable();
+		        }
+		    }
+		    else
+		    {
+		        ImVec2 textSize = gui::CalcTextSize("No Messages to Display");
+		        gui::SetCursorPos({(gui::GetWindowSize().x - gui::GetFrameHeightWithSpacing() - textSize.x) * 0.5f, (gui::GetWindowSize().y - textSize.y) * 0.5f});
+		        gui::TextDisabled("No Messages to Display");
+		    }
 		}
 		gui::End();
 	}
@@ -2187,9 +2280,9 @@ struct Editor
                         }
                         if (i == 0)
                         {
-                            ImVec2 textSize = gui::CalcTextSize("This folder is Empty.");
+                            ImVec2 textSize = gui::CalcTextSize("This folder is Empty");
                             gui::SetCursorPos({(gui::GetWindowSize().x - textSize.x) * 0.5f, (gui::GetWindowSize().y - textSize.y) * 0.5f});
-                            gui::TextDisabled("This folder is Empty.");
+                            gui::TextDisabled("This folder is Empty");
                         }
                     }
                 }
