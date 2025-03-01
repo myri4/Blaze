@@ -1183,6 +1183,7 @@ struct Editor
 
 					if (gui::Begin("Add##Component", &showAddComponent, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar))
 					{
+					    ui::CloseIfCursorFarFromCenter(showAddComponent);
 						if (!gui::IsWindowFocused()) showAddComponent = false;
 
 						if (menu != None && gui::ArrowButton("Back", ImGuiDir_Left))
@@ -1733,7 +1734,7 @@ struct Editor
 	        std::filesystem::path filePath = file;
 	        if (gui::BeginPopup(("##RightClick" + file).c_str(), ImGuiWindowFlags_NoSavedSettings))
             {
-	            ui::ClosePopupIfCursorFarFromCenter();
+	            ui::CloseIfCursorFarFromCenter();
                 gui::Text(filePath.filename().string().c_str());
 	            gui::Separator();
 	            if (!std::filesystem::is_directory(filePath)) { if (ui::MenuItemButton("Open File")) openFileOnDoubleClick(filePath); }
@@ -2715,7 +2716,9 @@ struct Editor
 					gui::EndMenuBar();
 				}
 
-				gui::PushFont(Globals.f_Default.Big);
+			    //gui::SameLine(0, 50.f + gui::GetStyle().ItemSpacing.x);
+
+			    gui::PushFont(Globals.f_Default.Big);
 				if (gui::Button("New Project"))
 				{
 					gui::OpenPopup("New Project");
@@ -2763,48 +2766,145 @@ struct Editor
 				gui::Separator();
 
 				if (gui::BeginChild("Project Display", ImVec2(0, 0)))
-				{
-					for (const auto& project : Project::savedProjectPaths)
-					{
-						gui::PushFont(Globals.f_Default.Big);
-						std::filesystem::path path = project;
-						if (std::filesystem::exists(path))
-						{
-							if (gui::Button((path.filename().string() + "##" + path.string()).c_str()))
-							{
-								if (Project::Load(project))
-									LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
-							}
+                {
+                    constexpr int columns = 3;
+				    const float projectWidth = (gui::GetContentRegionAvail().x - 50.f /*ItemSpacing x*/ * 2) / columns;
+				    gui::PushStyleVar(ImGuiStyleVar_WindowPadding, {projectWidth * 0.1f, projectWidth * 0.1f});
+				    const float itemSpacing = gui::GetStyle().ItemSpacing.x; // get spacing before push
+				    gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(50.f, 50.f));
 
-							gui::SameLine(0, 100);
-							gui::Text("FullPath: %s", project.c_str());
-							gui::SameLine();
-							if (gui::Button(("Delete##" + path.string()).c_str()))
-							{
-								gui::OpenPopup(("Delete Project##" + project).c_str());
-							}
-						}
-						else WC_CORE_WARN("Project path does not exist: {0}", project);
-						gui::PopFont();
+				    int ind = 0;
+				    bool showPopup = false;
+                    for (const auto& project : Project::savedProjectPaths)
+                    {
+                        std::filesystem::path path = project;
+                        if (std::filesystem::exists(path))
+                        {
+                            gui::PushStyleColor(ImGuiCol_Border, { 1.f, 0.f, 0.f, 0.f });
+                            gui::PushStyleColor(ImGuiCol_ChildBg, conv::ImVec4Offset(gui::GetStyle().Colors[ImGuiCol_WindowBg], 0.07f));
+                            // calculate windowHeight manually
+                            const float windowHeight = projectWidth * 0.1f * 2 + projectWidth * 0.45f + gui::CalcTextSize(path.filename().string().c_str()).y + gui::CalcTextSize(path.string().c_str()).y + itemSpacing * 3;
+                            if (gui::BeginChild(("##Project" + project).c_str(), {projectWidth, windowHeight}, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse))
+                            {
+                                gui::PopStyleVar();
+                                gui::Button("* ScreenShots *", {projectWidth * 0.8f, projectWidth * 0.45f});
 
-						ui::CenterNextWindow();
-						if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
-						{
-							gui::Text("Are you sure you want to delete this project?");
-							if (gui::Button("Yes##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
-							{
-								Project::Delete(project);
-								gui::CloseCurrentPopup();
-							}
+                                gui::Spacing();
 
-							gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
-							if (gui::Button("No##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+                                gui::PushFont(Globals.f_Default.Big);
+                                gui::Text(path.filename().string().c_str());
+                                gui::PopFont();
 
-							gui::EndPopup();
-						}
-					}
-				}
-				gui::EndChild();
+                                gui::TextDisabled(path.string().c_str());
+                                //gui::SetWindowSize({gui::GetWindowSize().x, gui::GetCursorPos().y + 50.f}); // doesnt work?
+                                if (gui::IsItemHovered())
+                                {
+                                    ImVec2 textMin = gui::GetItemRectMin();
+                                    ImVec2 textMax = gui::GetItemRectMax();
+                                    float underlineY = textMax.y + 1.0f;
+                                    gui::GetWindowDrawList()->AddLine(ImVec2(textMin.x, underlineY), ImVec2(textMax.x, underlineY), gui::GetColorU32(ImGuiCol_TextDisabled), 1.0f);
+
+                                    if (gui::IsMouseClicked(0))
+                                    {
+                                        FileDialogs::OpenInFileExplorer(path.string());
+                                    }
+                                }
+                                else
+                                {
+                                    if (!gui::IsAnyItemHovered() && gui::IsWindowHovered())
+                                    {
+                                        gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y}, gui::GetColorU32(ImGuiCol_Button));
+                                        if (gui::IsMouseClicked(0))
+                                        {
+                                            if (Project::Load(project)) LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+
+                                            // Load first project
+                                            m_Scene.Path = Project::savedProjectScenes.front();
+                                            m_Scene.Load(m_Scene.Path);
+                                        }
+                                        if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                        {
+                                            //WC_CORE_INFO("RIGHT");
+                                            showPopup = true;
+                                        }
+                                    }
+                                }
+                                gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(50.f, 50.f));
+                            }
+                            gui::EndChild();
+
+                            gui::PopStyleColor(2);
+
+                            if ((ind + 1) % columns != 0) gui::SameLine();
+
+                            ind++;
+                        }
+                        else
+                        {
+                            WC_CORE_WARN("Project path does not exist: {0}", project);
+                        }
+
+                        if (showPopup)
+                        {
+                            gui::OpenPopup(("RightClick##" + project).c_str());
+                            showPopup = false;
+                        }
+
+                        static bool showDeletePopup = false;
+                        gui::PopStyleVar(2);
+                        if (gui::BeginPopup(("RightClick##" + project).c_str()))
+                        {
+                            gui::Text(path.filename().string().c_str());
+                            gui::Separator();
+                            if (gui::MenuItem("Open in File Explorer"))
+                            {
+                                FileDialogs::OpenInFileExplorer(path.string());
+                            }
+
+                            if (gui::MenuItem("Rename"))
+                            {
+                                WC_CORE_INFO("Rename");
+                            }
+
+                            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.f, 0.f, 0.f, 0.5f));
+                            if (ui::MenuItemButton("Delete"))
+                            {
+                                showDeletePopup = true;
+                            }
+                            ImGui::PopStyleColor();
+
+                            gui::EndPopup();
+                        }
+
+                        if (showDeletePopup)
+                        {
+                            gui::OpenPopup(("Delete Project##" + project).c_str());
+                            showDeletePopup = false;
+                        }
+
+                        ui::CenterNextWindow();
+                        if (gui::BeginPopupModal(("Delete Project##" + project).c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+                        {
+                            gui::Text("Are you sure you want to delete this project?");
+                            if (gui::Button("Yes##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
+                            {
+                                Project::Delete(project);
+                                gui::CloseCurrentPopup();
+                            }
+
+                            gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
+                            if (gui::Button("No##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+
+                            gui::EndPopup();
+                        }
+
+                        gui::PushStyleVar(ImGuiStyleVar_WindowPadding, {projectWidth * 0.1f, projectWidth * 0.1f});
+                        gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(50.f, 50.f));
+                    }
+				    gui::PopStyleVar(2);
+                }
+                gui::EndChild();
+
 			}
 			else
 			{

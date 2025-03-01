@@ -38,7 +38,7 @@ namespace wc
 			return ImVec4(v.x, v.y, v.z, v.w);
 		}
 
-	    inline ImVec4 GlmToImVec4(const ImVec4& v, const float offset)
+	    inline ImVec4 ImVec4Offset(const ImVec4& v, const float offset)
 		{
 		    return ImVec4(v.x + offset, v.y + offset, v.z + offset, v.w + offset);
 		}
@@ -290,7 +290,11 @@ namespace wc
 			        gui::InputText("##NewFileFilter", &newFileText, ImGuiInputTextFlags_ReadOnly);
 			    }
 
-				// Action buttons
+			    /*WC_CORE_INFO("selectedPath empt {}", selectedPath.empty());
+			    WC_CORE_INFO("newfulefulter empt {}", newFileFilter.empty());
+			    WC_CORE_INFO("selecpath empt {}", selectedPath.empty());
+			    WC_CORE_INFO("newfilename empt {}", std::filesystem::path(newFileName).filename().string().empty());
+			    WC_CORE_INFO("shouldBeDissabled empt {}", selectedPath.empty() || !newFileFilter.empty() ? std::filesystem::path(newFileName).filename().string().empty() : false);*/
 				ImGui::BeginDisabled(selectedPath.empty() || !newFileFilter.empty() ? std::filesystem::path(newFileName).filename().string().empty() : false);
 				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || IsKeyPressedDissabled(ImGuiKey_Enter) && !selectedPath.empty())
 				{
@@ -480,9 +484,9 @@ namespace wc
 			return upper_popup->Window && (upper_popup->Window->Flags & ImGuiWindowFlags_ChildMenu) && ImGui::IsWindowChildOf(upper_popup->Window, window, true, false);
 		}
 
-        inline void ClosePopupIfCursorFarFromCenter(float distance = -1.f)
+        inline void CloseIfCursorFarFromCenter(float distance = -1.f)
 		{
-		    if (distance < 0.f) distance = gui::GetWindowWidth() * 0.5f;
+		    if (distance < 0.f) distance = glm::max(gui::GetWindowWidth(), gui::GetWindowHeight()) * 0.5f;
 		    const ImVec2 mousePos = gui::GetIO().MousePos;
 		    const ImVec2 windowPos = gui::GetWindowPos();
 		    const float windowWidth = gui::GetWindowWidth();
@@ -495,6 +499,25 @@ namespace wc
                  mousePos.y > windowPos.y + windowHeight + distance))
 		    {
                 gui::CloseCurrentPopup();
+		    }
+		}
+
+	    // add state if it is window
+	    inline void CloseIfCursorFarFromCenter(bool& winState, float distance = -1.f)
+		{
+		    if (distance < 0.f) distance = glm::max(gui::GetWindowWidth(), gui::GetWindowHeight()) * 0.5f;
+		    const ImVec2 mousePos = gui::GetIO().MousePos;
+		    const ImVec2 windowPos = gui::GetWindowPos();
+		    const float windowWidth = gui::GetWindowWidth();
+		    const float windowHeight = gui::GetWindowHeight();
+
+		    if (gui::IsWindowFocused() && gui::IsMousePosValid() &&
+                (mousePos.x < windowPos.x - distance ||
+                 mousePos.x > windowPos.x + windowWidth + distance ||
+                 mousePos.y < windowPos.y - distance ||
+                 mousePos.y > windowPos.y + windowHeight + distance))
+		    {
+		        winState = false;
 		    }
 		}
 

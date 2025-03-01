@@ -252,7 +252,7 @@ void OnFrameUpdate()
 
 		// Resize window
 		{
-			constexpr glm::ivec2 minWindowSize{ 100, 100 };
+			constexpr glm::ivec2 minWindowSize{ 720, 480 };
 			struct ResizeState {
 				bool active = false;
 				bool edges[4] = {};
