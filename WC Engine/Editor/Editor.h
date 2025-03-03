@@ -1315,7 +1315,13 @@ struct EditorInstance
 						});
 
 					EditComponent<TextRendererComponent>("Text Renderer", [&](auto& component) {
-						gui::InputText("Text", &component.Text);
+						//gui::InputText("Text", &component.Text);
+						int newLines = 1;
+					    for (char c : component.Text)
+					    {
+                            if (c == '\n') newLines++;
+                        }
+						gui::InputTextMultiline("Text", &component.Text, {0, gui::GetStyle().FramePadding.y * 2 + gui::GetFontSize() * std::min(4, newLines)}, ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_AllowTabInput);
 						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
 						ui::Drag("Line spacing", component.LineSpacing);
 						ui::Drag("Kerning", component.Kerning);
