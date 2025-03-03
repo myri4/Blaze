@@ -489,8 +489,8 @@ namespace Editor
 		void ChangeTransform(const flecs::entity& entity)
 		{
 			auto& cmd = *PushCommand<CMD_TransformChange>();
-			cmd.Entity = SelectedEntity;
-			cmd.Transform = *SelectedEntity.get<TransformComponent>();
+			cmd.Entity = entity;
+			cmd.Transform = *entity.get<TransformComponent>();
 		}
 	};
 }
