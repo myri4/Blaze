@@ -2744,7 +2744,7 @@ struct EditorInstance
 		glm::vec2 mousePos = Globals.window.GetCursorPos() + Globals.window.GetPosition();
 		static glm::vec2 mouseCur = {};
 
-		if (ImGui::IsMouseClicked(0) && Globals.window.GetCursorPos().y <= gui::GetFrameHeightWithSpacing() && !ImGui::IsAnyItemHovered() && !Globals.window.IsMaximized())
+		if (ImGui::IsMouseClicked(0) && Globals.window.GetCursorPos().y <= gui::GetFrameHeightWithSpacing() && !ImGui::IsAnyItemHovered())
 		{
 			// TODO - FIX: check if not hovering edge
 			bool top = (Globals.window.GetCursorPos().y >= -Globals.window.borderSize) && (Globals.window.GetCursorPos().y <= Globals.window.borderSize);
@@ -2753,10 +2753,17 @@ struct EditorInstance
 
 			if (!top && !left && !right)
 			{
+			    if (Globals.window.IsMaximized())
+			    {
+			        Globals.window.SetMaximized(false);
+			        Globals.window.SetPosition(glm::vec2(mousePos.x - Globals.window.GetSize().x * 0.5f, mousePos.y - Globals.window.borderSize * 2.5f));
+			    }
+
 				dragging = true;
 				mouseCur = Globals.window.GetCursorPos();
 			}
 		}
+
 		if (dragging && ImGui::IsMouseDown(0))
 			Globals.window.SetPosition({ mousePos.x - mouseCur.x, mousePos.y - mouseCur.y });
 
