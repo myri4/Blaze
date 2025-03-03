@@ -11,11 +11,10 @@ namespace vk
 
 		void Create(VkFenceCreateFlags flags = 0)
 		{
-			VkFenceCreateInfo createInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-
-			createInfo.flags = flags;
-
-			Create(createInfo);
+			Create({
+				.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+				.flags = flags,
+			});
 		}
 
 		VkResult Wait(uint64_t timeout = UINT64_MAX) { return vkWaitForFences(VulkanContext::GetLogicalDevice(), 1, &m_Handle, true, timeout); }
@@ -37,10 +36,10 @@ namespace vk
 
 		void Create(VkSemaphoreCreateFlags flags = 0)
 		{
-			VkSemaphoreCreateInfo createInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-			createInfo.flags = flags;
-
-			Create(createInfo);
+			Create({
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+				.flags = flags,
+			});
 		}
 
 		void Create(const std::string& name, VkSemaphoreCreateFlags flags = 0)
@@ -60,13 +59,15 @@ namespace vk
 	{
 		void Create(uint64_t initialValue = 0, VkSemaphoreCreateFlags flags = 0)
 		{
-			VkSemaphoreTypeCreateInfo timelineCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO };
-			timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-			timelineCreateInfo.initialValue = initialValue;
+			VkSemaphoreTypeCreateInfo timelineCreateInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+				.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+				.initialValue = initialValue,
+			};
 
-			VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-			semaphoreCreateInfo.pNext = &timelineCreateInfo;
-			semaphoreCreateInfo.flags = flags;
+			VkSemaphoreCreateInfo semaphoreCreateInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+				.pNext = &timelineCreateInfo,
+				.flags = flags,
+			};
 
 			vkCreateSemaphore(VulkanContext::GetLogicalDevice(), &semaphoreCreateInfo, VulkanContext::GetAllocator(), &m_Handle);
 		}
@@ -85,20 +86,24 @@ namespace vk
 
 		void Signal(uint64_t value)
 		{
-			VkSemaphoreSignalInfo signalInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO };
-			signalInfo.semaphore = m_Handle;
-			signalInfo.value = value;
+			VkSemaphoreSignalInfo signalInfo = { 
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
+				.semaphore = m_Handle,
+				.value = value,
+			};
 
 			vkSignalSemaphore(VulkanContext::GetLogicalDevice(), &signalInfo);
 		}
 
 		void Wait(uint64_t waitValue, uint64_t timeout = UINT64_MAX)
 		{
-			VkSemaphoreWaitInfo waitInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO };
-			waitInfo.flags = 0;
-			waitInfo.semaphoreCount = 1;
-			waitInfo.pSemaphores = &m_Handle;
-			waitInfo.pValues = &waitValue;
+			VkSemaphoreWaitInfo waitInfo = { 
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+				.flags = 0,
+				.semaphoreCount = 1,
+				.pSemaphores = &m_Handle,
+				.pValues = &waitValue,
+			};
 
 			vkWaitSemaphores(VulkanContext::GetLogicalDevice(), &waitInfo, timeout);
 		}
@@ -117,10 +122,10 @@ namespace vk
 
 		void Create(VkEventCreateFlags flags = 0)
 		{
-			VkEventCreateInfo createInfo = { VK_STRUCTURE_TYPE_EVENT_CREATE_INFO };
-			createInfo.flags = flags;
-
-			Create(createInfo);
+			Create({
+				.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO,
+				.flags = flags,
+			});
 		}
 
 		VkResult GetStatus() { return vkGetEventStatus(VulkanContext::GetLogicalDevice(), m_Handle); }

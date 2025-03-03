@@ -5,7 +5,7 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
-#define WC_GRAPHICS_VALIDATION 0
+#define WC_GRAPHICS_VALIDATION 1
 #define WC_SYNCHRONIZATION_VALIDATION 1
 #define WC_SHADER_DEBUG_PRINT 0
 
@@ -355,6 +355,7 @@ namespace VulkanContext
 #endif
 				//VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT
 		};
+
 		if (bValidationLayers)
 		{
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -583,7 +584,6 @@ namespace VulkanContext
 				.bufferDeviceAddress = true,
 			};
 
-			VkDeviceCreateInfo createInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 
 			std::set<uint32_t> uniqueQueueFamilies = {
 				indices.graphicsFamily.value(),
@@ -595,24 +595,25 @@ namespace VulkanContext
 			std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 			float queuePriorities[] = { 1.f };
 			for (const auto& queueFamily : uniqueQueueFamilies)
-			{
-				VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-				queueCreateInfo.queueFamilyIndex = queueFamily;
-				queueCreateInfo.queueCount = (uint32_t)std::size(queuePriorities);
-				queueCreateInfo.pQueuePriorities = queuePriorities;
+				queueCreateInfos.push_back({
+					.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+					.queueFamilyIndex = queueFamily,
+					.queueCount = (uint32_t)std::size(queuePriorities),
+					.pQueuePriorities = queuePriorities,
+					});
 
-				queueCreateInfos.push_back(queueCreateInfo);
-			}
+			VkDeviceCreateInfo createInfo = { 
+				.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+				.pNext = &features12,
 
-			createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-			createInfo.pQueueCreateInfos = queueCreateInfos.data();
+				.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+				.pQueueCreateInfos = queueCreateInfos.data(),
 
-			createInfo.pEnabledFeatures = &deviceFeatures;
+				.pEnabledFeatures = &deviceFeatures,
 
-			createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-			createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-			createInfo.pNext = &features12;
+				.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
+				.ppEnabledExtensionNames = deviceExtensions.data(),
+			};
 
 #if WC_GRAPHICS_VALIDATION
 			if (bValidationLayers)
@@ -644,17 +645,20 @@ namespace VulkanContext
 			vk::TransferQueue.SetName("TransferQueue");
 		}
 
-		VmaVulkanFunctions vulkanFunctions = {};
-		vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-		vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+		VmaVulkanFunctions vulkanFunctions = {
+			.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+			.vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+		};
 
-		VmaAllocatorCreateInfo allocatorInfo = {};
-		allocatorInfo.vulkanApiVersion = appInfo.apiVersion;
-		allocatorInfo.physicalDevice = physicalDevice;
-		allocatorInfo.device = GetLogicalDevice();
-		allocatorInfo.instance = instance;
-		allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-		allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+		VmaAllocatorCreateInfo allocatorInfo = {
+			.vulkanApiVersion = appInfo.apiVersion,
+			.physicalDevice = physicalDevice,
+			.device = GetLogicalDevice(),
+			.instance = instance,
+			.pVulkanFunctions = &vulkanFunctions,
+			.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+		};
+
 		if (vmaCreateAllocator(&allocatorInfo, &MemoryAllocator) != VK_SUCCESS)
 		{
 			WC_CORE_ERROR("Failed to create a memory allocator!");

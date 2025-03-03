@@ -88,7 +88,7 @@ namespace vk::SyncContext
 			.pSignalSemaphoreValues = &signalValue,
 		};
 
-		VkSubmitInfo submitInfo = {
+		queue.Submit({
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.pNext = &timelineInfo,
 			.waitSemaphoreCount = 1,
@@ -99,9 +99,7 @@ namespace vk::SyncContext
 			.pCommandBuffers = &cmd,
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores = &m_TimelineSemaphore,
-		};
-
-		queue.Submit(submitInfo, fence);
+		}, fence);
 	}
 
 	inline void ImmediateSubmit(std::function<void(VkCommandBuffer)>&& function) // @TODO: revisit if this is suitable for a inline
@@ -117,13 +115,11 @@ namespace vk::SyncContext
 
 		vkEndCommandBuffer(UploadCommandBuffer);
 
-		VkSubmitInfo submit = {
+		GetGraphicsQueue().Submit({
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.commandBufferCount = 1,
 			.pCommandBuffers = &UploadCommandBuffer,
-		};
-
-		GetGraphicsQueue().Submit(submit, ImmediateFence);
+			}, ImmediateFence);
 
 		ImmediateFence.Wait();
 		ImmediateFence.Reset();
