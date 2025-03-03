@@ -339,7 +339,6 @@ namespace Editor
 
 	enum class SceneState { Edit, Simulate, Play };
 
-
 	struct EditorScene
 	{
 		// @NOTE: maybe we should move the entity ordering in this struct as this is a feature that is only being used by the editor
@@ -356,86 +355,6 @@ namespace Editor
 
 		SceneState State = SceneState::Edit;
 		ImGuizmo::OPERATION GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
-
-		void Input(glm::vec2 RenderSize)
-		{
-			if (gui::IsKeyPressed(ImGuiKey_G)) GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_R)) GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_S)) GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
-
-			if (gui::IsKeyDown(ImGuiKey_LeftCtrl))
-			{
-				if (gui::IsKeyPressed(ImGuiKey_Z)) Undo();
-				else if (gui::IsKeyPressed(ImGuiKey_Y)) Redo();
-				else if (gui::IsKeyPressed(ImGuiKey_S)) Save();
-			}
-
-			/*float scroll = Mouse::GetMouseScroll().y;
-			if (scroll != 0.f)
-			{
-				camera.Zoom += -scroll * Settings::ZoomSpeed;
-				camera.Zoom = glm::max(camera.Zoom, 0.05f);
-				camera.Update(m_Renderer.GetHalfSize(camera.Zoom));
-			}
-
-			glm::vec2 mousePos = (glm::vec2)(Globals.window.GetCursorPos() + Globals.window.GetPosition()) - WindowPos;
-			glm::vec2 mouseFinal = m_BeginCameraPosition + m_Renderer.ScreenToWorld(mousePos, camera.Zoom);
-
-			if (Mouse::GetMouse(Mouse::RIGHT))
-			{
-				if (!m_Panning)
-				{
-					m_StartPan = mouseFinal;
-					m_BeginCameraPosition = camera.Position;
-				}
-
-				camera.Position = glm::vec3(m_BeginCameraPosition + (m_StartPan - mouseFinal), camera.Position.z);
-				m_Panning = true;
-			}
-			else
-			{
-				m_StartPan = glm::vec2(0.f);
-				m_BeginCameraPosition = camera.Position;
-				m_Panning = false;
-			}*/
-
-			if (Key::GetKey(Key::LeftAlt))
-			{
-				const glm::vec2& mouse = Globals.window.GetCursorPos();
-				glm::vec2 delta = (mouse - camera.m_InitialMousePosition) * 0.01f;
-				camera.m_InitialMousePosition = mouse;
-
-				if (Mouse::GetMouse(Mouse::LEFT))
-				{
-					auto panSpeed = camera.PanSpeed(RenderSize);
-					camera.FocalPoint += -camera.GetRightDirection() * delta.x * panSpeed.x * camera.m_Distance;
-					camera.FocalPoint += camera.GetUpDirection() * delta.y * panSpeed.y * camera.m_Distance;
-				}
-				else if (Mouse::GetMouse(Mouse::RIGHT))
-				{
-					float yawSign = camera.GetUpDirection().y < 0 ? -1.f : 1.f;
-					camera.Yaw += yawSign * delta.x * camera.RotationSpeed;
-					camera.Pitch += delta.y * camera.RotationSpeed;
-				}
-
-				camera.UpdateView();
-			}
-
-			float scroll = Mouse::GetMouseScroll().y;
-			if (scroll != 0.f)
-			{
-				float delta = scroll * 0.1f;
-				{
-					camera.m_Distance -= delta * camera.ZoomSpeed();
-					if (camera.m_Distance < 1.f)
-					{
-						camera.FocalPoint += camera.GetForwardDirection();
-						camera.m_Distance = 1.f;
-					}
-				}
-				camera.UpdateView();
-			}
-		}
 
 		void CreatePhysicsWorld() { m_Scene.CreatePhysicsWorld(); }
 		void Create() { m_Scene.Create(); }
@@ -567,7 +486,7 @@ namespace Editor
 			}
 		}
 
-		void ChangeTransform()
+		void ChangeTransform(const flecs::entity& entity)
 		{
 			auto& cmd = *PushCommand<CMD_TransformChange>();
 			cmd.Entity = SelectedEntity;
