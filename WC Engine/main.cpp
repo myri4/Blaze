@@ -15,10 +15,7 @@
 #include "wc/imgui_backend/imgui_impl_glfw.h"
 #include "wc/imgui_backend/imgui_impl_vulkan.h"
 
-#include "Editor.h"
-#include "UI/Widgets.h"
-
-#include <wc/Swapchain.h>
+#include "Editor/Editor.h"
 
 //DANGEROUS!
 #pragma warning(push, 0)
@@ -40,7 +37,7 @@
 
 #pragma warning(pop)
 
-Editor editor;
+EditorInstance editor;
 
 vk::Swapchain swapchain;
 

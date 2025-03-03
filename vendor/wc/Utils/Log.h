@@ -22,13 +22,13 @@ namespace wc
 		struct Message
 		{
 			std::string loggerName;
-			spdlog::level::level_enum level;
-			std::chrono::system_clock::time_point time;
-			size_t thread_id{ 0 };
 			const char* filename = nullptr;
 			const char* funcname = nullptr;
-			uint32_t line = 0;
 			std::string payload;
+			spdlog::level::level_enum level;
+			std::chrono::system_clock::time_point time;
+			size_t thread_id = 0;
+			uint32_t line = 0;
 		};
 
 		std::vector<Message> messages;
@@ -37,16 +37,16 @@ namespace wc
 		{
 			spdlog::memory_buf_t formatted;
 			spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
-			Message fmsg = {};
-			fmsg.loggerName = std::string(msg.logger_name.data());
-			fmsg.level = msg.level;
-			fmsg.time = msg.time;
-			fmsg.thread_id = msg.thread_id;
-			fmsg.filename = msg.source.filename;
-			fmsg.funcname = msg.source.funcname;
-			fmsg.line = msg.source.line;
-			fmsg.payload = std::string(msg.payload.data());
-			messages.push_back(fmsg);
+			messages.push_back({
+				.loggerName = std::string(msg.logger_name.data(), msg.logger_name.size()),
+				.filename = msg.source.filename,
+				.funcname = msg.source.funcname,
+				.payload = std::string(msg.payload.data(), msg.payload.size()),
+				.level = msg.level,
+				.time = msg.time,
+				.thread_id = msg.thread_id,
+				.line = (uint32_t)msg.source.line,
+				});
 			//std::cout << fmt::to_string(formatted);
 		}
 

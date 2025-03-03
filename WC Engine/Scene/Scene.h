@@ -135,7 +135,7 @@ namespace blaze
 		{
 			PhysicsWorld.Create(b2DefaultWorldDef());
 
-			EntityWorld.observer<BoxCollider2DComponent, RigidBodyComponent, TransformComponent>()
+			/*EntityWorld.observer<BoxCollider2DComponent, RigidBodyComponent, TransformComponent>()
 				.event(flecs::Monitor).each([&](flecs::iter& it, size_t i, BoxCollider2DComponent& collider, RigidBodyComponent& rigidBody, TransformComponent& transform) {
 					if (it.event() == flecs::OnAdd) 
 					{
@@ -175,7 +175,7 @@ namespace blaze
 					{
 						rigidBody.body.Destroy();
 					}
-				});
+				});*/
 		}
 
 		void CreatePhysicsWorld()

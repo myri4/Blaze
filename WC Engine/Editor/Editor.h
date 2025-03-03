@@ -9,7 +9,7 @@
 
 #include "Rendering/Renderer2D.h"
 
-#include "Scene/EditorScene.h"
+#include "EditorScene.h"
 
 #include "Globals.h"
 #include "Project/Settings.h"
@@ -18,6 +18,7 @@
 
 using namespace wc;
 using namespace blaze;
+using namespace Editor;
 namespace gui = ImGui;
 
 glm::vec4 decompress(uint32_t num)
@@ -94,7 +95,7 @@ void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor color, void* context)
 	//static_cast<Draw*>(context)->DrawString(p, s);
 }
 
-struct Editor
+struct EditorInstance
 {
 	// Debug stats
 	float m_DebugTimer = 0.f;
@@ -235,7 +236,7 @@ struct Editor
 	{
 		if (allowInput)
 		{
-			m_Scene.EditorInput(m_Renderer.m_RenderSize);
+			m_Scene.Input(m_Renderer.m_RenderSize);
 		}
 	}
 
@@ -344,7 +345,7 @@ struct Editor
 		                {
 		                    if (m_Scene.Path != scene)
 		                    {
-		                        //WC_INFO("Opening scene: {0}", scene);
+		                        //WC_INFO("Opening scene: {}", scene);
 		                        m_Scene.Save(m_Scene.Path);
 		                        m_Scene.Path = scene;
 		                        m_Scene.Load(scene);
@@ -362,7 +363,7 @@ struct Editor
 		                if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 		                {
 		                    //WC_CORE_INFO("Save scene before changing");
-		                    //WC_INFO("Opening scene: {0}", scene);
+		                    //WC_INFO("Opening scene: {}", scene);
 		                    m_Scene.Save();
 		                    m_Scene.Path = scene;
 		                    m_Scene.Load(scene);
@@ -371,7 +372,7 @@ struct Editor
 		                gui::SameLine(0, spacing);
 		                if (gui::Button("No", {textSize * 0.3f, 0}))
 		                {
-		                    //WC_INFO("Opening scene: {0}", scene);
+		                    //WC_INFO("Opening scene: {}", scene);
 		                    m_Scene.Path = scene;
 		                    m_Scene.Load(scene);
 		                    gui::CloseCurrentPopup();
@@ -390,7 +391,7 @@ struct Editor
 		            // Handle tab closure
 		            if (!open)
 		            {
-		                //WC_INFO("Closing scene: {0}", scene);
+		                //WC_INFO("Closing scene: {}", scene);
 		                bool wasActive = (m_Scene.Path == scene);
 
 		                if (wasActive)
@@ -524,17 +525,17 @@ struct Editor
 					parent = parent.parent();
 				}
 
-				ImGuizmo::Manipulate(
+				static bool wasUsingGuizmo = false;
+				if (ImGuizmo::Manipulate(
 					glm::value_ptr(m_Scene.camera.ViewMatrix),
 					glm::value_ptr(projection),
 					m_Scene.GuizmoOp,
 					ImGuizmo::MODE::WORLD,
 					glm::value_ptr(world_transform),
 					glm::value_ptr(deltaMatrix)
-				);
-
-				if (ImGuizmo::IsUsing())
+				))
 				{
+					wasUsingGuizmo = true;
 					// Convert world transform back to local space
 					glm::mat4 parent_world_transform(1.f);
 					parent = m_Scene.SelectedEntity.parent();
@@ -579,6 +580,13 @@ struct Editor
 							body.SetTransform(translation, b2MakeRot(rotation.z));
 						}
 					}
+				}
+				else
+				{
+					if (wasUsingGuizmo)
+						m_Scene.ChangeTransform();
+
+					wasUsingGuizmo = false;
 				}
 			}
 		}
@@ -669,7 +677,7 @@ struct Editor
 			std::string exportPath = ui::FileDialog("Export Entity", ".", Project::rootPath);
 			if (!exportPath.empty())
 			{
-				YAML::Node entityData = m_Scene.SerializeEntity(entity); // TODO - fix with merge
+				YAML::Node entityData = m_Scene.ExportEntity(entity); // TODO - fix with merge
 				YAMLUtils::SaveFile(exportPath + "\\" + std::string(entity.name().c_str()) + ".blzent", entityData);
 			}
 
@@ -1445,10 +1453,7 @@ struct Editor
 		if (gui::Begin("Console", &showConsole))
 		{
 			if (gui::Button("Clear"))
-			{
-				//Globals.console.Clear();
 				Log::GetConsoleSink()->messages.clear();
-			}
 
 			gui::SameLine();
 			if (gui::Button("Copy"))
@@ -1570,7 +1575,7 @@ struct Editor
 	            {
 	                if (m_Scene.Path != filePath.string())
 	                {
-	                    //WC_INFO("Assets: Opening scene: {0}", filePath.string());
+	                    //WC_INFO("Assets: Opening scene: {}", filePath.string());
 	                    //save old scene
 	                    m_Scene.Save();
 	                    m_Scene.Destroy();
@@ -1600,8 +1605,7 @@ struct Editor
 	                gui::BeginDisabled(name.empty() || m_Scene.m_Scene.EntityWorld.lookup(name.c_str()) != flecs::entity::null());
 	                if (gui::Button("Yes##Confirm") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 	                {
-	                    YAML::Node node = YAML::LoadFile(filePath.string());
-	                    m_Scene.DeserializeEntity(node); // TODO - fix with merge
+	                    m_Scene.LoadEntity(filePath.string()); // TODO - fix with merge
 	                    name = "#@#";
 	                    gui::CloseCurrentPopup();
 	                }
@@ -2680,11 +2684,9 @@ struct Editor
 							gui::Text("FullPath: %s", project.c_str());
 							gui::SameLine();
 							if (gui::Button(("Delete##" + path.string()).c_str()))
-							{
 								gui::OpenPopup(("Delete Project##" + project).c_str());
-							}
 						}
-						else WC_CORE_WARN("Project path does not exist: {0}", project);
+						else WC_CORE_WARN("Project path does not exist: {}", project);
 						gui::PopFont();
 
 						ui::CenterNextWindow();
@@ -2698,7 +2700,8 @@ struct Editor
 							}
 
 							gui::SameLine(gui::CalcTextSize("Are you sure you want to delete this project?").x - gui::GetContentRegionAvail().x * 0.3f + gui::GetStyle().ItemSpacing.x);
-							if (gui::Button("No##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape)) gui::CloseCurrentPopup();
+							if (gui::Button("No##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Escape)) 
+								gui::CloseCurrentPopup();
 
 							gui::EndPopup();
 						}
@@ -2722,14 +2725,14 @@ struct Editor
 				{
 					if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.f_Default.Menu))
 					{
-						if (gui::MenuItem("Change", "CTRL + P")) Project::Reset();
+						if (gui::MenuItem("Change", "CTRL + P")) 
+							Project::Reset();
 
 					    if (gui::MenuItem("Open in File Explorer", "CTRL + L"))
-					    {
 					        FileDialogs::OpenInFileExplorer(Project::rootPath);
-					    }
 
-					    if (ui::MenuItemButton("Rename")) gui::OpenPopup("Rename Project");
+					    if (ui::MenuItemButton("Rename")) 
+							gui::OpenPopup("Rename Project");
 
 					    ui::CenterNextWindow();
 					    if (gui::BeginPopupModal("Rename Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
@@ -2805,9 +2808,7 @@ struct Editor
 						}
 
 						if (ui::MenuItemButton("Open", "CTRL + O", false))
-						{
 							gui::OpenPopup("Open Scene");
-						}
 
 						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath, true);
 						if (!sOpenPath.empty())
@@ -2824,18 +2825,14 @@ struct Editor
 							SavePhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
 						}
 
-						if (gui::MenuItem("Save As", "CTRL + A + S"))
+						if (gui::MenuItem("Save As", "CTRL + A + S")) 
 							m_Scene.Save();
 
 						if (gui::MenuItem("Undo", "CTRL + Z"))
-						{
-							WC_INFO("Undo");
-						}
+							m_Scene.Undo();
 
-						if (gui::MenuItem("Redo", "CTRL + Y"))
-						{
-							WC_INFO("Redo");
-						}
+						if (gui::MenuItem("Redo", "CTRL + Y")) 
+							m_Scene.Redo();
 
 						gui::EndMenu();
 					}

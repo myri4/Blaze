@@ -30,7 +30,6 @@ namespace wc
 	struct ICommand
 	{
 		CommandType type;
-		uint8_t size;
 	};
 
 	template<CommandType cmd>
@@ -279,7 +278,6 @@ namespace wc
 		{
 			T* cmd = new T(); // call the constructor
 			cmd->type = T::cmd_type;
-			cmd->size = sizeof(T);
 			encode_buffer.push_back(cmd);
 			return cmd;
 		}
