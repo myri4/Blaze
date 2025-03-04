@@ -3,10 +3,12 @@
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
-#include "box2d.h"
-#include "../Rendering/Font.h"
-#include "../Scripting/Script.h"
 
+#include "box2d.h"
+
+#include "../Rendering/Font.h"
+
+#include "../Scripting/Script.h"
 
 namespace blaze
 {

@@ -315,22 +315,6 @@ namespace Editor
 		}
 	}
 
-	void SaveScene(const Scene& scene, const std::string& filepath) { YAMLUtils::SaveFile(filepath, toYAML(scene)); }
-
-	bool LoadScene(Scene& scene, const std::string& filepath, const bool clear = true)
-	{
-		if (clear) scene.DeleteAllEntities();
-		if (!std::filesystem::exists(filepath))
-		{
-			WC_CORE_ERROR("{} does not exist.", filepath);
-			return false;
-		}
-
-		fromYAML(scene, YAML::LoadFile(filepath));
-		Project::AddSceneToList(filepath);
-		return true;
-	}
-
 	void CopyScene(const Scene& srcScene, Scene& dstScene)
 	{
 		dstScene.DeleteAllEntities();
@@ -359,7 +343,16 @@ namespace Editor
 		void CreatePhysicsWorld() { m_Scene.CreatePhysicsWorld(); }
 		void Create() { m_Scene.Create(); }
 
-		void Destroy() { m_Scene.Destroy(); }
+		void Destroy() 
+		{ 
+			m_Scene.Destroy(); 
+
+			SelectedEntity = flecs::entity::null();
+			CommandIndex = 0;
+			//@TODO clear the command buffer
+			GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
+			Path.clear();
+		}
 		void DeleteAllEntities() { m_Scene.DeleteAllEntities(); }
 
 		flecs::entity AddEntity() { return m_Scene.AddEntity(); }
@@ -426,11 +419,42 @@ namespace Editor
 		flecs::entity LoadEntity(const YAML::Node& entityData) { return DeserializeEntity(m_Scene, entityData); } // bruh :: is absolutely not required, thanks clang
 		flecs::entity LoadEntity(const std::string& path) { return LoadEntity(YAML::LoadFile(path)); }
 
-		void Save() { SaveScene(m_Scene, Path); }
+		void Save() 
+		{
+			YAML::Node data = toYAML(m_Scene);
+			data["CameraFocalPoint"] = camera.FocalPoint; // @TODO: Camera loading doesnt work
+			data["CameraYaw"] = camera.Yaw;
+			data["CameraPitch"] = camera.Pitch;
+			data["CameraDistance"] = camera.m_Distance;
+			YAMLUtils::SaveFile(Path, data); 
+		}
+
+		void Save(const std::string& filepath) 
+		{ 
+			Path = filepath;
+			Save();
+		}
+
 		bool Load(const std::string& filepath, const bool clear = true)
 		{
 			Path = filepath;
-			return LoadScene(m_Scene, Path, clear);
+
+			if (clear) m_Scene.DeleteAllEntities();
+			if (!std::filesystem::exists(Path))
+			{
+				WC_CORE_ERROR("{} does not exist.", Path);
+				return false;
+			}
+
+			YAML::Node data = YAML::LoadFile(Path);
+
+			fromYAML(m_Scene, data);
+
+			if (data["CameraFocalPoint"]) camera.FocalPoint = data["CameraFocalPoint"].as<glm::vec3>();
+			if (data["CameraYaw"]) camera.Yaw = data["CameraYaw"].as<float>();
+			if (data["CameraPitch"]) camera.Pitch = data["CameraPitch"].as<float>();
+			if (data["CameraDistance"]) camera.m_Distance = data["CameraDistance"].as<float>();
+			return true;
 		}
 
 		// Undo/Redo

@@ -11,13 +11,8 @@
 
 #include "EditorScene.h"
 
-#include "Globals.h"
-#include "Project/Settings.h"
+#include "../Globals.h"
 
-#include <wc/Math/Camera.h>
-
-using namespace wc;
-using namespace blaze;
 using namespace Editor;
 namespace gui = ImGui;
 
@@ -95,6 +90,15 @@ void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor color, void* context)
 	//static_cast<Draw*>(context)->DrawString(p, s);
 }
 
+#define PROJECT_SETTINGS_EXTENSION ".blzproj"
+#define PROJECT_USER_SETTINGS_EXTENSION ".blzproj.user"
+
+namespace Project
+{
+	
+}
+
+
 struct EditorInstance
 {
 	// Debug stats
@@ -164,7 +168,7 @@ struct EditorInstance
 
 	void Create()
 	{
-		Settings::Load();
+		LoadSettings();
 
 		assetManager.Init();
 
@@ -223,9 +227,9 @@ struct EditorInstance
 
 	void Destroy()
 	{
-		Settings::Save();
+		SaveSettings();
 
-		SavePhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+		SavePhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
 
 		t_Close.Destroy();
 		t_Collapse.Destroy();
@@ -377,7 +381,7 @@ struct EditorInstance
 
 	void Render()
 	{
-		if (!Project::Exists()) return;
+		if (!ProjectExists()) return;
 		auto& renderData = m_RenderData[CURRENT_FRAME];
 
 		if (m_Renderer.TextureCapacity < assetManager.Textures.size())
@@ -424,7 +428,7 @@ struct EditorInstance
 
 		        ImGuiTabItemFlags flags = ImGuiTabBarFlags_NoTooltip;
 		        gui::BeginDisabled(SceneState::Play == m_Scene.State || SceneState::Simulate == m_Scene.State);
-		        for (const auto& scene : Project::savedProjectScenes)
+		        for (const auto& scene : savedProjectScenes)
 		        {
 		            if (scene == m_Scene.Path) flags |= ImGuiTabItemFlags_SetSelected;
 		            else flags &= ~ImGuiTabItemFlags_SetSelected;
@@ -502,13 +506,13 @@ struct EditorInstance
 		                    m_Scene.Destroy();
 		                }
 
-		                Project::RemoveSceneFromList(scene);
+		                RemoveSceneFromList(scene);
 
 		                if (wasActive)
 		                {
-		                    if (!Project::savedProjectScenes.empty())
+		                    if (!savedProjectScenes.empty())
 		                    {
-		                        m_Scene.Path = Project::savedProjectScenes.front();
+		                        m_Scene.Path = savedProjectScenes.front();
 		                        m_Scene.Load(m_Scene.Path);
 		                    }
 		                    else
@@ -776,7 +780,7 @@ struct EditorInstance
 			{
 				gui::OpenPopup("Export Entity");
 			}
-			std::string exportPath = ui::FileDialog("Export Entity", ".", Project::rootPath);
+			std::string exportPath = ui::FileDialog("Export Entity", ".", ProjectRootPath);
 			if (!exportPath.empty())
 			{
 				YAML::Node entityData = m_Scene.ExportEntity(entity); // TODO - fix with merge
@@ -1688,7 +1692,7 @@ struct EditorInstance
 	void UI_Assets()
     {
 	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua", ".luau", ".luarc" };
-        auto assetsPath = std::filesystem::path(Project::rootPath);
+        auto assetsPath = std::filesystem::path(ProjectRootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
         static std::vector<std::filesystem::path> openedFiles;
@@ -1757,7 +1761,7 @@ struct EditorInstance
 	                    m_Scene.Destroy();
 
 	                    //load new scene
-	                    Project::AddSceneToList(filePath.string());
+	                    AddSceneToList(filePath.string());
 	                    m_Scene.SelectedEntity = flecs::entity::null();
 	                    m_Scene.Load(filePath.string());
 	                }
@@ -1845,14 +1849,14 @@ struct EditorInstance
                             }
                             else
                             {
-                                if (Project::SceneExistInList(file))
+                                if (SceneExistInList(file))
                                 {
                                     if (m_Scene.Path == file)
                                     {
                                         m_Scene.Path.clear();
                                         m_Scene.Destroy();
                                     }
-                                    Project::RemoveSceneFromList(file);
+                                    RemoveSceneFromList(file);
                                 }
                                 openedFiles.erase(std::remove(openedFiles.begin(), openedFiles.end(), filePath), openedFiles.end());
                                 openedFileNames.erase(filePath.string());
@@ -2699,7 +2703,7 @@ struct EditorInstance
 		static bool showCloseWarn = false;
 		if (gui::ImageButton("close", t_Close, { buttonSize, buttonSize }))
 		{
-			if (Project::Exists())
+			if (ProjectExists())
 				showCloseWarn = true;
 			else
 				Globals.window.Close();
@@ -2714,13 +2718,12 @@ struct EditorInstance
 		ui::CenterNextWindow();
 	    if (gui::BeginPopupModal("Close Project Warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar))
 	    {
-	        gui::Text("Save Changes to [%s] before closing?", Project::name.c_str());
-	        float textSize = gui::CalcTextSize("Save Changes to [").x + gui::CalcTextSize(Project::name.c_str()).x + gui::CalcTextSize("] before closing?").x;
+	        gui::Text("Save Changes to [%s] before closing?", ProjectName.c_str());
+	        float textSize = gui::CalcTextSize("Save Changes to [").x + gui::CalcTextSize(ProjectName.c_str()).x + gui::CalcTextSize("] before closing?").x;
 	        float spacing = textSize * 0.05f;
 	        if (gui::Button("Yes", {textSize * 0.3f, 0}) || gui::IsKeyPressed(ImGuiKey_Enter))
 	        {
-				Project::Save();
-	            m_Scene.Save(); // Saving scene
+				SaveProject();
 	            Globals.window.Close();
 	            gui::CloseCurrentPopup();
 	        }
@@ -2781,7 +2784,7 @@ struct EditorInstance
 		gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.0f, 7.0f));
 		gui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
 		gui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-		gui::PushStyleVar(ImGuiStyleVar_WindowPadding, Project::Exists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
+		gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ProjectExists() ? ImVec2(0.f, 0.f) : ImVec2(50.f, 50.f));
 
 		static ImGuiWindowFlags windowFlags =
 			ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking
@@ -2790,7 +2793,7 @@ struct EditorInstance
 			| ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 		if (gui::Begin("DockSpace", nullptr, windowFlags))
 		{
-			if (!Project::Exists())
+			if (!ProjectExists())
 			{
 				gui::PopStyleVar(4);
 				windowFlags &= ~ImGuiWindowFlags_NoBackground;
@@ -2817,13 +2820,13 @@ struct EditorInstance
 				{
 				    std::string projName = std::filesystem::path(newProjectPath).filename().string();
 				    std::string projPath = std::filesystem::path(newProjectPath).parent_path().string();
-				    if (Project::ProjectExistInList(projName))
+				    if (ProjectExistInList(projName))
 				    {
 				        gui::OpenPopup("Project Already Exists");
 				    }
 				    else
 				    {
-				        Project::Create(projPath, projName);
+				        CreateProject(projPath, projName);
 				    }
 				}
 			    ui::CenterNextWindow();
@@ -2844,10 +2847,7 @@ struct EditorInstance
 				gui::PopFont();
 				std::string openProjectPath = ui::FileDialog("Open Project", ".");
 				if (!openProjectPath.empty())
-				{
-					if (Project::Load(openProjectPath))
-						LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
-				}
+					LoadProject(openProjectPath);
 
 				gui::Separator();
 
@@ -2861,7 +2861,7 @@ struct EditorInstance
 
 				    int ind = 0;
 				    bool showPopup = false;
-                    for (const auto& project : Project::savedProjectPaths)
+                    for (const auto& project : savedProjectPaths)
                     {
                         std::filesystem::path path = project;
                         if (std::filesystem::exists(path))
@@ -2900,14 +2900,9 @@ struct EditorInstance
                                     if (!gui::IsAnyItemHovered() && gui::IsWindowHovered())
                                     {
                                         gui::GetWindowDrawList()->AddRectFilled(gui::GetWindowPos(), {gui::GetWindowPos().x + gui::GetWindowSize().x, gui::GetWindowPos().y + gui::GetWindowSize().y}, gui::GetColorU32(ImGuiCol_Button));
-                                        if (gui::IsMouseClicked(0))
-                                        {
-                                            if (Project::Load(project)) LoadPhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+										if (gui::IsMouseClicked(0))
+											LoadProject(project);
 
-                                            // Load first project
-                                            m_Scene.Path = Project::savedProjectScenes.front();
-                                            m_Scene.Load(m_Scene.Path);
-                                        }
                                         if (gui::IsMouseClicked(ImGuiMouseButton_Right))
                                         {
                                             //WC_CORE_INFO("RIGHT");
@@ -2974,7 +2969,7 @@ struct EditorInstance
                             gui::Text("Are you sure you want to delete this project?");
                             if (gui::Button("Yes##Delete", { gui::GetContentRegionMax().x * 0.3f, 0 }) || gui::IsKeyPressed(ImGuiKey_Enter))
                             {
-                                Project::Delete(project);
+                                DeleteProject(project);
                                 gui::CloseCurrentPopup();
                             }
 
@@ -3006,13 +3001,13 @@ struct EditorInstance
 
 				if (gui::BeginMenuBar())
 				{
-					if (ui::BeginMenuFt(("[" + Project::name + "]").c_str(), Globals.f_Default.Menu))
+					if (ui::BeginMenuFt(("[" + ProjectName + "]").c_str(), Globals.f_Default.Menu))
 					{
 						if (gui::MenuItem("Change", "CTRL + P"))
-							Project::Reset();
+							ResetProject();
 
 					    if (gui::MenuItem("Open in File Explorer", "CTRL + L"))
-					        FileDialogs::OpenInFileExplorer(Project::rootPath);
+					        FileDialogs::OpenInFileExplorer(ProjectRootPath);
 
 					    if (ui::MenuItemButton("Rename"))
 							gui::OpenPopup("Rename Project");
@@ -3021,7 +3016,7 @@ struct EditorInstance
 					    if (gui::BeginPopupModal("Rename Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 					    {
 					        static std::string newName = "#@#";
-					        if (newName == "#@#") newName = Project::name;
+					        if (newName == "#@#") newName = ProjectName;
 					        if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
 					        gui::InputText("New Name", &newName);
 					        const float widgetWidth = gui::GetItemRectSize().x;
@@ -3029,7 +3024,7 @@ struct EditorInstance
 					        gui::BeginDisabled(newName.empty());
 					        if (gui::Button("OK", { gui::GetContentRegionMax().x * 0.3f, 0 }) || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
                             {
-                                Project::Rename(newName);
+                                RenameProject(newName);
                                 newName = "#@#";
                                 gui::CloseCurrentPopup();
                             }
@@ -3076,7 +3071,7 @@ struct EditorInstance
 
 						if (ui::MenuItemButton("New", "CTRL + N", false)) gui::OpenPopup("New Scene");
 
-						std::string newScenePath = ui::FileDialog("New Scene", ".", Project::rootPath, true, ".scene");
+						std::string newScenePath = ui::FileDialog("New Scene", ".", ProjectRootPath, true, ".scene");
 						if (!newScenePath.empty())
 						{
 						    //save old scene
@@ -3084,16 +3079,14 @@ struct EditorInstance
 						    m_Scene.Destroy();
 
 						    //create new scene
-						    Project::AddSceneToList(newScenePath);
-						    m_Scene.SelectedEntity = flecs::entity::null();
-						    m_Scene.Path = newScenePath;
-						    m_Scene.Save();
+						    AddSceneToList(newScenePath);
+						    m_Scene.Save(newScenePath);
 						}
 
 						if (ui::MenuItemButton("Open", "CTRL + O", false))
 							gui::OpenPopup("Open Scene");
 
-						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", Project::rootPath, true);
+						std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", ProjectRootPath, true);
 						if (!sOpenPath.empty())
 						{
 							m_Scene.Load(m_Scene.Path);
@@ -3105,7 +3098,7 @@ struct EditorInstance
 						if (gui::MenuItem("Save", "CTRL + S"))
 						{
 							m_Scene.Save();
-							SavePhysicsMaterials(Project::rootPath + "\\physicsMaterials.yaml");
+							SavePhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
 						}
 
 						if (gui::MenuItem("Save As", "CTRL + A + S"))
@@ -3166,7 +3159,7 @@ struct EditorInstance
 				}
 
 				//Display tabs - check project again because we can change state with menu bar (inside this else-case)
-				if (Project::Exists())
+				if (ProjectExists())
 				{
 					if (showEditor) UI_Editor();
 					if (showSceneProperties) UI_SceneProperties();
@@ -3180,5 +3173,268 @@ struct EditorInstance
 			}
 		}
 		gui::End();
+	}
+
+	// [PROJECT MANAGING]
+	std::string ProjectName;
+	std::string ProjectRootPath;
+	std::string ProjectFirstScene;
+
+	std::string texturePath;
+	std::string fontPath;
+	std::string soundPath;
+
+	std::string scenesPath;
+	std::string scriptsPath;
+	std::string entitiesPath;
+
+	std::vector<std::string> savedProjectPaths; // @NOTE: This could just be std::set
+	std::vector<std::string> savedProjectScenes;
+
+	bool AutoCleanUpProjectOnExit = true; // If this flag is set, when exiting the application all materials and entities that are not used in any scenes will be deleted.
+
+	void AddSceneToList(const std::string& path)
+	{
+		if (std::find(savedProjectScenes.begin(), savedProjectScenes.end(), path) == savedProjectScenes.end())
+			savedProjectScenes.push_back(path);
+	}
+
+	void RemoveSceneFromList(const std::string& filepath) { std::erase(savedProjectScenes, filepath); }
+
+	bool SceneExistInList(const std::string& path)
+	{
+		for (auto& each : savedProjectScenes)
+			if (std::filesystem::path(each).string() == path)
+				return true;
+
+		return false;
+	}
+
+	void AddProjectToList(const std::string& path)
+	{
+		if (std::find(savedProjectPaths.begin(), savedProjectPaths.end(), path) == savedProjectPaths.end())
+			savedProjectPaths.push_back(path);
+	}
+
+	void RemoveProjectFromList(const std::string& filepath) { std::erase(savedProjectPaths, filepath); }
+
+	bool ProjectExistInList(const std::string& pName)
+	{
+		for (auto& each : savedProjectPaths)
+			if (std::filesystem::path(each).filename().string() == pName)
+				return true;
+
+		return false;
+	}
+
+	void ResetProject()
+	{
+		ProjectName = "";
+		ProjectRootPath = "";
+		ProjectFirstScene = "";
+		savedProjectScenes.clear();
+	}
+
+	bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + PROJECT_SETTINGS_EXTENSION); }
+	std::string GetProjectSettingsPath() { return ProjectRootPath + "\\settings" + PROJECT_SETTINGS_EXTENSION; }
+	std::string GetProjectUserSettingsPath() { return ProjectRootPath + "\\settings" + PROJECT_USER_SETTINGS_EXTENSION; }
+
+	void SaveProjectData()
+	{
+		if (ProjectRootPath.empty()) return;
+
+		YAML::Node data;
+		YAML_SAVE_VAR(data, texturePath);
+		YAML_SAVE_VAR(data, fontPath);
+		YAML_SAVE_VAR(data, soundPath);
+
+		YAML_SAVE_VAR(data, scenesPath);
+		YAML_SAVE_VAR(data, scriptsPath);
+		YAML_SAVE_VAR(data, entitiesPath);
+
+		YAML::Node openedScenes;
+		for (auto& scene : savedProjectScenes)
+			openedScenes.push_back(scene);
+
+		YAML::Node userData;
+		userData["OpenedScenes"] = openedScenes;
+
+		YAMLUtils::SaveFile(GetProjectSettingsPath(), data);
+		YAMLUtils::SaveFile(GetProjectUserSettingsPath(), userData);
+	}
+
+	void SaveProject()
+	{
+		SaveProjectData();
+		m_Scene.Save(); // @TODO: This should save all opened scenes
+	}
+
+	bool LoadProject(const std::string& filepath)
+	{
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("{} does not exist", filepath);
+			return false;
+		}
+
+		if (!IsProject(filepath))
+		{
+			WC_CORE_ERROR("{} is not a Blaze project", filepath);
+			return false;
+		}
+
+		ProjectName = std::filesystem::path(filepath).stem().string();
+		ProjectRootPath = filepath;
+
+		YAML::Node data = YAML::LoadFile(GetProjectSettingsPath());
+		if (data)
+		{
+			YAML_LOAD_VAR(data, texturePath);
+			YAML_LOAD_VAR(data, fontPath);
+			YAML_LOAD_VAR(data, soundPath);
+
+			YAML_LOAD_VAR(data, scenesPath);
+			YAML_LOAD_VAR(data, scriptsPath);
+			YAML_LOAD_VAR(data, entitiesPath);
+		}
+		AddProjectToList(ProjectRootPath);
+
+		LoadPhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
+
+		if (std::filesystem::exists(GetProjectUserSettingsPath()))
+		{
+			YAML::Node userDataScenes = YAML::LoadFile(GetProjectUserSettingsPath());
+			for (const auto& openedScene : userDataScenes["OpenedScenes"])
+			{
+				auto path = openedScene.as<std::string>();
+				AddSceneToList(path);
+				m_Scene.Load(path);
+			}
+		}
+		return true;
+	}
+
+	void CreateProject(const std::string& filepath, const std::string& pName)
+	{
+		if (ProjectExistInList(pName))
+		{
+			WC_CORE_WARN("Project with this name already exists: {}", pName);
+			return;
+		}
+
+		ProjectName = pName;
+		ProjectRootPath = filepath + "\\" + pName; // @TODO: I think the '\\' are OS specific
+
+		texturePath = ProjectRootPath + "\\Textures";
+		fontPath = ProjectRootPath + "\\Fonts";
+		soundPath = ProjectRootPath + "\\Sounds";
+
+		scenesPath = ProjectRootPath + "\\Scenes";
+		scriptsPath = ProjectRootPath + "\\Scripts";
+		entitiesPath = ProjectRootPath + "\\Entities";
+
+		AddProjectToList(ProjectRootPath);
+		//std::string assetDir = ProjectRootPath + "\\Assets";
+		std::filesystem::create_directory(ProjectRootPath);
+
+		std::filesystem::create_directory(texturePath);
+		std::filesystem::create_directory(fontPath);
+		std::filesystem::create_directory(soundPath);
+
+		std::filesystem::create_directory(scenesPath);
+		std::filesystem::create_directory(scriptsPath);
+		std::filesystem::create_directory(entitiesPath);
+
+		SaveProjectData();
+	}
+
+	void DeleteProject(const std::string& filepath) // @TODO: This function should accept project index from savedProjectPaths
+	{
+		if (std::filesystem::exists(filepath))
+		{
+			if (IsProject(filepath))
+			{
+				std::filesystem::remove_all(filepath);
+				RemoveProjectFromList(filepath);
+				ResetProject();
+				WC_CORE_INFO("Deleted project: {}", filepath);
+			}
+			else WC_CORE_WARN("Directory is not a .blz project: {}", filepath);
+		}
+		else
+			WC_CORE_WARN("Project path does not exist: {}", filepath);
+	}
+
+	void RenameProject(const std::string& newName)
+	{
+		if (newName.empty())
+		{
+			WC_CORE_WARN("Project name cannot be empty");
+			return;
+		}
+
+		if (ProjectExistInList(newName))
+		{
+			WC_CORE_WARN("Project with this name already exists: {}", newName);
+			return;
+		}
+
+		RemoveProjectFromList(ProjectRootPath);
+		std::filesystem::rename(ProjectRootPath, ProjectRootPath.substr(0, ProjectRootPath.find_last_of('\\') + 1) + newName);
+		ProjectRootPath = ProjectRootPath.substr(0, ProjectRootPath.find_last_of('\\') + 1) + newName;
+		AddProjectToList(ProjectRootPath);
+		ProjectName = newName;
+		SaveProjectData();
+	}
+
+	bool ProjectExists() { return !ProjectName.empty() && !ProjectRootPath.empty(); }
+	
+	// [SETTINGS MANAGING]
+
+	float ZoomSpeed = 1.f;
+
+	void SaveSettings()
+	{
+		YAML::Node data;
+		YAML_SAVE_VAR(data, ZoomSpeed);
+		data["projectPaths"] = savedProjectPaths;
+
+		YAMLUtils::SaveFile("settings.yaml", data);
+	}
+	
+	void LoadSettings()
+	{
+		std::string filepath = "settings.yaml";
+		if (!std::filesystem::exists(filepath))
+		{
+			WC_CORE_ERROR("Save file does not exist: {}", filepath);
+			return;
+		}
+
+		YAML::Node data = YAML::LoadFile(filepath);
+		if (!data)
+		{
+			WC_CORE_ERROR("Couldn't open file {}", filepath);
+			return;
+		}
+		YAML_LOAD_VAR(data, ZoomSpeed);
+		if (data["projectPaths"])
+		{
+			bool shouldSave = false;
+
+			for (const auto& iPath : data["projectPaths"])
+			{
+				auto path = iPath.as<std::string>();
+				if (std::filesystem::exists(path) && IsProject(path))
+					savedProjectPaths.push_back(path);
+				else
+				{
+					std::erase(savedProjectPaths, path);
+					shouldSave = true;
+				}
+			}
+
+			if (shouldSave) SaveSettings();
+		}
 	}
 };
