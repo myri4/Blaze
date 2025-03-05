@@ -1632,6 +1632,7 @@ struct EditorInstance
 
 	void UI_Console()
 	{
+	    gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 		if (gui::Begin("Console", &showConsole, ImGuiWindowFlags_MenuBar))
 		{
 		    static bool showDebug = true;
@@ -1750,6 +1751,7 @@ struct EditorInstance
 		    }
 		}
 		gui::End();
+	    gui::PopStyleVar();
 	}
 
     void SaveStringToFile(const std::filesystem::path& filePath, const std::string& content) 
