@@ -91,7 +91,7 @@ void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor color, void* context)
 }
 
 #define PROJECT_SETTINGS_EXTENSION ".blzproj"
-#define PROJECT_USER_SETTINGS_EXTENSION ".blzproj.user"
+#define PROJECT_USER_SETTINGS_EXTENSION ".blzprojuser"
 
 namespace Project
 {
@@ -1749,7 +1749,7 @@ struct EditorInstance
 
 	void UI_Assets()
     {
-	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", /*.blzproj.user*/".user", ".blzent", ".lua", ".luau", ".luarc" };
+	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzprojuser", ".blzent", ".lua", ".luau", ".luarc" };
         auto assetsPath = std::filesystem::path(ProjectRootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
@@ -1797,7 +1797,6 @@ struct EditorInstance
             }
             else
             {
-                WC_INFO(filePath.extension().string());
                 if (openedFileNames.insert(filePath.string()).second)
                     openedFiles.push_back(filePath);
             }
