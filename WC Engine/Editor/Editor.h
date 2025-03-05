@@ -2083,77 +2083,73 @@ struct EditorInstance
             // Recursive display for the folder tree (text view)
             std::function<void(const std::filesystem::path&)> displayDirectory = [&](const std::filesystem::path& path)
             {
-                if (gui::BeginChild("FoldersChild", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar))
+                if (path != assetsPath) gui::Indent(20);
+
+                for (const auto& entry : std::filesystem::directory_iterator(path))
                 {
-                    if (path != assetsPath) gui::Indent(20);
-
-                    for (const auto& entry : std::filesystem::directory_iterator(path))
+                    const auto& filenameStr = entry.path().filename().string();
+                    const auto& fullPathStr = entry.path().string();
+                    if (std::filesystem::exists(entry.path()))
                     {
-                        const auto& filenameStr = entry.path().filename().string();
-                        const auto& fullPathStr = entry.path().string();
-                        if (std::filesystem::exists(entry.path()))
+                        if (entry.is_directory())
                         {
-                            if (entry.is_directory())
-                            {
-                                auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
-                                bool& isOpen = it->second;
+                            auto [it, inserted] = folderStates.try_emplace(fullPathStr, false);
+                            bool& isOpen = it->second;
 
-                                gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-                                gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
-                                if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+                            gui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                            gui::PushStyleColor(ImGuiCol_Button, gui::GetStyle().Colors[ImGuiCol_WindowBg]);
+                            if (gui::ImageButton((filenameStr + "##b" + fullPathStr).c_str(), isOpen ? t_FolderOpen : t_FolderClosed, ImVec2(16, 16)))
+                                isOpen = !isOpen;
+
+                            gui::PopStyleColor();
+                            gui::PopStyleVar();
+                            gui::SameLine();
+
+                            if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
+                                selectedFolderPath = entry.path();
+
+                            if (gui::IsItemHovered())
+                            {
+                                if (gui::IsMouseDoubleClicked(0))
                                     isOpen = !isOpen;
 
-                                gui::PopStyleColor();
-                                gui::PopStyleVar();
-                                gui::SameLine();
-
-                                if (gui::Selectable((filenameStr + "##" + fullPathStr).c_str(), selectedFolderPath == entry.path() && showIcons, ImGuiSelectableFlags_DontClosePopups))
-                                    selectedFolderPath = entry.path();
-
-                                if (gui::IsItemHovered())
-                                {
-                                    if (gui::IsMouseDoubleClicked(0))
-                                        isOpen = !isOpen;
-
-                                    if (gui::IsMouseClicked(ImGuiMouseButton_Right))
-                                        gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
-                                }
-
-                                if (isOpen)
-                                    displayDirectory(entry.path());
+                                if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                    gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
                             }
-                            else
-                            {
-                                ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-                                gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
-                                if (gui::IsItemHovered())
-                                {
-                                    if (previewAsset)
-                                        gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-                                    if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                                        openFileOnDoubleClick(entry.path());
-
-                                    if (gui::IsMouseClicked(ImGuiMouseButton_Right))
-                                        gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
-
-                                    //gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
-                                    if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoSavedSettings))
-                                    {
-                                        gui::Text("Preview: %s", filenameStr.c_str());
-                                        gui::EndPopup();
-                                    }
-                                }
-
-                                openFilePopups(entry.path());
-                            }
+                            if (isOpen)
+                                displayDirectory(entry.path());
                         }
-                        openRightClick(entry.path().string());
-                    }
+                        else
+                        {
+                            ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                            gui::TreeNodeEx((filenameStr + "##" + fullPathStr).c_str(), leafFlags);
+                            if (gui::IsItemHovered())
+                            {
+                                if (previewAsset)
+                                    gui::OpenPopup(("PreviewAsset##" + fullPathStr).c_str());
 
-                    if (path != assetsPath) gui::Unindent(20);
+                                if (gui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                                    openFileOnDoubleClick(entry.path());
+
+                                if (gui::IsMouseClicked(ImGuiMouseButton_Right))
+                                    gui::OpenPopup(("##RightClick" + entry.path().string()).c_str());
+
+                                //gui::SetNextWindowPos({ gui::GetCursorScreenPos().x + gui::GetItemRectSize().x, gui::GetCursorScreenPos().y });
+                                if (gui::BeginPopup(("PreviewAsset##" + fullPathStr).c_str(), ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoSavedSettings))
+                                {
+                                    gui::Text("Preview: %s", filenameStr.c_str());
+                                    gui::EndPopup();
+                                }
+                            }
+
+                            openFilePopups(entry.path());
+                        }
+                    }
+                    openRightClick(entry.path().string());
                 }
-                gui::EndChild();
+
+                if (path != assetsPath) gui::Unindent(20);
             };
 
             // Display directory as icons (icon view)
@@ -2346,7 +2342,9 @@ struct EditorInstance
                     gui::TableNextRow();
 
                     gui::TableSetColumnIndex(0);
+                    gui::BeginChild("FoldersChild", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
                     displayDirectory(assetsPath);
+                    gui::EndChild();
 
 
                     gui::TableSetColumnIndex(1);
@@ -2360,7 +2358,10 @@ struct EditorInstance
                 if (showFolders)
                 {
                     gui::Spacing();
+                    gui::TableSetColumnIndex(0);
+                    gui::BeginChild("FoldersChild", { 0, 0 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
                     displayDirectory(assetsPath);
+                    gui::EndChild();
                 }
                 else if (showIcons)
                 {
