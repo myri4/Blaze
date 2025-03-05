@@ -687,9 +687,11 @@ namespace wc
 		    return result;
 		}
 
-	    //Pop font(3) is needed
-	    inline void PushButtonColor(const ImVec4 color, const float hoverOffset = 0.8f, const float activeOffset = 0.9f)
+	    //ImGui::PopColor(3) is needed
+	    //if there is a loaded font, you need to pop
+	    inline void PushButtonColor(const ImVec4 color, const float hoverOffset = 0.8f, const float activeOffset = 0.9f, ImFont* font = nullptr )
 		{
+		    if (font)gui::PushFont(font);
 		    gui::PushStyleColor(ImGuiCol_Button, color);
 		    gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x * hoverOffset, color.y * hoverOffset, color.z * hoverOffset, color.w));
 		    gui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x * activeOffset, color.y * activeOffset, color.z * activeOffset, color.w));

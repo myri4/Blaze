@@ -127,14 +127,13 @@ struct EditorInstance
     // Window Buttons
 	Texture t_Close;
 	Texture t_Minimize;
+    Texture t_Maximize;
 	Texture t_Collapse;
 
     // Assets
 	Texture t_FolderOpen;
 	Texture t_FolderClosed;
 	Texture t_File;
-	Texture t_FolderEmpty;
-	Texture t_Folder;
 
     // Scene Editor Buttons
 	Texture t_Play;
@@ -178,13 +177,12 @@ struct EditorInstance
 		std::string assetPath = "assets/textures/menu/";
 		t_Close.Load(assetPath + "close.png");
 		t_Minimize.Load(assetPath + "minimize.png");
+	    t_Maximize.Load(assetPath + "maximize.png");
 		t_Collapse.Load(assetPath + "collapse.png");
 
 		t_FolderOpen.Load(assetPath + "folder-open.png");
 		t_FolderClosed.Load(assetPath + "folder-closed.png");
 		t_File.Load(assetPath + "file.png");
-		t_FolderEmpty.Load(assetPath + "folder-empty.png");
-		t_Folder.Load(assetPath + "folder-fill.png");
 
 		t_Play.Load(assetPath + "play.png");
 		t_Simulate.Load(assetPath + "simulate.png");
@@ -232,14 +230,13 @@ struct EditorInstance
 		SavePhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
 
 		t_Close.Destroy();
-		t_Collapse.Destroy();
 		t_Minimize.Destroy();
+	    t_Maximize.Destroy();
+		t_Collapse.Destroy();
 
 		t_FolderClosed.Destroy();
 		t_FolderOpen.Destroy();
 		t_File.Destroy();
-		t_Folder.Destroy();
-		t_FolderEmpty.Destroy();
 
 		t_Play.Destroy();
 		t_Simulate.Destroy();
@@ -1290,7 +1287,7 @@ struct EditorInstance
 					EditComponent<SpriteRendererComponent>("Sprite Renderer", [&](auto& component)
 						{
 							gui::ColorEdit4("color", glm::value_ptr(component.Color));
-					        std::string name = "Texture";
+					        std::string name = "None";
 					        for (auto& [texturePath, id] : assetManager.TextureCache)
 					        {
 					            if (id == component.Texture)
@@ -1300,10 +1297,12 @@ struct EditorInstance
                                 }
                             }
 							gui::Text("Texture: "); gui::SameLine();
+					        if (ui::MatchPayloadType("DND_PATH")) ui::PushButtonColor(gui::GetStyle().Colors[ImGuiCol_CheckMark], 0.8f, 0.9f, Globals.f_Display.Bold);
 					        if (gui::Button(name.c_str()))
 					        {
 					            gui::OpenPopup("Chose Texture");
 					        }
+					        if (ui::MatchPayloadType("DND_PATH")) {gui::PopStyleColor(3); gui::PopFont();}
 					        std::string newTexturePath = ui::FileDialog("Chose Texture", ".png,.jpg", ProjectRootPath, true);
 					        if (!newTexturePath.empty())
 					        {
@@ -1358,7 +1357,7 @@ struct EditorInstance
 						ui::Drag("Line spacing", component.LineSpacing, 0.01f);
 						ui::Drag("Kerning", component.Kerning, 0.01f);
 
-					    std::string name = "Font";
+					    std::string name = "None";
                         for (auto& [texturePath, id] : assetManager.FontCache)
                         {
                             if (id == component.FontID)
@@ -1368,11 +1367,13 @@ struct EditorInstance
                             }
                         }
 					    gui::Text("Font: "); gui::SameLine();
+					    if (ui::MatchPayloadType("DND_PATH")) ui::PushButtonColor(gui::GetStyle().Colors[ImGuiCol_CheckMark], 0.8f, 0.9f, Globals.f_Display.Bold);
 					    if (gui::Button(name.c_str()))
 					    {
 					        gui::OpenPopup("Chose Font");
 					    }
-					    std::string newFontPath = ui::FileDialog("Chose Font", ".png,.jpg", ProjectRootPath, true);
+					    if (ui::MatchPayloadType("DND_PATH")) {gui::PopStyleColor(3); gui::PopFont();}
+					    std::string newFontPath = ui::FileDialog("Chose Font", ".ttf,.otf", ProjectRootPath, true);
                         if (!newFontPath.empty())
                         {
                             //WC_INFO("Implement import - {}", newTexturePath);
@@ -1397,12 +1398,12 @@ struct EditorInstance
 							}
 						}
 
-					    if (component.FontID != 0)
+					    if (component.FontID != UINT32_MAX)
 					    {
                             gui::SameLine();
-                            if (gui::Button("Clear"))
+                            if (gui::Button("X"))
                             {
-                                component.FontID = 0;
+                                component.FontID = UINT32_MAX;
                             }
                         }
 
@@ -1748,7 +1749,7 @@ struct EditorInstance
 
 	void UI_Assets()
     {
-	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", ".blzent", ".lua", ".luau", ".luarc" };
+	    const std::set<std::string> textEditorExt = {".txt", ".scene", ".yaml", ".blzproj", /*.blzproj.user*/".user", ".blzent", ".lua", ".luau", ".luarc" };
         auto assetsPath = std::filesystem::path(ProjectRootPath);
         static std::unordered_map<std::string, bool> folderStates;  // Track the expansion state per folder
         static std::filesystem::path selectedFolderPath = assetsPath;
@@ -1796,6 +1797,7 @@ struct EditorInstance
             }
             else
             {
+                WC_INFO(filePath.extension().string());
                 if (openedFileNames.insert(filePath.string()).second)
                     openedFiles.push_back(filePath);
             }
@@ -2165,8 +2167,9 @@ struct EditorInstance
                 }
                 else
                 {
-                    if (gui::ArrowButton("Back", ImGuiDir_Left))
-                        selectedFolderPath = selectedFolderPath.parent_path();
+                    if (ui::MatchPayloadType("DND_PATH")) ui::PushButtonColor(gui::GetStyle().Colors[ImGuiCol_CheckMark], 0.8f, 0.9f, Globals.f_Display.Bold);
+                    if (gui::ArrowButton("Back", ImGuiDir_Left)) selectedFolderPath = selectedFolderPath.parent_path();
+                    if (ui::MatchPayloadType("DND_PATH")) {gui::PopStyleColor(3); gui::PopFont();}
 
                     if (gui::BeginDragDropTarget())
                     {
@@ -2220,7 +2223,7 @@ struct EditorInstance
                                     gui::BeginGroup();
                                     gui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0, 0 });
                                     gui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-                                    gui::ImageButton((entry.path().string() + "/").c_str(), t_FolderEmpty, { buttonSize, buttonSize });
+                                    gui::ImageButton((entry.path().string() + "/").c_str(), ui::MatchPayloadType("DND_PATH") ? t_FolderOpen : t_FolderClosed, { buttonSize, buttonSize });
                                     if (gui::IsItemHovered())
                                     {
                                         if ( gui::IsMouseDoubleClicked(0))
@@ -2232,8 +2235,8 @@ struct EditorInstance
 
                                     if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
                                     {
-                                        std::string path = entry.path().string();
-                                        gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+                                        std::string mPath = entry.path().string();
+                                        gui::SetDragDropPayload("DND_PATH", mPath.c_str(), mPath.size() + 1);
                                         gui::Text("Moving %s", entry.path().filename().string().c_str());
                                         gui::EndDragDropSource();
                                     }
@@ -2304,8 +2307,8 @@ struct EditorInstance
 
                                     if (gui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
                                     {
-                                        std::string path = entry.path().string();
-                                        gui::SetDragDropPayload("DND_PATH", path.c_str(), path.size() + 1);
+                                        std::string mPath = entry.path().string();
+                                        gui::SetDragDropPayload("DND_PATH", mPath.c_str(), mPath.size() + 1);
                                         gui::Text("Moving %s", entry.path().filename().string().c_str());
                                         gui::EndDragDropSource();
                                     }
@@ -2752,8 +2755,8 @@ struct EditorInstance
 			Globals.window.Minimize();
 
 		gui::SameLine(0, 0);
-		if (gui::ImageButton("minimize", t_Minimize, { buttonSize, buttonSize }))
-			Globals.window.SetMaximized(!Globals.window.IsMaximized());
+		if (gui::ImageButton("minimize", Globals.window.IsMaximized() ? t_Minimize : t_Maximize, { buttonSize, buttonSize }))
+		    Globals.window.SetMaximized(!Globals.window.IsMaximized());
 
 		gui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.25f, 0.2f, 1.f));
 		gui::SameLine(0, 0);
