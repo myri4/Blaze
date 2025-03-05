@@ -331,6 +331,8 @@ namespace Editor
 
 		std::string Path;
 
+	    float snapStrength = 1.0f;
+
 		flecs::entity SelectedEntity = flecs::entity::null();
 		std::vector<void*> CommandBuffer;
 		uint32_t CommandIndex = 0;

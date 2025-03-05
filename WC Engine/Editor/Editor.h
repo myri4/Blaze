@@ -273,6 +273,17 @@ struct EditorInstance
 				if (gui::IsKeyPressed(ImGuiKey_Z)) m_Scene.Undo();
 				else if (gui::IsKeyPressed(ImGuiKey_Y)) m_Scene.Redo();
 				else if (gui::IsKeyPressed(ImGuiKey_S)) m_Scene.Save();
+
+			    if (gui::IsKeyPressed(ImGuiKey_UpArrow))
+			    {
+			        m_Scene.snapStrength++;
+			        WC_INFO("Snap increased to: {}", m_Scene.snapStrength);
+			    }
+			    else if (gui::IsKeyPressed(ImGuiKey_DownArrow))
+			    {
+			        m_Scene.snapStrength--;
+			        WC_INFO("Snap decreased to: {}", m_Scene.snapStrength);
+			    }
 			}
 
 			/*float scroll = Mouse::GetMouseScroll().y;
@@ -416,8 +427,6 @@ struct EditorInstance
 
 		if (gui::Begin("Editor", &showEditor))
 		{
-		    //gui::Spacing();
-
 		    gui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
 		    if (gui::BeginTabBar("ScenesBar", ImGuiTabBarFlags_NoCloseWithMiddleMouseButton | ImGuiTabBarFlags_DrawSelectedOverline | ImGuiTabBarFlags_Reorderable))
 		    {
@@ -629,13 +638,15 @@ struct EditorInstance
 				}
 
 				static bool wasUsingGuizmo = false;
+			    const glm::vec3 snap = glm::vec3(m_Scene.snapStrength);
 				if (ImGuizmo::Manipulate(
 					glm::value_ptr(m_Scene.camera.ViewMatrix),
 					glm::value_ptr(projection),
 					m_Scene.GuizmoOp,
 					ImGuizmo::MODE::WORLD,
 					glm::value_ptr(world_transform),
-					glm::value_ptr(deltaMatrix)
+					glm::value_ptr(deltaMatrix),
+					gui::IsKeyDown(ImGuiKey_LeftCtrl) ? glm::value_ptr(snap) : nullptr
 				))
 				{
 					wasUsingGuizmo = true;
