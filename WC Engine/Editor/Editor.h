@@ -1290,7 +1290,26 @@ struct EditorInstance
 					EditComponent<SpriteRendererComponent>("Sprite Renderer", [&](auto& component)
 						{
 							gui::ColorEdit4("color", glm::value_ptr(component.Color));
-							gui::Button("Texture");
+					        std::string name = "Texture";
+					        for (auto& [texturePath, id] : assetManager.TextureCache)
+					        {
+					            if (id == component.Texture)
+                                {
+					                name = std::filesystem::path(texturePath).stem().string();
+					                break;
+                                }
+                            }
+							gui::Text("Texture: "); gui::SameLine();
+					        if (gui::Button(name.c_str()))
+					        {
+					            gui::OpenPopup("Chose Texture");
+					        }
+					        std::string newTexturePath = ui::FileDialog("Chose Texture", ".png,.jpg", ProjectRootPath, true);
+					        if (!newTexturePath.empty())
+					        {
+                                //WC_INFO("Implement import - {}", newTexturePath);
+					            component.Texture = assetManager.LoadTexture(newTexturePath);
+					        }
 
 							if (ui::MatchPayloadType("DND_PATH"))
 							{
@@ -1310,6 +1329,15 @@ struct EditorInstance
 									}
 								}
 							}
+
+					        if (component.Texture != 0)
+					        {
+                                gui::SameLine();
+                                if (gui::Button("X"))
+                                {
+                                    component.Texture = 0;
+                                }
+                            }
 						});
 
 					EditComponent<CircleRendererComponent>("Circle Renderer", [](auto& component) {
@@ -1327,10 +1355,29 @@ struct EditorInstance
                         }
 						gui::InputTextMultiline("Text", &component.Text, {0, gui::GetStyle().FramePadding.y * 2 + gui::GetFontSize() * std::min(4, newLines)}, ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_AllowTabInput);
 						gui::ColorEdit4("Color", glm::value_ptr(component.Color));
-						ui::Drag("Line spacing", component.LineSpacing);
-						ui::Drag("Kerning", component.Kerning);
+						ui::Drag("Line spacing", component.LineSpacing, 0.01f);
+						ui::Drag("Kerning", component.Kerning, 0.01f);
 
-						gui::Button("Font");
+					    std::string name = "Font";
+                        for (auto& [texturePath, id] : assetManager.FontCache)
+                        {
+                            if (id == component.FontID)
+                            {
+                                name = std::filesystem::path(texturePath).stem().string();
+                                break;
+                            }
+                        }
+					    gui::Text("Font: "); gui::SameLine();
+					    if (gui::Button(name.c_str()))
+					    {
+					        gui::OpenPopup("Chose Font");
+					    }
+					    std::string newFontPath = ui::FileDialog("Chose Font", ".png,.jpg", ProjectRootPath, true);
+                        if (!newFontPath.empty())
+                        {
+                            //WC_INFO("Implement import - {}", newTexturePath);
+                            component.FontID = assetManager.LoadFont(newFontPath);
+                        }
 
 						if (ui::MatchPayloadType("DND_PATH"))
 						{
@@ -1349,6 +1396,16 @@ struct EditorInstance
 								}
 							}
 						}
+
+					    if (component.FontID != 0)
+					    {
+                            gui::SameLine();
+                            if (gui::Button("Clear"))
+                            {
+                                component.FontID = 0;
+                            }
+                        }
+
 						});
 
 					auto UI_PhysicsMaterial = [&](uint32_t& currentMaterial) // @TODO: Some more error handling for completely invalid IDs?

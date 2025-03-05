@@ -58,274 +58,297 @@ namespace wc
 		    return !(gui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && gui::IsKeyPressed(key);
 		}
 
-		const std::unordered_map<std::string, std::string> fileTypeExt =
-		{
-			{".*", "All"},
-			{".", "Folder"},
-			{".png", "Image"},
-			{".wav", "WAVE"},
-			{".mp3", "mp3"},
-			{".scene", ""}, // self-explanatory
-			{".script", "Script"},
-			{".shader", "Shader"},
-			{".font", "Font"}
-		};
+        inline std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "", const bool limitToStart = false, const std::string& newFileFilter = "")
+        {
+            static std::filesystem::path currentPath;
+            static std::vector<std::filesystem::path> disks;
+            static std::string selectedPath;
+            std::string finalPath;
+            static std::vector<std::filesystem::directory_entry> fileEntries;
 
-		// FileDialog - A simple file dialog for opening files or selecting directories
-		// Only way to return a Directory(Folder) is to use the "." filter
-	    // If newFileFilter is set, then there will be a input text for the new file name, and the path will return the new file path
-		inline std::string FileDialog(const char* name, const std::string& filter = ".*", const std::string& startPath = "", const bool limitToStart = false, const std::string& newFileFilter = "")
-		{
-			//bool showPopup = true; for close button X on the window
-			static std::filesystem::path currentPath;
-			static std::vector<std::filesystem::path> disks;
-			static std::string selectedPath;
-			std::string finalPath;
-			static std::vector<std::filesystem::directory_entry> fileEntries;
+            CenterNextWindow();
+            if (ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoSavedSettings))
+            {
+                // Initialize disks
+                if (disks.empty())
+                {
+                    for (char drive = 'A'; drive <= 'Z'; ++drive)
+                    {
+                        std::filesystem::path drive_path = std::string(1, drive) + ":\\";
+                        std::error_code ec;
+                        if (std::filesystem::exists(drive_path, ec))
+                        {
+                            disks.push_back(drive_path);
+                        }
+                    }
 
-		    CenterNextWindow();
-			if (ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoSavedSettings))
-			{
-				// Initialize disks
-				if (disks.empty())
-				{
-					for (char drive = 'A'; drive <= 'Z'; ++drive)
-					{
-						std::filesystem::path drive_path = std::string(1, drive) + ":\\";
-						std::error_code ec;
-						if (std::filesystem::exists(drive_path, ec))
-						{
-							disks.push_back(drive_path);
-						}
-					}
+                    if (startPath.empty()) currentPath = disks[0];
+                    else currentPath = startPath;
+                }
 
-					if (startPath.empty())currentPath = disks[0];
-					else currentPath = startPath;
-				}
+                // Navigation controls
+                ImGui::BeginDisabled(currentPath == currentPath.root_path() || (limitToStart ? currentPath == startPath : false));
+                if (ImGui::ArrowButton("##back", ImGuiDir_Left))
+                {
+                    if (currentPath.has_parent_path())
+                        currentPath = currentPath.parent_path();
+                    else
+                        currentPath = currentPath.root_path();
+                    fileEntries.clear();
+                }
+                ImGui::EndDisabled();
 
-				// Navigation controls
-				ImGui::BeginDisabled(currentPath == currentPath.root_path() || limitToStart ? currentPath == startPath : false);
-				if (ImGui::ArrowButton("##back", ImGuiDir_Left))
-				{
-					if (currentPath.has_parent_path())
-						currentPath = currentPath.parent_path();
-					else
-						currentPath = currentPath.root_path();
-					fileEntries.clear();
-				}
-				ImGui::EndDisabled();
+                ImGui::SameLine();
+                float comboWidth = std::max(ImGui::CalcTextSize(currentPath.string().c_str()).x + 50, 300.0f);
+                ImGui::SetWindowSize(ImVec2(ImGui::GetItemRectSize().x + comboWidth + ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 3, 0));
+                ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Refresh").x - ImGui::GetStyle().FramePadding.x * 2);
+                if (ImGui::BeginCombo("##disks", currentPath.string().c_str()))
+                {
+                    for (const auto& disk : disks)
+                    {
+                        if (ImGui::Selectable(disk.string().c_str()))
+                        {
+                            currentPath = disk;
+                            fileEntries.clear();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
 
-				ImGui::SameLine();
-				float comboWidth = std::max(ImGui::CalcTextSize(currentPath.string().c_str()).x + 50, 300.0f);
-				ImGui::SetWindowSize(ImVec2(ImGui::GetItemRectSize().x + comboWidth + ImGui::CalcTextSize("Refresh").x + ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 3, 0));
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Refresh").x - ImGui::GetStyle().FramePadding.x * 2);
-				if (ImGui::BeginCombo("##disks", currentPath.string().c_str()))
-				{
-					for (const auto& disk : disks)
-					{
-						if (ImGui::Selectable(disk.string().c_str()))
-						{
-							currentPath = disk;
-							fileEntries.clear();
-						}
-					}
-					ImGui::EndCombo();
-				}
+                // Refresh button
+                ImGui::SameLine();
+                if (ImGui::Button("Refresh"))
+                {
+                    fileEntries.clear();
+                    std::error_code ec;
+                    std::filesystem::directory_iterator(currentPath, ec); // Force refresh
+                }
 
-				// Refresh button
-				ImGui::SameLine();
-				if (ImGui::Button("Refresh"))
-				{
-					fileEntries.clear();
-					std::error_code ec;
-					std::filesystem::directory_iterator(currentPath, ec); // Force refresh
-				}
-
-				// File list
-				if (ImGui::BeginChild("##file_list", ImVec2(0, 300.0f), true))
-				{
-					try
-					{
-						// Refresh directory contents if empty
-						if (fileEntries.empty())
-						{
-							std::error_code ec;
-							auto dir_iter = std::filesystem::directory_iterator(currentPath, ec);
-							if (ec)
-							{
-								ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", ec.message().c_str());
-							}
-							else
-							{
-								for (const auto& entry : dir_iter)
-								{
-									try
-									{
-										// Skip hidden/system files using attributes
-										//TODO - add for other systems
+                // File list
+                if (ImGui::BeginChild("##file_list", ImVec2(0, 300.0f), true))
+                {
+                    try
+                    {
+                        // Refresh directory contents if empty
+                        if (fileEntries.empty())
+                        {
+                            std::error_code ec;
+                            auto dir_iter = std::filesystem::directory_iterator(currentPath, ec);
+                            if (ec)
+                            {
+                                ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", ec.message().c_str());
+                            }
+                            else
+                            {
+                                for (const auto& entry : dir_iter)
+                                {
+                                    try
+                                    {
+                                        // Skip hidden/system files
                                         #ifdef _WIN32
-										DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
-										if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
-											continue;
+                                        DWORD attrs = GetFileAttributesW(entry.path().wstring().c_str());
+                                        if (attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+                                            continue;
                                         #endif
+                                        if (entry.path().filename().string()[0] == '$')
+                                            continue;
 
-										// Skip reserved system files
-										if (entry.path().filename().string()[0] == '$')
-											continue;
+                                        fileEntries.push_back(entry);
+                                    }
+                                    catch (...)
+                                    {
+                                        continue;
+                                    }
+                                }
 
-										fileEntries.push_back(entry);
-									}
-									catch (...)
-									{
-										// Skip problematic entries
-										continue;
-									}
-								}
+                                // Sort directories first
+                                std::sort(fileEntries.begin(), fileEntries.end(),
+                                    [](const auto& a, const auto& b) {
+                                        std::string a_name = a.path().filename().string();
+                                        std::string b_name = b.path().filename().string();
+                                        std::transform(a_name.begin(), a_name.end(), a_name.begin(), ::tolower);
+                                        std::transform(b_name.begin(), b_name.end(), b_name.begin(), ::tolower);
 
-								// Sort directories first (case-insensitive)
-								std::sort(fileEntries.begin(), fileEntries.end(),
-									[](const auto& a, const auto& b) {
-										std::string a_name = a.path().filename().string();
-										std::string b_name = b.path().filename().string();
-										std::transform(a_name.begin(), a_name.end(), a_name.begin(), ::tolower);
-										std::transform(b_name.begin(), b_name.end(), b_name.begin(), ::tolower);
+                                        if (a.is_directory() == b.is_directory())
+                                            return a_name < b_name;
+                                        return a.is_directory() > b.is_directory();
+                                    });
+                            }
+                        }
 
-										if (a.is_directory() == b.is_directory())
-											return a_name < b_name;
-										return a.is_directory() > b.is_directory();
-									});
-							}
-						}
+                        // Split filter into parts
+                        std::vector<std::string> filterParts;
+                        size_t start = 0;
+                        size_t end = filter.find(',');
+                        while (end != std::string::npos)
+                        {
+                            std::string part = filter.substr(start, end - start);
+                            part.erase(part.begin(), std::find_if(part.begin(), part.end(), [](int ch) { return !std::isspace(ch); }));
+                            part.erase(std::find_if(part.rbegin(), part.rend(), [](int ch) { return !std::isspace(ch); }).base(), part.end());
+                            if (!part.empty())
+                                filterParts.push_back(part);
+                            start = end + 1;
+                            end = filter.find(',', start);
+                        }
+                        std::string part = filter.substr(start);
+                        part.erase(part.begin(), std::find_if(part.begin(), part.end(), [](int ch) { return !std::isspace(ch); }));
+                        part.erase(std::find_if(part.rbegin(), part.rend(), [](int ch) { return !std::isspace(ch); }).base(), part.end());
+                        if (!part.empty())
+                            filterParts.push_back(part);
 
-						// Display entries
-						for (const auto& entry : fileEntries)
-						{
-							const bool isDirectory = entry.is_directory();
-							std::string filename = entry.path().filename().string();
+                        // Check if any filter is .*
+                        bool allowAll = std::any_of(filterParts.begin(), filterParts.end(), [](const std::string& part) { return part == ".*"; });
 
-							// File type filtering (case-insensitive)
-							if (!isDirectory && !filter.empty() && filter != ".*")
-							{
-								std::string target_ext = filter;
-								std::transform(target_ext.begin(), target_ext.end(), target_ext.begin(), ::tolower);
+                        // Display entries
+                        for (const auto& entry : fileEntries)
+                        {
+                            const bool isDirectory = entry.is_directory();
+                            std::string filename = entry.path().filename().string();
 
-								std::string entry_ext = entry.path().extension().string();
-								std::transform(entry_ext.begin(), entry_ext.end(), entry_ext.begin(), ::tolower);
+                            // Filtering
+                            if (!isDirectory && !filter.empty() && !allowAll)
+                            {
+                                std::string entry_ext = entry.path().extension().string();
+                                std::transform(entry_ext.begin(), entry_ext.end(), entry_ext.begin(), ::tolower);
 
-								if (entry_ext != target_ext)
-									continue;
-							}
+                                bool matches = false;
+                                for (const auto& target_part : filterParts)
+                                {
+                                    std::string target_ext = target_part;
+                                    std::transform(target_ext.begin(), target_ext.end(), target_ext.begin(), ::tolower);
+                                    if (entry_ext == target_ext)
+                                    {
+                                        matches = true;
+                                        break;
+                                    }
+                                }
 
-							// Display as tree node
-							ImGui::PushID(filename.c_str());
+                                if (!matches)
+                                    continue;
+                            }
 
-							// Set tree node flags
-							ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
-								ImGuiTreeNodeFlags_NoTreePushOnOpen |
-								ImGuiTreeNodeFlags_OpenOnArrow;
+                            // Display as tree node
+                            ImGui::PushID(filename.c_str());
+                            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
+                                ImGuiTreeNodeFlags_NoTreePushOnOpen |
+                                ImGuiTreeNodeFlags_OpenOnArrow;
 
-							if (!isDirectory) flags |= ImGuiTreeNodeFlags_Leaf;
+                            if (!isDirectory) flags |= ImGuiTreeNodeFlags_Leaf;
 
-							if (selectedPath == entry.path().string()) flags |= ImGuiTreeNodeFlags_Selected;
+                            if (selectedPath == entry.path().string()) flags |= ImGuiTreeNodeFlags_Selected;
 
-						    gui::SetNextItemOpen(false, ImGuiCond_Always);
-							ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
+                            gui::SetNextItemOpen(false, ImGuiCond_Always);
+                            ImGui::TreeNodeEx("##node", flags, "%s", filename.c_str());
 
-							if (ImGui::IsItemClicked())
-							{
-								if (isDirectory)
-								{
-									if (filter == ".") selectedPath = entry.path().string();
-									/*else
-									{
-										currentPath = entry.path();
-										fileEntries.clear();
-									}*/
-								}
-								else selectedPath = entry.path().string();
-							}
+                            if (ImGui::IsItemClicked())
+                            {
+                                if (isDirectory)
+                                {
+                                    if (filter == ".") selectedPath = entry.path().string();
+                                }
+                                else selectedPath = entry.path().string();
+                            }
 
-							// Handle double-click
-							if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-							{
-								if (isDirectory)
-								{
-									currentPath = entry.path();
-									fileEntries.clear();
-								}
-								else selectedPath = entry.path().string();
-							}
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                            {
+                                if (isDirectory)
+                                {
+                                    currentPath = entry.path();
+                                    fileEntries.clear();
+                                }
+                                else selectedPath = entry.path().string();
+                            }
 
-							ImGui::PopID();
-						}
-					}
-					catch (const std::exception& e)
-					{
-						ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", e.what());
-					}
-				}
-				ImGui::EndChild();
+                            ImGui::PopID();
+                        }
+                    }
+                    catch (const std::exception& e)
+                    {
+                        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", e.what());
+                    }
+                }
+                ImGui::EndChild();
 
-				// Selected file path
-				ImGui::Text("Selected:"); ImGui::SameLine();
-				auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
-				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-				ImGui::InputText("##SelectedFile", &selectedFileName, ImGuiInputTextFlags_ReadOnly);
+                // Selected file path
+                ImGui::Text("Selected:"); ImGui::SameLine();
+                auto selectedFileName = selectedPath.empty() ? "* None *" : std::filesystem::path(selectedPath).filename().string();
+                std::string filterText = filter;
+                if (filterText == ".*") filterText += " All";
+                if (filterText == ".") filterText += " Folder";
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(filterText.c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+                ImGui::InputText("##SelectedFile", &selectedFileName, ImGuiInputTextFlags_ReadOnly);
 
-				// Filter text
-				ImGui::SameLine();
-				ImGui::SetNextItemWidth(ImGui::CalcTextSize(filter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(filter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
-				auto filterText = filter + " " + fileTypeExt.at(filter);
-				ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
+                // Filter text
+                ImGui::SameLine();
+                std::vector<std::string> filterParts;
+                size_t start = 0;
+                size_t end = filter.find(',');
+                while (end != std::string::npos)
+                {
+                    std::string part = filter.substr(start, end - start);
+                    part.erase(part.begin(), std::find_if(part.begin(), part.end(), [](int ch) { return !std::isspace(ch); }));
+                    part.erase(std::find_if(part.rbegin(), part.rend(), [](int ch) { return !std::isspace(ch); }).base(), part.end());
+                    if (!part.empty())
+                        filterParts.push_back(part);
+                    start = end + 1;
+                    end = filter.find(',', start);
+                }
+                std::string part = filter.substr(start);
+                part.erase(part.begin(), std::find_if(part.begin(), part.end(), [](int ch) { return !std::isspace(ch); }));
+                part.erase(std::find_if(part.rbegin(), part.rend(), [](int ch) { return !std::isspace(ch); }).base(), part.end());
+                if (!part.empty())
+                    filterParts.push_back(part);
 
-			    static std::string newFileName;
-			    if (!newFileFilter.empty())
-			    {
-			        gui::Text("NewFile Name:"); ImGui::SameLine();
-			        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(newFileFilter.c_str()).x - ImGui::CalcTextSize(fileTypeExt.at(newFileFilter).c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
-			        gui::InputText("##NewFile", &newFileName);
-			        ImGui::SameLine();
-			        ImGui::SetNextItemWidth(ImGui::CalcTextSize(newFileFilter.c_str()).x + ImGui::CalcTextSize(fileTypeExt.at(newFileFilter).c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
-			        auto newFileText = newFileFilter + " " + fileTypeExt.at(newFileFilter);
-			        gui::InputText("##NewFileFilter", &newFileText, ImGuiInputTextFlags_ReadOnly);
-			    }
+                ImGui::SetNextItemWidth(ImGui::CalcTextSize(filterText.c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
+                ImGui::InputText("##Filter", &filterText, ImGuiInputTextFlags_ReadOnly);
 
-			    /*WC_CORE_INFO("selectedPath empt {}", selectedPath.empty());
-			    WC_CORE_INFO("newfulefulter empt {}", newFileFilter.empty());
-			    WC_CORE_INFO("selecpath empt {}", selectedPath.empty());
-			    WC_CORE_INFO("newfilename empt {}", std::filesystem::path(newFileName).filename().string().empty());
-			    WC_CORE_INFO("shouldBeDissabled empt {}", selectedPath.empty() || !newFileFilter.empty() ? std::filesystem::path(newFileName).filename().string().empty() : false);*/
-				ImGui::BeginDisabled(selectedPath.empty() || !newFileFilter.empty() ? std::filesystem::path(newFileName).filename().string().empty() : false);
-				if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || IsKeyPressedDissabled(ImGuiKey_Enter) && !selectedPath.empty())
-				{
-                    if (newFileFilter.empty()) { finalPath = selectedPath; }
-				    else { finalPath = selectedPath + "\\" + newFileName + (newFileFilter != "." ? newFileFilter : ""); }
-				    newFileName.clear();
-					selectedPath.clear();
-					currentPath = disks[0];
-					disks.clear();
-					fileEntries.clear();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndDisabled();
+                static std::string newFileName;
+                if (!newFileFilter.empty())
+                {
+                    gui::Text("NewFile Name:"); ImGui::SameLine();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(newFileFilter.c_str()).x - ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+                    gui::InputText("##NewFile", &newFileName);
+                    ImGui::SameLine();
+                    std::string newFileText = newFileFilter;
+                    if (newFileFilter == ".*") newFileText += " All";
+                    if (newFileFilter == ".") newFileText += " Folder";
+                    ImGui::SetNextItemWidth(ImGui::CalcTextSize(newFileText.c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
+                    gui::InputText("##NewFileFilter", &newFileText, ImGuiInputTextFlags_ReadOnly);
+                }
 
-				ImGui::SameLine();
-				ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - gui::GetContentRegionMax().x * 0.3f);
-				if (ImGui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Escape))
-				{
-				    newFileName.clear();
-					selectedPath.clear();
-					currentPath = disks[0];
-					disks.clear();
-					fileEntries.clear();
-					ImGui::CloseCurrentPopup();
-				}
+                ImGui::BeginDisabled(selectedPath.empty() || (!newFileFilter.empty() && newFileName.empty()));
+                if (ImGui::Button("OK", {gui::GetContentRegionMax().x * 0.3f, 0}) || (IsKeyPressedDissabled(ImGuiKey_Enter) && !selectedPath.empty()))
+                {
+                    if (newFileFilter.empty())
+                        finalPath = selectedPath;
+                    else
+                        finalPath = selectedPath + "\\" + newFileName + (newFileFilter != "." ? newFileFilter : "");
+                    newFileName.clear();
+                    selectedPath.clear();
+                    currentPath = disks[0];
+                    disks.clear();
+                    fileEntries.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
 
-				ImGui::EndPopup();
-			}
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - gui::GetContentRegionMax().x * 0.3f);
+                if (ImGui::Button("Cancel", {gui::GetContentRegionMax().x * 0.3f, 0}) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+                {
+                    newFileName.clear();
+                    selectedPath.clear();
+                    currentPath = disks[0];
+                    disks.clear();
+                    fileEntries.clear();
+                    ImGui::CloseCurrentPopup();
+                }
 
-			return finalPath;
-		}
+                ImGui::EndPopup();
+            }
+
+            return finalPath;
+        }
 
 		inline void ApplyHue(ImGuiStyle& style, float hue)
 		{
@@ -442,7 +465,8 @@ namespace wc
 				ImGui::GetWindowDrawList(),
 				arrowPos,
 				ImGui::GetColorU32(col),
-				dir
+				dir,
+				scale
 			);
 		}
 
