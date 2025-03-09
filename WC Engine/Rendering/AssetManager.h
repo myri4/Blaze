@@ -76,22 +76,28 @@ namespace blaze
             return texID;
         }
 
-        uint32_t LoadTexture(const std::string& file)
+        uint32_t LoadTexture(const std::string& file, Texture& texture, bool mipMapping = false)
         {
             if (TextureCache.find(file) != TextureCache.end())
                 return TextureCache[file];
 
             if (std::filesystem::exists(file))
             {
-                Texture texture;
-                texture.Load(file);
+                texture.Load(file, mipMapping);
 
                 return PushTexture(texture, file);
             }
 
+            texture = Textures[0];
             TextureCache[file] = 0;
             WC_CORE_ERROR("Cannot find file at location: {}", file);
             return 0;
+        }
+
+        uint32_t LoadTexture(const std::string& file, bool mipMapping = false)
+        {
+            Texture texture;
+            return LoadTexture(file, texture, mipMapping);
         }
 
         uint32_t LoadTextureFromMemory(const Image& image, const std::string& name)

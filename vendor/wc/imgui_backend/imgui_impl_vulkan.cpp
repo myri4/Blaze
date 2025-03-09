@@ -311,7 +311,7 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer cmd,
                 if (sizeof(ImTextureID) < sizeof(ImU64))
                 {
                     // We don't support texture switches if ImTextureID hasn't been redefined to be 64-bit. Do a flaky check that other textures haven't been used.
-                    desc_set = bd->FontTexture.GetImageID();
+                    desc_set = bd->FontTexture.imageID;
                 }
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, bd->Shader.GetPipelineLayout(), 0, 1, &desc_set, 0, nullptr);
 

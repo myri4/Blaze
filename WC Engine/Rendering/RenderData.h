@@ -237,8 +237,8 @@ namespace blaze
 			const auto& metrics = fontGeometry.getMetrics();
 			uint32_t texID = font.TextureID;
 			auto& fontAtlas = font.Tex;
-			float texelWidth = 1.f / fontAtlas.GetImage().GetSize().x;
-			float texelHeight = 1.f / fontAtlas.GetImage().GetSize().y;
+			float texelWidth = 1.f / fontAtlas.image.GetSize().x;
+			float texelHeight = 1.f / fontAtlas.image.GetSize().y;
 
 			double x = 0.0;
 			double fsScale = 1.0 / (metrics.ascenderY - metrics.descenderY);

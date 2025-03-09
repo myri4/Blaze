@@ -26,13 +26,12 @@ namespace blaze
 		vk::SamplerAddressMode    addressModeW = vk::SamplerAddressMode::REPEAT;
     };
 
-    class Texture 
+    struct Texture 
     {
         vk::Image image;
         vk::ImageView view;
         vk::Sampler sampler;
         VkDescriptorSet imageID = VK_NULL_HANDLE;
-    public:
 
 		void Allocate(const TextureSpecification& specification)
 		{
@@ -51,8 +50,7 @@ namespace blaze
 
 			view.Create(image);
 
-			vk::SamplerSpecification samplerSpec = 
-            {
+			vk::SamplerSpecification samplerSpec = {
 			    .addressModeU = specification.addressModeU,
                 .addressModeV = specification.addressModeV,
                 .addressModeW = specification.addressModeW,
@@ -262,11 +260,6 @@ namespace blaze
         }
 
         glm::ivec2 GetSize() { return { image.width, image.height }; }
-
-        vk::ImageView GetView() const { return view; }
-        vk::Sampler GetSampler() const { return sampler; }
-        vk::Image GetImage() const { return image; }
-        auto GetImageID() const { return imageID; }
 
         void SetName(const std::string& name) 
         {

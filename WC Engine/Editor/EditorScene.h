@@ -141,22 +141,29 @@ namespace Editor
 		if (entity.has<EntityOrderComponent>())
 		{
 			YAML::Node childrenData;
-			scene.EntityWorld.query_builder<EntityTag>()
+			/*scene.EntityWorld.query_builder<EntityTag>()
 				.with(flecs::ChildOf, entity)
 				.each([&](flecs::entity child, EntityTag) {
 				YAML::Node childData = SerializeEntity(scene, child);
 
 				childrenData.push_back(childData);
-					});
+					});*/
 
-			/*for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
+			for (const auto& name : entity.get_ref<EntityOrderComponent>()->EntityOrder)
 			{
-				auto child = EntityWorld.lookup(name.c_str());
+				auto child = entity.lookup(name.c_str());
 
-				YAML::Node childData = SerializeEntity(child);
+				if (child)
+				{
+					YAML::Node childData = SerializeEntity(scene, child);
 
-				childrenData.push_back(childData);
-			}*/
+					childrenData.push_back(childData);
+				}
+				else
+				{
+					WC_ERROR("Could not find entity with name '{}'", name.c_str());
+				}
+			}
 
 			if (childrenData.size() != 0)
 				entityData["Children"] = childrenData;
@@ -174,111 +181,118 @@ namespace Editor
 		else if (name != "null") entity = scene.AddEntity(name);
 		else entity = scene.AddEntity();
 
-		auto transformComponent = entityData["TransformComponent"];
-		if (transformComponent)
+		try
 		{
-			entity.set<TransformComponent>({
-				transformComponent["Translation"].as<glm::vec3>(),
-				transformComponent["Scale"].as<glm::vec2>(),
-				glm::radians(transformComponent["Rotation"].as<float>())
-				});
-		}
-
-		{
-			auto componentData = entityData["TextRendererComponent"];
-			if (componentData)
+			auto transformComponent = entityData["TransformComponent"];
+			if (transformComponent)
 			{
-				TextRendererComponent component;
-				component.Text = componentData["Text"].as<std::string>();
-				component.Color = componentData["Color"].as<glm::vec4>();
-				component.Kerning = componentData["Kerning"].as<float>();
-				component.LineSpacing = componentData["LineSpacing"].as<float>();
-
-				if (componentData["Font"]) component.FontID = assetManager.LoadFont(componentData["Font"].as<std::string>());
-
-				entity.set<TextRendererComponent>(component);
+				entity.set<TransformComponent>({
+					transformComponent["Translation"].as<glm::vec3>(),
+					transformComponent["Scale"].as<glm::vec3>(),
+					glm::radians(transformComponent["Rotation"].as<glm::vec3>())
+					});
 			}
-		}
 
-		{
-			auto componentData = entityData["SpriteRendererComponent"];
-			if (componentData)
 			{
-				SpriteRendererComponent component;
-				component.Color = componentData["Color"].as<glm::vec4>();
-				component.Texture = assetManager.LoadTexture(componentData["Texture"].as<std::string>());
+				auto componentData = entityData["TextRendererComponent"];
+				if (componentData)
+				{
+					TextRendererComponent component;
+					component.Text = componentData["Text"].as<std::string>();
+					component.Color = componentData["Color"].as<glm::vec4>();
+					component.Kerning = componentData["Kerning"].as<float>();
+					component.LineSpacing = componentData["LineSpacing"].as<float>();
 
-				entity.set<SpriteRendererComponent>(component);
+					if (componentData["Font"]) component.FontID = assetManager.LoadFont(componentData["Font"].as<std::string>());
+
+					entity.set<TextRendererComponent>(component);
+				}
 			}
-		}
 
-		auto circleRendererComponent = entityData["CircleRendererComponent"];
-		if (circleRendererComponent)
-		{
-			entity.set<CircleRendererComponent>({
-				circleRendererComponent["Color"].as<glm::vec4>(),
-				circleRendererComponent["Thickness"].as<float>(),
-				circleRendererComponent["Fade"].as<float>()
-				});
-		}
-
-		auto rigidBodyComponent = entityData["RigidBodyComponent"];
-		if (rigidBodyComponent)
-		{
-			RigidBodyComponent component = {
-				.Type = magic_enum::enum_cast<BodyType>(rigidBodyComponent["Type"].as<std::string>()).value(),
-				.FixedRotation = rigidBodyComponent["FixedRotation"].as<bool>(),
-				.Bullet = rigidBodyComponent["Bullet"].as<bool>(),
-				.FastRotation = rigidBodyComponent["FastRotation"].as<bool>(),
-				.GravityScale = rigidBodyComponent["GravityScale"].as<float>(),
-				.LinearDamping = rigidBodyComponent["LinearDamping"].as<float>(),
-				.AngularDamping = rigidBodyComponent["AngularDamping"].as<float>(),
-			};
-			entity.set<RigidBodyComponent>(component);
-		}
-
-		{
-			auto componentData = entityData["BoxCollider2DComponent"];
-			if (componentData)
 			{
-				BoxCollider2DComponent component;
-				component.Offset = componentData["Offset"].as<glm::vec2>();
-				component.Size = componentData["Size"].as<glm::vec2>();
-				if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
+				auto componentData = entityData["SpriteRendererComponent"];
+				if (componentData)
+				{
+					SpriteRendererComponent component;
+					component.Color = componentData["Color"].as<glm::vec4>();
+					component.Texture = assetManager.LoadTexture(componentData["Texture"].as<std::string>());
 
-				entity.set<BoxCollider2DComponent>(component);
+					entity.set<SpriteRendererComponent>(component);
+				}
 			}
-		}
 
-		{
-			auto componentData = entityData["CircleCollider2DComponent"];
-			if (componentData)
+			auto circleRendererComponent = entityData["CircleRendererComponent"];
+			if (circleRendererComponent)
 			{
-				CircleCollider2DComponent component;
-				component.Offset = componentData["Offset"].as<glm::vec2>();
-				component.Radius = componentData["Radius"].as<float>();
-				if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
-
-				entity.set<CircleCollider2DComponent>(component);
+				entity.set<CircleRendererComponent>({
+					circleRendererComponent["Color"].as<glm::vec4>(),
+					circleRendererComponent["Thickness"].as<float>(),
+					circleRendererComponent["Fade"].as<float>()
+					});
 			}
-		}
 
-		{
-			auto componentData = entityData["ScriptComponent"];
-			if (componentData)
+			auto rigidBodyComponent = entityData["RigidBodyComponent"];
+			if (rigidBodyComponent)
 			{
-				ScriptComponent component;
-				component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(componentData["Path"].as<std::string>())]);
-
-				entity.set<ScriptComponent>(component);
+				RigidBodyComponent component = {
+					.Type = magic_enum::enum_cast<BodyType>(rigidBodyComponent["Type"].as<std::string>()).value(),
+					.FixedRotation = rigidBodyComponent["FixedRotation"].as<bool>(),
+					.Bullet = rigidBodyComponent["Bullet"].as<bool>(),
+					.FastRotation = rigidBodyComponent["FastRotation"].as<bool>(),
+					.GravityScale = rigidBodyComponent["GravityScale"].as<float>(),
+					.LinearDamping = rigidBodyComponent["LinearDamping"].as<float>(),
+					.AngularDamping = rigidBodyComponent["AngularDamping"].as<float>(),
+				};
+				entity.set<RigidBodyComponent>(component);
 			}
+
+			{
+				auto componentData = entityData["BoxCollider2DComponent"];
+				if (componentData)
+				{
+					BoxCollider2DComponent component;
+					component.Offset = componentData["Offset"].as<glm::vec2>();
+					component.Size = componentData["Size"].as<glm::vec2>();
+					if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
+
+					entity.set<BoxCollider2DComponent>(component);
+				}
+			}
+
+			{
+				auto componentData = entityData["CircleCollider2DComponent"];
+				if (componentData)
+				{
+					CircleCollider2DComponent component;
+					component.Offset = componentData["Offset"].as<glm::vec2>();
+					component.Radius = componentData["Radius"].as<float>();
+					if (componentData["Material"]) component.MaterialID = PhysicsMaterialNames[componentData["Material"].as<std::string>()];
+
+					entity.set<CircleCollider2DComponent>(component);
+				}
+			}
+
+			{
+				auto componentData = entityData["ScriptComponent"];
+				if (componentData)
+				{
+					ScriptComponent component;
+					component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(componentData["Path"].as<std::string>())]);
+
+					entity.set<ScriptComponent>(component);
+				}
+			}
+
+			auto childEntities = entityData["Children"];
+			if (childEntities)
+				for (const auto& child : childEntities)
+					scene.SetChild(entity, DeserializeEntity(scene, child), false);
 		}
-
-		auto childEntities = entityData["Children"];
-		if (childEntities)
-			for (const auto& child : childEntities)
-				scene.SetChild(entity, DeserializeEntity(scene, child), false);
-
+		catch (std::exception ex)
+		{
+			WC_ERROR(ex.what());
+			return entity;
+		}
 		return entity;
 	}
 
@@ -287,11 +301,18 @@ namespace Editor
 		YAML::Node metaData;
 		YAML::Node entitiesData;
 
-		for (auto& name : scene.EntityOrder)
+		for (const auto& name : scene.EntityOrder)
 		{
 			auto entity = scene.EntityWorld.lookup(name.c_str());
 
-			entitiesData.push_back(SerializeEntity(scene, entity));
+			if (entity)
+			{
+				entitiesData.push_back(SerializeEntity(scene, entity));
+			}
+			else
+			{
+				WC_ERROR("Could not find entity with name '{}'", name.c_str());
+			}
 		}
 
 		if (scene.PhysicsWorld.IsValid())
@@ -321,6 +342,27 @@ namespace Editor
 		fromYAML(dstScene, toYAML(srcScene));
 	}
 
+	TransformComponent GetEntityWorldTransform(const flecs::entity& entity)
+	{
+		TransformComponent tc = *entity.get<TransformComponent>();
+
+		auto parent = entity.parent();
+		while (parent != flecs::entity::null())
+		{
+			if (parent.has<TransformComponent>())
+			{
+				auto parent_tc = *parent.get<TransformComponent>();
+				tc.Translation += parent_tc.Translation;
+				tc.Rotation += parent_tc.Rotation;
+				tc.Scale *= parent_tc.Scale;
+
+				parent = parent.parent();
+			}
+		}
+
+		return tc;
+	}
+
 	enum class SceneState { Edit, Simulate, Play };
 
 	struct EditorScene
@@ -331,7 +373,7 @@ namespace Editor
 
 		std::string Path;
 
-	    float snapStrength = 1.0f;
+		float snapStrength = 1.0f;
 
 		flecs::entity SelectedEntity = flecs::entity::null();
 		std::vector<void*> CommandBuffer;
@@ -340,19 +382,24 @@ namespace Editor
 		EditorCamera camera;
 
 		SceneState State = SceneState::Edit;
-		ImGuizmo::OPERATION GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
+		ImGuizmo::OPERATION GuizmoOp = ImGuizmo::OPERATION::TRANSLATE;
 
 		void CreatePhysicsWorld() { m_Scene.CreatePhysicsWorld(); }
 		void Create() { m_Scene.Create(); }
 
-		void Destroy() 
-		{ 
-			m_Scene.Destroy(); 
+		void Destroy()
+		{
+			m_Scene.Destroy();
 
 			SelectedEntity = flecs::entity::null();
 			CommandIndex = 0;
-			//@TODO clear the command buffer
-			GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
+
+			for (const auto& cmd : CommandBuffer)
+				delete cmd;
+
+			CommandBuffer.clear();
+
+			GuizmoOp = ImGuizmo::OPERATION::TRANSLATE;
 			Path.clear();
 		}
 		void DeleteAllEntities() { m_Scene.DeleteAllEntities(); }
@@ -360,13 +407,12 @@ namespace Editor
 		flecs::entity AddEntity() { return m_Scene.AddEntity(); }
 		flecs::entity AddEntity(const std::string& name) { return m_Scene.AddEntity(name); }
 
-		void CopyEntity(const flecs::entity& ent, const flecs::entity& ent2) { m_Scene.CopyEntity(ent, ent2); }
 		void DuplicateEntity(const flecs::entity& ent)
 		{
-			//auto ent2 = AddEntity(std::string(ent.name()) + " Clone");
-			//m_Scene.CopyEntity(ent, ent2); 
-			WC_CORE_INFO("TODO: Implement clone");
+			auto ent2 = m_Scene.CopyEntity(ent);
+			m_Scene.SetEntityName(ent2, std::string(ent.name().c_str()) + " Clone");
 		}
+
 		void KillEntity(const flecs::entity& ent)
 		{
 			if (SelectedEntity == ent) SelectedEntity = flecs::entity::null();
@@ -421,18 +467,18 @@ namespace Editor
 		flecs::entity LoadEntity(const YAML::Node& entityData) { return DeserializeEntity(m_Scene, entityData); } // bruh :: is absolutely not required, thanks clang
 		flecs::entity LoadEntity(const std::string& path) { return LoadEntity(YAML::LoadFile(path)); }
 
-		void Save() 
+		void Save()
 		{
 			YAML::Node data = toYAML(m_Scene);
 			data["CameraFocalPoint"] = camera.FocalPoint; // @TODO: Camera loading doesnt work
 			data["CameraYaw"] = camera.Yaw;
 			data["CameraPitch"] = camera.Pitch;
 			data["CameraDistance"] = camera.m_Distance;
-			YAMLUtils::SaveFile(Path, data); 
+			YAMLUtils::SaveFile(Path, data);
 		}
 
-		void Save(const std::string& filepath) 
-		{ 
+		void Save(const std::string& filepath)
+		{
 			Path = filepath;
 			Save();
 		}
@@ -456,6 +502,7 @@ namespace Editor
 			if (data["CameraYaw"]) camera.Yaw = data["CameraYaw"].as<float>();
 			if (data["CameraPitch"]) camera.Pitch = data["CameraPitch"].as<float>();
 			if (data["CameraDistance"]) camera.m_Distance = data["CameraDistance"].as<float>();
+			camera.UpdateView();
 			return true;
 		}
 
@@ -465,9 +512,15 @@ namespace Editor
 		{
 			T* cmd = new T(); // call the constructor
 			cmd->type = T::cmd_type;
+
+			if (CommandBuffer.size() == 0)
+			{
+				WC_INFO("Should make a first snapshot");
+			}
+
 			if ((int32_t)CommandIndex < int32_t(CommandBuffer.size()) - 1)
 			{
-				for (size_t i = CommandIndex; i < CommandBuffer.size(); ++i)
+				for (size_t i = CommandIndex; i < CommandBuffer.size(); i++)
 					delete CommandBuffer[i];
 
 				CommandBuffer[CommandIndex] = cmd;

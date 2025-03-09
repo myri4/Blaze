@@ -190,7 +190,7 @@ namespace blaze
 				{
 					auto collDef = entt.get_ref<BoxCollider2DComponent>();
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
-					bodyDef.rotation = b2MakeRot(pos.Rotation);
+					bodyDef.rotation = b2MakeRot(pos.Rotation.z);
 					p.body.Create(PhysicsWorld, bodyDef);
 					collDef->Shape.CreatePolygonShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), b2MakeBox(collDef->Size.x * 0.5f, collDef->Size.y * 0.5f));
 				}
@@ -199,12 +199,12 @@ namespace blaze
 				{
 					auto collDef = entt.get_ref<CircleCollider2DComponent>();
 					bodyDef.position = b2Vec2(pos.Translation.x + collDef->Offset.x, pos.Translation.y + collDef->Offset.y);
-					bodyDef.rotation = b2MakeRot(pos.Rotation);
+					bodyDef.rotation = b2MakeRot(pos.Rotation.z);
 					p.body.Create(PhysicsWorld, bodyDef);
 					collDef->Shape.CreateCircleShape(p.body, PhysicsMaterials[collDef->MaterialID].GetShapeDef(), { {0.f, 0.f}, collDef->Radius });
 				}
 				p.prevPos = { bodyDef.position.x, bodyDef.position.y };
-				p.previousRotation = pos.Rotation;
+				p.previousRotation = pos.Rotation.z;
 				});
 		}
 
@@ -222,7 +222,14 @@ namespace blaze
 			return EntityWorld.entity(name.c_str()).add<EntityTag>();
 		}
 
+		void SetEntityName(const flecs::entity& entity, const std::string& name)
+		{
+			EntityOrder.push_back(name);
+			entity.set_name(name.c_str());
+		}
+
 		void CopyEntity(const flecs::entity& ent, const flecs::entity& ent2) { ecs_clone(EntityWorld, ent2, ent, true); }
+		flecs::entity CopyEntity(const flecs::entity& ent) { return flecs::entity(EntityWorld, ecs_clone(EntityWorld, 0, ent, true)); }
 
 		void KillEntity(const flecs::entity& ent)
 		{
@@ -348,7 +355,7 @@ namespace blaze
 					float end = p.body.GetAngle();
 					auto diff = end - start;
 
-					pc.Rotation = glm::mix(start, end, alpha);
+					pc.Rotation.z = glm::mix(start, end, alpha);
 				});
 		}
 

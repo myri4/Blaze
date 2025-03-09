@@ -93,12 +93,6 @@ void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor color, void* context)
 #define PROJECT_SETTINGS_EXTENSION ".blzproj"
 #define PROJECT_USER_SETTINGS_EXTENSION ".blzprojuser"
 
-namespace Project
-{
-	
-}
-
-
 struct EditorInstance
 {
 	// Debug stats
@@ -174,28 +168,29 @@ struct EditorInstance
 		m_Renderer.Init();
 
 		// Load Textures
-		std::string assetPath = "assets/textures/menu/";
-		t_Close.Load(assetPath + "close.png");
-		t_Minimize.Load(assetPath + "minimize.png");
-	    t_Maximize.Load(assetPath + "maximize.png");
-		t_Collapse.Load(assetPath + "collapse.png");
+		std::string assetPath = "assets/";
+		std::string texturePath = assetPath + "textures/menu/";
+		assetManager.LoadTexture(texturePath + "close.png", t_Close);
+		assetManager.LoadTexture(texturePath + "minimize.png", t_Minimize);
+		assetManager.LoadTexture(texturePath + "maximize.png", t_Maximize);
+		assetManager.LoadTexture(texturePath + "collapse.png", t_Collapse);
 
-		t_FolderOpen.Load(assetPath + "folder-open.png");
-		t_FolderClosed.Load(assetPath + "folder-closed.png");
-		t_File.Load(assetPath + "file.png");
+		assetManager.LoadTexture(texturePath + "folder_open.png", t_FolderOpen);
+		assetManager.LoadTexture(texturePath + "folder_closed.png", t_FolderClosed);
+		assetManager.LoadTexture(texturePath + "file.png", t_File);
 
-		t_Play.Load(assetPath + "play.png");
-		t_Simulate.Load(assetPath + "simulate.png");
-		t_Stop.Load(assetPath + "stop.png");
+		assetManager.LoadTexture(texturePath + "play.png", t_Play);
+		assetManager.LoadTexture(texturePath + "simulate.png", t_Simulate);
+		assetManager.LoadTexture(texturePath + "stop.png", t_Stop);
 
-		t_Eye.Load(assetPath + "eye.png");
-		t_EyeClosed.Load(assetPath + "eye-slash.png");
+		assetManager.LoadTexture(texturePath + "eye.png", t_Eye);
+		assetManager.LoadTexture(texturePath + "eye_slash.png", t_EyeClosed);
 
-	    t_Debug.Load(assetPath + "debug.png");
-	    t_Info.Load(assetPath + "info.png");
-	    t_Warning.Load(assetPath + "warning.png");
-	    t_Error.Load(assetPath + "error.png");
-	    t_Critical.Load(assetPath + "critical.png");
+	    assetManager.LoadTexture(texturePath + "debug.png", t_Debug);
+		assetManager.LoadTexture(texturePath + "info.png", t_Info);
+		assetManager.LoadTexture(texturePath + "warning.png", t_Warning);
+		assetManager.LoadTexture(texturePath + "error.png", t_Error);
+		assetManager.LoadTexture(texturePath + "critical.png", t_Critical);
 
 		PhysicsMaterials.emplace_back(PhysicsMaterial()); // @NOTE: Index 0 is the default material
 		PhysicsMaterialNames["Default"] = PhysicsMaterials.size() - 1;
@@ -227,29 +222,7 @@ struct EditorInstance
 	{
 		SaveSettings();
 
-		SavePhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
-
-		t_Close.Destroy();
-		t_Minimize.Destroy();
-	    t_Maximize.Destroy();
-		t_Collapse.Destroy();
-
-		t_FolderClosed.Destroy();
-		t_FolderOpen.Destroy();
-		t_File.Destroy();
-
-		t_Play.Destroy();
-		t_Simulate.Destroy();
-		t_Stop.Destroy();
-
-		t_Eye.Destroy();
-		t_EyeClosed.Destroy();
-
-	    t_Debug.Destroy();
-	    t_Info.Destroy();
-	    t_Warning.Destroy();
-	    t_Error.Destroy();
-	    t_Critical.Destroy();
+		SavePhysicsMaterials(ProjectRootPath + "/physicsMaterials.yaml");
 
 		assetManager.Free();
 		m_Renderer.Deinit();
@@ -264,26 +237,15 @@ struct EditorInstance
 		{
 			auto& GuizmoOp = m_Scene.GuizmoOp;
 			auto& camera = m_Scene.camera;
-			if (gui::IsKeyPressed(ImGuiKey_G)) GuizmoOp = ImGuizmo::OPERATION::TRANSLATE_X | ImGuizmo::OPERATION::TRANSLATE_Y | ImGuizmo::OPERATION::TRANSLATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_R)) GuizmoOp = ImGuizmo::OPERATION::ROTATE_Z;
-			else if (gui::IsKeyPressed(ImGuiKey_S)) GuizmoOp = ImGuizmo::OPERATION::SCALE_X | ImGuizmo::OPERATION::SCALE_Y;
+			if (gui::IsKeyPressed(ImGuiKey_G)) GuizmoOp = ImGuizmo::OPERATION::TRANSLATE;
+			else if (gui::IsKeyPressed(ImGuiKey_R)) GuizmoOp = ImGuizmo::OPERATION::ROTATE;
+			else if (gui::IsKeyPressed(ImGuiKey_S)) GuizmoOp = ImGuizmo::OPERATION::SCALE;
 
 			if (gui::IsKeyDown(ImGuiKey_LeftCtrl))
 			{
 				if (gui::IsKeyPressed(ImGuiKey_Z)) m_Scene.Undo();
 				else if (gui::IsKeyPressed(ImGuiKey_Y)) m_Scene.Redo();
 				else if (gui::IsKeyPressed(ImGuiKey_S)) m_Scene.Save();
-
-			    if (gui::IsKeyPressed(ImGuiKey_UpArrow))
-			    {
-			        m_Scene.snapStrength++;
-			        WC_INFO("Snap increased to: {}", m_Scene.snapStrength);
-			    }
-			    else if (gui::IsKeyPressed(ImGuiKey_DownArrow))
-			    {
-			        m_Scene.snapStrength--;
-			        WC_INFO("Snap decreased to: {}", m_Scene.snapStrength);
-			    }
 			}
 
 			/*float scroll = Mouse::GetMouseScroll().y;
@@ -679,9 +641,9 @@ struct EditorInstance
 
 					// Update the entity's local transform
 					m_Scene.SelectedEntity.set<TransformComponent>({
-						glm::vec3(translation),
-						glm::vec2(scale),
-						rotation.z
+						translation,
+						scale,
+						rotation
 						});
 
 					if (m_Scene.SelectedEntity.has<RigidBodyComponent>())
@@ -717,11 +679,8 @@ struct EditorInstance
 				auto& worldData = m_Scene.m_Scene.PhysicsWorldData;
 				ui::DragButton2("Gravity", worldData.Gravity);
 
-				ui::Drag("Near", m_Scene.camera.NearClip, 0.1f);
-				ui::Drag("Far", m_Scene.camera.FarClip, 0.1f);
-				ui::Drag3("Camera position", glm::value_ptr(m_Scene.camera.Position));
 				ui::Drag3("Focal point", glm::value_ptr(m_Scene.camera.FocalPoint));
-				m_Scene.camera.Update(m_Renderer.GetAspectRatio());
+				m_Scene.camera.UpdateView();
 				//{
 				//	auto rt = physicsWorld.GetRestitutionThreshold();
 				//	UI::Drag("Restitution Threshold", rt);
@@ -792,7 +751,7 @@ struct EditorInstance
 			if (!exportPath.empty())
 			{
 				YAML::Node entityData = m_Scene.ExportEntity(entity); // TODO - fix with merge
-				YAMLUtils::SaveFile(exportPath + "\\" + std::string(entity.name().c_str()) + ".blzent", entityData);
+				YAMLUtils::SaveFile(exportPath + "/" + std::string(entity.name().c_str()) + ".blzent", entityData);
 			}
 
 			gui::Separator();
@@ -926,7 +885,7 @@ struct EditorInstance
 			if (entity.has<TransformComponent>())
 			{
 				auto& camera = m_Scene.camera;
-				camera.FocalPoint = glm::vec3(glm::vec2(entity.get<TransformComponent>()->Translation), camera.FocalPoint.z); // @TODO: its still kinda buggy
+				camera.FocalPoint = glm::vec3(glm::vec2(GetEntityWorldTransform(entity).Translation), camera.FocalPoint.z); // @TODO: its still kinda buggy
 				camera.Yaw = 0.f;
 				camera.Pitch = 0.f;
 				camera.UpdateView();
@@ -1286,12 +1245,12 @@ struct EditorInstance
 				if (gui::BeginChild("components"))
 				{
 					EditComponent<TransformComponent>("Transform", [](auto& component) {
-						auto& realRotation = const_cast<float&>(component.Rotation);
+						auto& realRotation = const_cast<glm::vec3&>(component.Rotation);
 						auto rotation = glm::degrees(realRotation);
 
 						ui::DragButton3("Position", component.Translation);
-						ui::DragButton2("Scale", component.Scale);
-						ui::Drag("Rotation", rotation, 0.5f, 0.f, 360.f);
+						ui::DragButton3("Scale", component.Scale);
+						ui::DragButton3("Rotation", rotation);// , 0.5f, 0.f, 360.f);
 						realRotation = glm::radians(rotation);
 						});
 
@@ -3171,7 +3130,7 @@ struct EditorInstance
 						if (gui::MenuItem("Save", "CTRL + S"))
 						{
 							m_Scene.Save();
-							SavePhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
+							SavePhysicsMaterials(ProjectRootPath + "/physicsMaterials.yaml");
 						}
 
 						if (gui::MenuItem("Save As", "CTRL + A + S"))
@@ -3308,26 +3267,26 @@ struct EditorInstance
 		savedProjectScenes.clear();
 	}
 
-	bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "\\settings" + PROJECT_SETTINGS_EXTENSION); }
-	std::string GetProjectSettingsPath() { return ProjectRootPath + "\\settings" + PROJECT_SETTINGS_EXTENSION; }
-	std::string GetProjectUserSettingsPath() { return ProjectRootPath + "\\settings" + PROJECT_USER_SETTINGS_EXTENSION; }
+	bool IsProject(const std::string& filepath) { return std::filesystem::exists(filepath + "/settings" + PROJECT_SETTINGS_EXTENSION); }
+	std::string GetProjectSettingsPath() { return ProjectRootPath + "/settings" + PROJECT_SETTINGS_EXTENSION; }
+	std::string GetProjectUserSettingsPath() { return ProjectRootPath + "/settings" + PROJECT_USER_SETTINGS_EXTENSION; }
 
 	void SaveProjectData()
 	{
 		if (ProjectRootPath.empty()) return;
 
 		YAML::Node data;
-		YAML_SAVE_VAR(data, texturePath);
-		YAML_SAVE_VAR(data, fontPath);
-		YAML_SAVE_VAR(data, soundPath);
+		data["texturePath"] = std::filesystem::relative(texturePath, ProjectRootPath).string(); 
+		data["fontPath"] = std::filesystem::relative(fontPath, ProjectRootPath).string();
+		data["soundPath"] = std::filesystem::relative(soundPath, ProjectRootPath).string();
 
-		YAML_SAVE_VAR(data, scenesPath);
-		YAML_SAVE_VAR(data, scriptsPath);
-		YAML_SAVE_VAR(data, entitiesPath);
+		data["scenesPath"] = std::filesystem::relative(scenesPath, ProjectRootPath).string();
+		data["scriptsPath"] = std::filesystem::relative(scriptsPath, ProjectRootPath).string();
+		data["entitiesPath"] = std::filesystem::relative(entitiesPath, ProjectRootPath).string();
 
 		YAML::Node openedScenes;
-		for (auto& scene : savedProjectScenes)
-			openedScenes.push_back(scene);
+		for (const auto& scene : savedProjectScenes)
+			openedScenes.push_back(std::filesystem::relative(scene, scenesPath).string());
 
 		YAML::Node userData;
 		userData["OpenedScenes"] = openedScenes;
@@ -3344,46 +3303,55 @@ struct EditorInstance
 
 	bool LoadProject(const std::string& filepath)
 	{
-		if (!std::filesystem::exists(filepath))
+		try
 		{
-			WC_CORE_ERROR("{} does not exist", filepath);
-			return false;
-		}
-
-		if (!IsProject(filepath))
-		{
-			WC_CORE_ERROR("{} is not a Blaze project", filepath);
-			return false;
-		}
-
-		ProjectName = std::filesystem::path(filepath).stem().string();
-		ProjectRootPath = filepath;
-
-		YAML::Node data = YAML::LoadFile(GetProjectSettingsPath());
-		if (data)
-		{
-			YAML_LOAD_VAR(data, texturePath);
-			YAML_LOAD_VAR(data, fontPath);
-			YAML_LOAD_VAR(data, soundPath);
-
-			YAML_LOAD_VAR(data, scenesPath);
-			YAML_LOAD_VAR(data, scriptsPath);
-			YAML_LOAD_VAR(data, entitiesPath);
-		}
-		AddProjectToList(ProjectRootPath);
-
-		LoadPhysicsMaterials(ProjectRootPath + "\\physicsMaterials.yaml");
-
-		if (std::filesystem::exists(GetProjectUserSettingsPath()))
-		{
-			YAML::Node userDataScenes = YAML::LoadFile(GetProjectUserSettingsPath());
-			for (const auto& openedScene : userDataScenes["OpenedScenes"])
+			if (!std::filesystem::exists(filepath))
 			{
-				auto path = openedScene.as<std::string>();
-				AddSceneToList(path);
-				m_Scene.Load(path);
+				WC_CORE_ERROR("{} does not exist", filepath);
+				return false;
+			}
+
+			if (!IsProject(filepath))
+			{
+				WC_CORE_ERROR("{} is not a Blaze project", filepath);
+				return false;
+			}
+
+			ProjectName = std::filesystem::path(filepath).stem().string();
+			ProjectRootPath = filepath;			
+
+			YAML::Node data = YAML::LoadFile(GetProjectSettingsPath());
+			if (data)
+			{
+				if (data["texturePath"]) texturePath = ProjectRootPath + '/' + data["texturePath"].as<std::string>();
+				if (data["fontPath"]) fontPath = ProjectRootPath + '/' + data["fontPath"].as<std::string>();
+				if (data["soundPath"]) soundPath = ProjectRootPath + '/' + data["soundPath"].as<std::string>();
+
+				if (data["scenesPath"]) scenesPath = ProjectRootPath + '/' + data["scenesPath"].as<std::string>();
+				if (data["scriptsPath"]) scriptsPath = ProjectRootPath + '/' + data["scriptsPath"].as<std::string>();
+				if (data["entitiesPath"]) entitiesPath = ProjectRootPath + '/' + data["entitiesPath"].as<std::string>();
+			}
+			AddProjectToList(ProjectRootPath);
+
+			LoadPhysicsMaterials(ProjectRootPath + "/physicsMaterials.yaml");
+
+			if (std::filesystem::exists(GetProjectUserSettingsPath()))
+			{
+				YAML::Node userDataScenes = YAML::LoadFile(GetProjectUserSettingsPath());
+				for (const auto& openedScene : userDataScenes["OpenedScenes"])
+				{
+					auto path = openedScene.as<std::string>();
+					AddSceneToList(scenesPath + '/' + path);
+				}
+				m_Scene.Load(savedProjectScenes.front());
 			}
 		}
+		catch (std::exception ex)
+		{
+			WC_ERROR(ex.what());
+			return false;
+		}
+
 		return true;
 	}
 
@@ -3396,18 +3364,18 @@ struct EditorInstance
 		}
 
 		ProjectName = pName;
-		ProjectRootPath = filepath + "\\" + pName; // @TODO: I think the '\\' are OS specific
+		ProjectRootPath = filepath + "/" + pName;
 
-		texturePath = ProjectRootPath + "\\Textures";
-		fontPath = ProjectRootPath + "\\Fonts";
-		soundPath = ProjectRootPath + "\\Sounds";
+		texturePath = ProjectRootPath + "/Textures";
+		fontPath = ProjectRootPath + "/Fonts";
+		soundPath = ProjectRootPath + "/Sounds";
 
-		scenesPath = ProjectRootPath + "\\Scenes";
-		scriptsPath = ProjectRootPath + "\\Scripts";
-		entitiesPath = ProjectRootPath + "\\Entities";
+		scenesPath = ProjectRootPath + "/Scenes";
+		scriptsPath = ProjectRootPath + "/Scripts";
+		entitiesPath = ProjectRootPath + "/Entities";
 
 		AddProjectToList(ProjectRootPath);
-		//std::string assetDir = ProjectRootPath + "\\Assets";
+		//std::string assetDir = ProjectRootPath + "/Assets";
 		std::filesystem::create_directory(ProjectRootPath);
 
 		std::filesystem::create_directory(texturePath);
@@ -3453,11 +3421,12 @@ struct EditorInstance
 		}
 
 		RemoveProjectFromList(ProjectRootPath);
-		std::filesystem::rename(ProjectRootPath, ProjectRootPath.substr(0, ProjectRootPath.find_last_of('\\') + 1) + newName);
+		auto oldProjectPath = ProjectRootPath;
 		ProjectRootPath = ProjectRootPath.substr(0, ProjectRootPath.find_last_of('\\') + 1) + newName;
+		std::filesystem::rename(oldProjectPath, ProjectRootPath);
 		AddProjectToList(ProjectRootPath);
 		ProjectName = newName;
-		SaveProjectData();
+		SaveProjectData(); // @TODO: Obsolete?
 	}
 
 	bool ProjectExists() { return !ProjectName.empty() && !ProjectRootPath.empty(); }
@@ -3477,37 +3446,44 @@ struct EditorInstance
 	
 	void LoadSettings()
 	{
-		std::string filepath = "settings.yaml";
-		if (!std::filesystem::exists(filepath))
+		try
 		{
-			WC_CORE_ERROR("Save file does not exist: {}", filepath);
-			return;
-		}
-
-		YAML::Node data = YAML::LoadFile(filepath);
-		if (!data)
-		{
-			WC_CORE_ERROR("Couldn't open file {}", filepath);
-			return;
-		}
-		YAML_LOAD_VAR(data, ZoomSpeed);
-		if (data["projectPaths"])
-		{
-			bool shouldSave = false;
-
-			for (const auto& iPath : data["projectPaths"])
+			std::string filepath = "settings.yaml";
+			if (!std::filesystem::exists(filepath))
 			{
-				auto path = iPath.as<std::string>();
-				if (std::filesystem::exists(path) && IsProject(path))
-					savedProjectPaths.push_back(path);
-				else
-				{
-					std::erase(savedProjectPaths, path);
-					shouldSave = true;
-				}
+				WC_CORE_ERROR("Save file does not exist: {}", filepath);
+				return;
 			}
 
-			if (shouldSave) SaveSettings();
+			YAML::Node data = YAML::LoadFile(filepath);
+			if (!data)
+			{
+				WC_CORE_ERROR("Couldn't open file {}", filepath);
+				return;
+			}
+			YAML_LOAD_VAR(data, ZoomSpeed);
+			if (data["projectPaths"])
+			{
+				bool shouldSave = false;
+
+				for (const auto& iPath : data["projectPaths"])
+				{
+					auto path = iPath.as<std::string>();
+					if (std::filesystem::exists(path) && IsProject(path))
+						savedProjectPaths.push_back(path);
+					else
+					{
+						std::erase(savedProjectPaths, path);
+						shouldSave = true;
+					}
+				}
+
+				if (shouldSave) SaveSettings();
+			}
+		}
+		catch (std::exception ex)
+		{
+			WC_ERROR(ex.what());
 		}
 	}
 };
