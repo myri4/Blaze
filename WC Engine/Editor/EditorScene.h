@@ -437,16 +437,16 @@ namespace Editor
 
 				m_Scene.EntityWorld.each([this](ScriptComponent& script)
 					{
-						if (script.ScriptInstance.L)
-							script.ScriptInstance.Execute("Create");
+						if (script.ScriptInstance)
+							script.ScriptInstance.state.Execute("Create");
 					});
 			}
 			else if (newState == SceneState::Edit)
 			{
 				m_Scene.EntityWorld.each([this](ScriptComponent& script)
 					{
-						if (script.ScriptInstance.L)
-							script.ScriptInstance.Execute("Destroy");
+						if (script.ScriptInstance)
+							script.ScriptInstance.state.Execute("Destroy");
 					});
 				m_Scene.PhysicsWorld.Destroy();
 

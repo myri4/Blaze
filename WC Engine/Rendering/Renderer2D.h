@@ -38,9 +38,9 @@ namespace blaze
 
 		void CreateImages(glm::vec2 renderSize, uint32_t mipLevelCount)
 		{
-			glm::ivec2 bloomTexSize = renderSize * 0.5f;
-			bloomTexSize += glm::ivec2(m_ComputeWorkGroupSize - bloomTexSize.x % m_ComputeWorkGroupSize, m_ComputeWorkGroupSize - bloomTexSize.y % m_ComputeWorkGroupSize);
-			m_MipLevels = mipLevelCount - 4;
+			glm::uvec2 bloomTexSize = renderSize * 0.5f;
+			bloomTexSize += glm::uvec2(m_ComputeWorkGroupSize - bloomTexSize.x % m_ComputeWorkGroupSize, m_ComputeWorkGroupSize - bloomTexSize.y % m_ComputeWorkGroupSize);
+			m_MipLevels = glm::max(mipLevelCount - 4, 1u);
 
 			vk::SamplerSpecification samplerSpec = {
 				.magFilter = vk::Filter::LINEAR,
@@ -58,33 +58,37 @@ namespace blaze
 			for (int i = 0; i < 3; i++)
 			{
 				auto& buffer = m_Buffers[i];
-				vk::ImageSpecification imgInfo;
+				vk::ImageSpecification imgInfo = {
+					.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 
-				imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+					.width = bloomTexSize.x,
+					.height = bloomTexSize.y,
 
-				imgInfo.width = bloomTexSize.x;
-				imgInfo.height = bloomTexSize.y;
-
-				imgInfo.mipLevels = m_MipLevels;
-				imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+					.mipLevels = m_MipLevels,
+					.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+				};
 
 				buffer.image.Create(imgInfo);
 
 				auto& views = buffer.imageViews;
 				views.reserve(imgInfo.mipLevels);
 
-				VkImageViewCreateInfo createInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-				createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-				createInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-				createInfo.flags = 0;
-				createInfo.image = buffer.image;
-				createInfo.subresourceRange.layerCount = 1;
-				createInfo.subresourceRange.levelCount = imgInfo.mipLevels;
-				createInfo.subresourceRange.baseMipLevel = 0;
-				createInfo.subresourceRange.baseArrayLayer = 0;
-				createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				VkImageViewCreateInfo createInfo = { 
+					.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
+					.viewType = VK_IMAGE_VIEW_TYPE_2D,
+					.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+					.flags = 0,
+					.image = buffer.image,
+					.subresourceRange = {
+						.layerCount = 1,
+						.levelCount = imgInfo.mipLevels,
+						.baseMipLevel = 0,
+						.baseArrayLayer = 0,
+						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					}
+				};
 				{ // Creating the first image view
-					vk::ImageView& imageView = views.emplace_back();
+					auto& imageView = views.emplace_back();
 					imageView.Create(createInfo);
 				}
 
@@ -93,7 +97,7 @@ namespace blaze
 				for (uint32_t mip = 1; mip < imgInfo.mipLevels; mip++)
 				{
 					createInfo.subresourceRange.baseMipLevel = mip;
-					vk::ImageView& imageView = views.emplace_back();
+					auto& imageView = views.emplace_back();
 					imageView.Create(createInfo);
 				}
 
@@ -102,12 +106,13 @@ namespace blaze
 
 			vk::SyncContext::ImmediateSubmit([&](VkCommandBuffer cmd)
 				{
-					VkImageSubresourceRange range;
-					range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					range.baseArrayLayer = 0;
-					range.baseMipLevel = 0;
-					range.layerCount = 1;
-					range.levelCount = m_MipLevels;
+					VkImageSubresourceRange range = {
+						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+						.baseArrayLayer = 0,
+						.baseMipLevel = 0,
+						.layerCount = 1,
+						.levelCount = m_MipLevels,
+					};
 					for (int i = 0; i < 3; i++)
 						m_Buffers[i].image.SetLayout(cmd, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, range);
 				});

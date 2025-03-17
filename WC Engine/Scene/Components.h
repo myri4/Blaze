@@ -169,6 +169,6 @@ namespace blaze
 
 	struct ScriptComponent
 	{
-		ScriptState ScriptInstance;
+		Script ScriptInstance;
 	};
 }

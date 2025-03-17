@@ -363,8 +363,8 @@ namespace blaze
 		{
 			EntityWorld.each([this](ScriptComponent& script)
 				{
-					if (script.ScriptInstance.L) 
-						script.ScriptInstance.Execute("Update");
+					if (script.ScriptInstance) 
+						script.ScriptInstance.state.Execute("Update");
 				});
 
 			UpdatePhysics();

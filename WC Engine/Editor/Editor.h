@@ -1538,38 +1538,38 @@ struct EditorInstance
 						if (gui::Button("Reload script"))
 							component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(component.ScriptInstance.Name, true)]);
 
-						if (script.L)
+						if (script)
 						{
-							ui::Text(std::format("Stack size: {}", script.GetTop()));
+							ui::Text(std::format("Stack size: {}", script.state.GetTop()));
 							auto it = ScriptBinaryCache.find(script.Name);
 							if (it != ScriptBinaryCache.end())
 							{
 								const auto& binID = it->second;
 								for (const auto& variableName : ScriptBinaries[binID].VariableNames)
 								{
-									script.GetGlobal(variableName);
-									if (script.IsString() && !script.IsNumber())
+									script.state.GetGlobal(variableName);
+									if (script.state.IsString() && !script.state.IsNumber())
 									{
-										auto temp = script.To<std::string>();
+										auto temp = script.state.To<std::string>();
 										if (gui::InputText(variableName.c_str(), &temp))
-											script.SetVariable(variableName, temp);
+											script.state.SetVariable(variableName, temp);
 									}
-									else if (script.IsNumber())
+									else if (script.state.IsNumber())
 									{
-										auto temp = script.To<double>();
+										auto temp = script.state.To<double>();
 										if (ui::Drag(variableName, temp))
-											script.SetVariable(variableName, temp);
+											script.state.SetVariable(variableName, temp);
 									}
-									else if (script.IsBool())
+									else if (script.state.IsBool())
 									{
-										auto temp = script.To<bool>();
+										auto temp = script.state.To<bool>();
 										if (ui::Checkbox(variableName, temp))
-											script.SetVariable(variableName, temp);
+											script.state.SetVariable(variableName, temp);
 									}
 									else
 										ui::Text("Unknown type: " + variableName);
 
-									script.Pop();
+									script.state.Pop();
 								}
 							}
 						}
