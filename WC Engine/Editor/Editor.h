@@ -13,6 +13,8 @@
 
 #include "../Globals.h"
 
+#include "../Sound/SoundEngine.h"
+
 using namespace Editor;
 namespace gui = ImGui;
 
@@ -146,6 +148,9 @@ struct EditorInstance
     Texture t_Critical;
 
 
+	Audio::SoundContext context;
+
+
 	bool allowInput = true;
 
 	bool showEditor = true;
@@ -209,6 +214,8 @@ struct EditorInstance
 		};
 
 		m_Renderer.CreateScreen(Globals.window.GetSize());
+
+		context.InitializeContext();
 	}
 
 	void Resize(glm::vec2 size)
