@@ -171,6 +171,15 @@ namespace blaze
 	{
 		lua_State* L = nullptr;
 
+		ScriptState() = default;
+		ScriptState(lua_State* state) { L = state; }
+
+		void RaiseError(const std::string& errorMessage)
+		{
+			lua_pushstring(L, errorMessage.c_str());
+			lua_error(L);
+		}
+
 		void Pop(int n = 1) { lua_pop(L, n); }
 		void NewTable() { lua_newtable(L); }
 		void CreateTable(int narr, int nrec) { lua_createtable(L, narr, nrec); }
@@ -232,6 +241,11 @@ namespace blaze
 		auto GetGlobal(const std::string& s) { return lua_getglobal(L, s.c_str()); }
 
 		void Register(const std::string& libName, const luaL_Reg* l) { luaL_register(L, libName.c_str(), l); }
+		void Register(const std::string& funcName, lua_CFunction f) 
+		{ 
+			PushCFunction(f, funcName.c_str());
+			SetGlobal(funcName); 
+		}
 
 		auto PCall(int nargs, int nresults, int errfunc) { return lua_pcall(L, nargs, nresults, errfunc); }
 		auto Call(int nargs, int nresults) { return lua_call(L, nargs, nresults); }

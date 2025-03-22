@@ -3,7 +3,6 @@ type Log = {
     warn: <T...>(T...) -> (),
     error: <T...>(T...) -> (),
     critical: <T...>(T...) -> (),
-    keypress: (number) -> boolean
 }
 
 type vec2 =
@@ -39,3 +38,5 @@ type vec4 =
 }
 
 declare log: Log
+declare IsKeyPressed: (number) -> boolean
+declare vec4: (x: number?, y: number?, z: number?, w: number?) -> vec4
