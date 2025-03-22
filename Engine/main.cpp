@@ -406,11 +406,11 @@ int main()
 	Log::Init();
 
 #ifdef MSVC  // Visual Studio
-	std::filesystem::current_path("../../../../WC Engine/workdir");
+	std::filesystem::current_path("../../../../Engine/workdir");
 #elif defined(CLION)  // CLion
-	std::filesystem::current_path("../../WC Engine/workdir");
+	std::filesystem::current_path("../../Engine/workdir");
 #else  // Default or other IDEs
-	std::filesystem::current_path("../../../../WC Engine/workdir");
+	std::filesystem::current_path("../../../../Engine/workdir");
 #endif
 
 	glfwSetErrorCallback([](int err, const char* description) { WC_CORE_ERROR(description); /*WC_DEBUGBREAK();*/ });
