@@ -645,7 +645,45 @@ namespace blaze
 
 				lua_pushcfunction(state.L, vec4_add, "__add");
 				lua_setfield(state.L, -2, "__add");
+				lua_pushcfunction(state.L, vec4_sub, "__sub");
+				lua_setfield(state.L, -2, "__sub");
+				lua_pushcfunction(state.L, vec4_mul, "__mul");
+				lua_setfield(state.L, -2, "__mul");
+				lua_pushcfunction(state.L, vec4_div, "__div");
+				lua_setfield(state.L, -2, "__div");
 				state.Register("vec4", construct_vec4);
+
+				luaL_newmetatable(state.L, "vec3");
+
+				// Setup metatable
+				lua_pushcfunction(state.L, vec3_index, "__index");
+				lua_setfield(state.L, -2, "__index");
+
+				lua_pushcfunction(state.L, vec3_add, "__add");
+				lua_setfield(state.L, -2, "__add");
+				lua_pushcfunction(state.L, vec3_sub, "__sub");
+				lua_setfield(state.L, -2, "__sub");
+				lua_pushcfunction(state.L, vec3_mul, "__mul");
+				lua_setfield(state.L, -2, "__mul");
+				lua_pushcfunction(state.L, vec3_div, "__div");
+				lua_setfield(state.L, -2, "__div");
+				state.Register("vec3", construct_vec3);
+
+				luaL_newmetatable(state.L, "vec2");
+
+				// Setup metatable
+				lua_pushcfunction(state.L, vec2_index, "__index");
+				lua_setfield(state.L, -2, "__index");
+
+				lua_pushcfunction(state.L, vec2_add, "__add");
+				lua_setfield(state.L, -2, "__add");
+				lua_pushcfunction(state.L, vec2_sub, "__sub");
+				lua_setfield(state.L, -2, "__sub");
+				lua_pushcfunction(state.L, vec2_mul, "__mul");
+				lua_setfield(state.L, -2, "__mul");
+				lua_pushcfunction(state.L, vec2_div, "__div");
+				lua_setfield(state.L, -2, "__div");
+				state.Register("vec2", construct_vec2);
 				
 				state.Register("log", logFuncs);
 			}
