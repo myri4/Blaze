@@ -228,6 +228,383 @@ static int vec4_add(lua_State* L)
 	return 1;
 }
 
+static int vec4_sub(lua_State* L)
+{
+	glm::vec4 a = toVec4(L, 1);
+	glm::vec4 b = toVec4(L, 2);
+
+	pushVec4(L, a - b);
+	return 1;
+}
+
+static int vec4_mul(lua_State* L)
+{
+	glm::vec4 a = toVec4(L, 1);
+	glm::vec4 b = toVec4(L, 2);
+
+	pushVec4(L, a * b);
+	return 1;
+}
+
+static int vec4_div(lua_State* L)
+{
+	glm::vec4 a = toVec4(L, 1);
+	glm::vec4 b = toVec4(L, 2);
+
+	pushVec4(L, a / b);
+	return 1;
+}
+
+// Get a vec3 from the stack
+static glm::vec3 toVec3(lua_State* L, int index)
+{
+	blaze::ScriptState state(L);
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	float x, y, z;
+	bool success = true;
+
+	// Try x,y,z first
+	lua_getfield(L, index, "x");
+	if (lua_isnumber(L, -1))
+	{
+		x = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+	}
+	else
+	{
+		lua_pop(L, 1);
+		// Try r,g,b
+		lua_getfield(L, index, "r");
+		if (lua_isnumber(L, -1))
+		{
+			x = (float)lua_tonumber(L, -1);
+			lua_pop(L, 1);
+		}
+		else
+		{
+			success = false;
+			lua_pop(L, 1);
+		}
+	}
+
+	lua_getfield(L, index, "y");
+	if (lua_isnumber(L, -1))
+	{
+		y = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+	}
+	else
+	{
+		lua_pop(L, 1);
+		// Try r,g,b
+		lua_getfield(L, index, "g");
+		if (lua_isnumber(L, -1))
+		{
+			y = (float)lua_tonumber(L, -1);
+			lua_pop(L, 1);
+		}
+		else
+		{
+			success = false;
+			lua_pop(L, 1);
+		}
+	}
+
+	lua_getfield(L, index, "z");
+	if (lua_isnumber(L, -1))
+	{
+		z = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+	}
+	else
+	{
+		lua_pop(L, 1);
+		// Try r,g,b
+		lua_getfield(L, index, "b");
+		if (lua_isnumber(L, -1))
+		{
+			z = (float)lua_tonumber(L, -1);
+			lua_pop(L, 1);
+		}
+		else
+		{
+			success = false;
+			lua_pop(L, 1);
+		}
+	}
+
+	if (!success)
+	{
+		state.RaiseError("Invalid vec3 table format");
+		return glm::vec3(0.f);
+	}
+
+	return glm::vec3(x, y, z);
+}
+
+static void pushVec3(lua_State* L, const glm::vec3& value)
+{
+	lua_createtable(L, 0, 4);
+
+	lua_pushnumber(L, value.x);
+	lua_setfield(L, -2, "x");
+
+	lua_pushnumber(L, value.y);
+	lua_setfield(L, -2, "y");
+
+	lua_pushnumber(L, value.z);
+	lua_setfield(L, -2, "z");
+
+	// Set r,g,b aliases too for color access
+	lua_pushnumber(L, value.x);
+	lua_setfield(L, -2, "r");
+
+	lua_pushnumber(L, value.y);
+	lua_setfield(L, -2, "g");
+
+	lua_pushnumber(L, value.z);
+	lua_setfield(L, -2, "b");
+
+	// Set metatable
+	luaL_getmetatable(L, "vec3");
+	lua_setmetatable(L, -2);
+}
+
+static int construct_vec3(lua_State* L)
+{
+	int nargs = lua_gettop(L);
+
+	if (nargs == 0)
+		pushVec3(L, glm::vec3(0.f));
+	else if (nargs == 1 && lua_isnumber(L, 1))
+	{
+		float val = lua_tonumber(L, 1);
+		pushVec3(L, glm::vec3(val));
+	}
+	else
+	{
+		float x = luaL_optnumber(L, 1, 0.f);
+		float y = luaL_optnumber(L, 2, 0.f);
+		float z = luaL_optnumber(L, 3, 0.f);
+		pushVec3(L, glm::vec3(x, y, z));
+	}
+
+	return 1;
+}
+
+static int vec3_index(lua_State* L)
+{
+	const char* key = luaL_checkstring(L, 2);
+
+	lua_getmetatable(L, 1);
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 2);
+	lua_pushnil(L);
+	return 1;
+}
+
+static int vec3_add(lua_State* L)
+{
+	glm::vec3 a = toVec3(L, 1);
+	glm::vec3 b = toVec3(L, 2);
+
+	pushVec3(L, a + b);
+	return 1;
+}
+
+static int vec3_sub(lua_State* L)
+{
+	glm::vec3 a = toVec3(L, 1);
+	glm::vec3 b = toVec3(L, 2);
+
+	pushVec3(L, a - b);
+	return 1;
+}
+
+static int vec3_mul(lua_State* L)
+{
+	glm::vec3 a = toVec3(L, 1);
+	glm::vec3 b = toVec3(L, 2);
+
+	pushVec3(L, a * b);
+	return 1;
+}
+
+static int vec3_div(lua_State* L)
+{
+	glm::vec3 a = toVec3(L, 1);
+	glm::vec3 b = toVec3(L, 2);
+
+	pushVec3(L, a / b);
+	return 1;
+}
+
+// Get a vec2 from the stack
+static glm::vec2 toVec2(lua_State* L, int index)
+{
+	blaze::ScriptState state(L);
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	float x, y;
+	bool success = true;
+
+	// Try x,y first
+	lua_getfield(L, index, "x");
+	if (lua_isnumber(L, -1))
+	{
+		x = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+	}
+	else
+	{
+		lua_pop(L, 1);
+		// Try r,g
+		lua_getfield(L, index, "r");
+		if (lua_isnumber(L, -1))
+		{
+			x = (float)lua_tonumber(L, -1);
+			lua_pop(L, 1);
+		}
+		else
+		{
+			success = false;
+			lua_pop(L, 1);
+		}
+	}
+
+	lua_getfield(L, index, "y");
+	if (lua_isnumber(L, -1))
+	{
+		y = (float)lua_tonumber(L, -1);
+		lua_pop(L, 1);
+	}
+	else
+	{
+		lua_pop(L, 1);
+		// Try r,g
+		lua_getfield(L, index, "g");
+		if (lua_isnumber(L, -1))
+		{
+			y = (float)lua_tonumber(L, -1);
+			lua_pop(L, 1);
+		}
+		else
+		{
+			success = false;
+			lua_pop(L, 1);
+		}
+	}
+
+	if (!success)
+	{
+		state.RaiseError("Invalid vec2 table format");
+		return glm::vec2(0.f);
+	}
+
+	return glm::vec2(x, y);
+}
+
+static void pushVec2(lua_State* L, const glm::vec2& value)
+{
+	lua_createtable(L, 0, 4);
+
+	lua_pushnumber(L, value.x);
+	lua_setfield(L, -2, "x");
+
+	lua_pushnumber(L, value.y);
+	lua_setfield(L, -2, "y");
+
+	// Set r,g aliases too for color access
+	lua_pushnumber(L, value.x);
+	lua_setfield(L, -2, "r");
+
+	lua_pushnumber(L, value.y);
+	lua_setfield(L, -2, "g");
+
+	// Set metatable
+	luaL_getmetatable(L, "vec2");
+	lua_setmetatable(L, -2);
+}
+
+static int construct_vec2(lua_State* L)
+{
+	int nargs = lua_gettop(L);
+
+	if (nargs == 0)
+		pushVec2(L, glm::vec2(0.f));
+	else if (nargs == 1 && lua_isnumber(L, 1))
+	{
+		float val = lua_tonumber(L, 1);
+		pushVec2(L, glm::vec2(val));
+	}
+	else
+	{
+		float x = luaL_optnumber(L, 1, 0.f);
+		float y = luaL_optnumber(L, 2, 0.f);
+		pushVec2(L, glm::vec2(x, y));
+	}
+
+	return 1;
+}
+
+static int vec2_index(lua_State* L)
+{
+	const char* key = luaL_checkstring(L, 2);
+
+	lua_getmetatable(L, 1);
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 2);
+	lua_pushnil(L);
+	return 1;
+}
+
+static int vec2_add(lua_State* L)
+{
+	glm::vec2 a = toVec2(L, 1);
+	glm::vec2 b = toVec2(L, 2);
+
+	pushVec2(L, a + b);
+	return 1;
+}
+
+static int vec2_sub(lua_State* L)
+{
+	glm::vec2 a = toVec2(L, 1);
+	glm::vec2 b = toVec2(L, 2);
+
+	pushVec2(L, a - b);
+	return 1;
+}
+
+static int vec2_mul(lua_State* L)
+{
+	glm::vec2 a = toVec2(L, 1);
+	glm::vec2 b = toVec2(L, 2);
+
+	pushVec2(L, a * b);
+	return 1;
+}
+
+static int vec2_div(lua_State* L)
+{
+	glm::vec2 a = toVec2(L, 1);
+	glm::vec2 b = toVec2(L, 2);
+
+	pushVec2(L, a / b);
+	return 1;
+}
+
 static int lua_Print(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::trace); }
 static int lua_Info(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::info); }
 static int lua_Warn(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::warn); }
