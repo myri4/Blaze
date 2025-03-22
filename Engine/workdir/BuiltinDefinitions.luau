@@ -2,7 +2,8 @@ type Log = {
     info: <T...>(T...) -> (),
     warn: <T...>(T...) -> (),
     error: <T...>(T...) -> (),
-    critical: <T...>(T...) -> ()
+    critical: <T...>(T...) -> (),
+    keypress: (number) -> boolean
 }
 
 type vec2 =
