@@ -37,6 +37,16 @@ type vec4 =
     a: number
 }
 
+type frozenTable = {
+    Red: number,
+    Green: number,
+    Blue: number
+}
+
+
 declare log: Log
+declare FrozenTable: frozenTable
 declare IsKeyPressed: (number) -> boolean
+declare vec2: (x: number?, y: number?) -> vec2
+declare vec3: (x: number?, y: number?, z: number?) -> vec3
 declare vec4: (x: number?, y: number?, z: number?, w: number?) -> vec4
