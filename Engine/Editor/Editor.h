@@ -74,7 +74,7 @@ struct EditorInstance
     Texture t_Critical;
 
 
-	Audio::SoundContext context;
+	Audio::SoundContext SoundContext;
 
 
 	bool allowInput = true;

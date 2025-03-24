@@ -131,7 +131,7 @@ void EditorInstance::Create()
 
 	m_Renderer.CreateScreen(Globals.window.GetSize());
 
-	context.InitializeContext();
+	SoundContext.InitializeContext();
 }
 
 void EditorInstance::Resize(glm::vec2 size)
