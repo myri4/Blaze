@@ -29,10 +29,36 @@ static int lua_Log(lua_State* L, spdlog::level::level_enum level)
 
 static int lua_IsKeyPressed(lua_State* L)
 {
-	int Key = lua_tonumber(L, -1);
-	lua_pop(L, 1);
+	int Key = lua_tonumber(L, 1);
 	lua_pushboolean(L, wc::Key::GetKey(Key));
 	return 1;
+}
+
+static bool isVec2(lua_State* L, int index)
+{
+	bool res = true;
+
+	// TODO: Code
+
+	return res;
+}
+
+static bool isVec3(lua_State* L, int index)
+{
+	bool res = true;
+
+	// TODO: Code
+
+	return res;
+}
+
+static bool isVec4(lua_State* L, int index)
+{
+	bool res = true;
+
+	// TODO: Code
+
+	return res;
 }
 
 // Get a vec4 from the stack
@@ -185,7 +211,7 @@ static int vec4_index(lua_State* L)
 static int vec4_add(lua_State* L)
 {
 	glm::vec4 a = toVec4(L, 1);
-	glm::vec4 b = toVec4(L, 2);
+	glm::vec4 b = lua_isnumber(L, 2) ? glm::vec4(lua_tonumber(L, 2)) : toVec4(L, 2);
 
 	pushVec4(L, a + b);
 	return 1;
@@ -194,18 +220,16 @@ static int vec4_add(lua_State* L)
 static int vec4_sub(lua_State* L)
 {
 	glm::vec4 a = toVec4(L, 1);
-	glm::vec4 b = toVec4(L, 2);
+	glm::vec4 b = lua_isnumber(L, 2) ? glm::vec4(lua_tonumber(L, 2)) : toVec4(L, 2);
 
 	pushVec4(L, a - b);
 	return 1;
 }
 
-// @TODO: add support for multiplying and divinding by one number
-
 static int vec4_mul(lua_State* L)
 {
 	glm::vec4 a = toVec4(L, 1);
-	glm::vec4 b = toVec4(L, 2);
+	glm::vec4 b = lua_isnumber(L, 2) ? glm::vec4(lua_tonumber(L, 2)) : toVec4(L, 2);
 
 	pushVec4(L, a * b);
 	return 1;
@@ -214,7 +238,7 @@ static int vec4_mul(lua_State* L)
 static int vec4_div(lua_State* L)
 {
 	glm::vec4 a = toVec4(L, 1);
-	glm::vec4 b = toVec4(L, 2);
+	glm::vec4 b = lua_isnumber(L, 2) ? glm::vec4(lua_tonumber(L, 2)) : toVec4(L, 2);
 
 	pushVec4(L, a / b);
 	return 1;
@@ -385,7 +409,7 @@ static int vec3_index(lua_State* L)
 static int vec3_add(lua_State* L)
 {
 	glm::vec3 a = toVec3(L, 1);
-	glm::vec3 b = toVec3(L, 2);
+	glm::vec3 b = lua_isnumber(L, 2) ? glm::vec3(lua_tonumber(L, 2)) : toVec3(L, 2);
 
 	pushVec3(L, a + b);
 	return 1;
@@ -394,7 +418,7 @@ static int vec3_add(lua_State* L)
 static int vec3_sub(lua_State* L)
 {
 	glm::vec3 a = toVec3(L, 1);
-	glm::vec3 b = toVec3(L, 2);
+	glm::vec3 b = lua_isnumber(L, 2) ? glm::vec3(lua_tonumber(L, 2)) : toVec3(L, 2);
 
 	pushVec3(L, a - b);
 	return 1;
@@ -403,7 +427,7 @@ static int vec3_sub(lua_State* L)
 static int vec3_mul(lua_State* L)
 {
 	glm::vec3 a = toVec3(L, 1);
-	glm::vec3 b = toVec3(L, 2);
+	glm::vec3 b = lua_isnumber(L, 2) ? glm::vec3(lua_tonumber(L, 2)) : toVec3(L, 2);
 
 	pushVec3(L, a * b);
 	return 1;
@@ -412,7 +436,7 @@ static int vec3_mul(lua_State* L)
 static int vec3_div(lua_State* L)
 {
 	glm::vec3 a = toVec3(L, 1);
-	glm::vec3 b = toVec3(L, 2);
+	glm::vec3 b = lua_isnumber(L, 2) ? glm::vec3(lua_tonumber(L, 2)) : toVec3(L, 2);
 
 	pushVec3(L, a / b);
 	return 1;
@@ -557,7 +581,7 @@ static int vec2_index(lua_State* L)
 static int vec2_add(lua_State* L)
 {
 	glm::vec2 a = toVec2(L, 1);
-	glm::vec2 b = toVec2(L, 2);
+	glm::vec2 b = lua_isnumber(L, 2) ? glm::vec2(lua_tonumber(L, 2)) : toVec2(L, 2);
 
 	pushVec2(L, a + b);
 	return 1;
@@ -566,7 +590,7 @@ static int vec2_add(lua_State* L)
 static int vec2_sub(lua_State* L)
 {
 	glm::vec2 a = toVec2(L, 1);
-	glm::vec2 b = toVec2(L, 2);
+	glm::vec2 b = lua_isnumber(L, 2) ? glm::vec2(lua_tonumber(L, 2)) : toVec2(L, 2);
 
 	pushVec2(L, a - b);
 	return 1;
@@ -575,7 +599,7 @@ static int vec2_sub(lua_State* L)
 static int vec2_mul(lua_State* L)
 {
 	glm::vec2 a = toVec2(L, 1);
-	glm::vec2 b = toVec2(L, 2);
+	glm::vec2 b = lua_isnumber(L, 2) ? glm::vec2(lua_tonumber(L, 2)) : toVec2(L, 2);
 
 	pushVec2(L, a * b);
 	return 1;
@@ -584,7 +608,7 @@ static int vec2_mul(lua_State* L)
 static int vec2_div(lua_State* L)
 {
 	glm::vec2 a = toVec2(L, 1);
-	glm::vec2 b = toVec2(L, 2);
+	glm::vec2 b = lua_isnumber(L, 2) ? glm::vec2(lua_tonumber(L, 2)) : toVec2(L, 2);
 
 	pushVec2(L, a / b);
 	return 1;
@@ -604,6 +628,183 @@ static int vec2_unm(lua_State* L)
 	glm::vec2 a = -toVec2(L, 1);
 
 	pushVec2(L, a);
+	return 1;
+}
+
+static int normalize(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+
+		pushVec2(L, glm::normalize(a));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+
+		pushVec3(L, glm::normalize(a));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+
+		pushVec4(L, glm::normalize(a));
+	}
+	
+	return 1;
+}
+
+static int min(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+		glm::vec2 b = toVec2(L, 2);
+
+		pushVec2(L, glm::min(a, b));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+		glm::vec3 b = toVec3(L, 2);
+
+		pushVec3(L, glm::min(a, b));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+		glm::vec4 b = toVec4(L, 2);
+
+		pushVec4(L, glm::min(a, b));
+	}
+	
+	return 1;
+}
+
+static int max(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+		glm::vec2 b = toVec2(L, 2);
+
+		pushVec2(L, glm::max(a, b));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+		glm::vec3 b = toVec3(L, 2);
+
+		pushVec3(L, glm::max(a, b));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+		glm::vec4 b = toVec4(L, 2);
+
+		pushVec4(L, glm::max(a, b));
+	}
+	
+	return 1;
+}
+
+static int length(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+
+		lua_pushnumber(L, glm::length(a));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+
+		lua_pushnumber(L, glm::length(a));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+
+		lua_pushnumber(L, glm::length(a));
+	}
+	
+	return 1;
+}
+
+static int distance(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+		glm::vec2 b = toVec2(L, 2);
+
+		lua_pushnumber(L, glm::distance(a, b));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+		glm::vec3 b = toVec3(L, 2);
+
+		lua_pushnumber(L, glm::distance(a, b));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+		glm::vec4 b = toVec4(L, 2);
+
+		lua_pushnumber(L, glm::distance(a, b));
+	}
+	
+	return 1;
+}
+
+static int cross(lua_State* L)
+{
+	glm::vec3 a = toVec3(L, 1);
+	glm::vec3 b = toVec3(L, 2);
+
+	pushVec3(L, glm::cross(a, b));
+	return 1;
+}
+
+static int dot(lua_State* L)
+{
+	if (isVec2(L, 1) && isVec2(L, 2))
+	{
+		glm::vec2 a = toVec2(L, 1);
+		glm::vec2 b = toVec2(L, 2);
+
+		lua_pushnumber(L, glm::dot(a, b));
+	}
+
+	else if (isVec3(L, 1) && isVec3(L, 2))
+	{
+		glm::vec3 a = toVec3(L, 1);
+		glm::vec3 b = toVec3(L, 2);
+
+		lua_pushnumber(L, glm::dot(a, b));
+	}
+
+	else
+	{
+		glm::vec4 a = toVec4(L, 1);
+		glm::vec4 b = toVec4(L, 2);
+
+		lua_pushnumber(L, glm::dot(a, b));
+	}
+
 	return 1;
 }
 
@@ -647,6 +848,14 @@ namespace blaze
 
 				state.Register("print", lua_Print);
 				state.Register("IsKeyPressed", lua_IsKeyPressed);
+
+				state.Register("normalize", normalize);
+				state.Register("min", min);
+				state.Register("max", max);
+				state.Register("length", length);
+				state.Register("distance", distance);
+				state.Register("cross", cross);
+				state.Register("dot", dot);
 
 				// Setup metatable
 				state.NewMetatable("vec4");
