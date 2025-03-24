@@ -54,11 +54,33 @@ static bool isVec3(lua_State* L, int index)
 
 static bool isVec4(lua_State* L, int index)
 {
-	bool res = true;
+	blaze::ScriptState state(L);
 
-	// TODO: Code
+	if (!state.IsTable(index)) return false;
 
-	return res;
+	if (!state.GetMetatable(index)) return false;
+
+	// Get the name of the metatable
+	state.GetField(index, "__name");
+	if (state.IsString())
+	{
+		auto name = state.ToString();
+		if (name != "vec4") return false;
+	}
+	else 
+	{
+		WC_ERROR("__name is not a string!")
+	}
+	// Check for required numeric fields: x, y, z, w
+	/*const char* fields[] = {"x", "y", "z", "w"};
+	for (const char* field : fields) {
+		state.GetField(index, field);
+		if (!state.IsNumber(-1)) {
+			return false;
+		}
+	}*/
+
+	return true;
 }
 
 // Get a vec4 from the stack
@@ -631,9 +653,10 @@ static int vec2_unm(lua_State* L)
 	return 1;
 }
 
-static int normalize(lua_State* L)
+static int lua_normalize(lua_State* L)
 {
-	if (isVec2(L, 1) && isVec2(L, 2))
+	WC_INFO("{}", isVec4(L, 1))
+	/*if (isVec2(L, 1) && isVec2(L, 2))
 	{
 		glm::vec2 a = toVec2(L, 1);
 
@@ -652,7 +675,7 @@ static int normalize(lua_State* L)
 		glm::vec4 a = toVec4(L, 1);
 
 		pushVec4(L, glm::normalize(a));
-	}
+	}*/
 	
 	return 1;
 }
@@ -666,7 +689,6 @@ static int min(lua_State* L)
 
 		pushVec2(L, glm::min(a, b));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
@@ -674,7 +696,6 @@ static int min(lua_State* L)
 
 		pushVec3(L, glm::min(a, b));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
@@ -695,7 +716,6 @@ static int max(lua_State* L)
 
 		pushVec2(L, glm::max(a, b));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
@@ -703,7 +723,6 @@ static int max(lua_State* L)
 
 		pushVec3(L, glm::max(a, b));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
@@ -723,14 +742,12 @@ static int length(lua_State* L)
 
 		lua_pushnumber(L, glm::length(a));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
 
 		lua_pushnumber(L, glm::length(a));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
@@ -750,7 +767,6 @@ static int distance(lua_State* L)
 
 		lua_pushnumber(L, glm::distance(a, b));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
@@ -758,7 +774,6 @@ static int distance(lua_State* L)
 
 		lua_pushnumber(L, glm::distance(a, b));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
@@ -788,7 +803,6 @@ static int dot(lua_State* L)
 
 		lua_pushnumber(L, glm::dot(a, b));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
@@ -796,7 +810,6 @@ static int dot(lua_State* L)
 
 		lua_pushnumber(L, glm::dot(a, b));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
@@ -849,7 +862,7 @@ namespace blaze
 				state.Register("print", lua_Print);
 				state.Register("IsKeyPressed", lua_IsKeyPressed);
 
-				state.Register("normalize", normalize);
+				state.Register("normalize", lua_normalize);
 				state.Register("min", min);
 				state.Register("max", max);
 				state.Register("length", length);
@@ -859,6 +872,7 @@ namespace blaze
 
 				// Setup metatable
 				state.NewMetatable("vec4");
+				state.RegisterField("__name", "vec4");
 				state.RegisterField("__index", vec4_index);
 				state.RegisterField("__add", vec4_add);
 				state.RegisterField("__sub", vec4_sub);
@@ -866,11 +880,13 @@ namespace blaze
 				state.RegisterField("__div", vec4_div);
 				state.RegisterField("__eq", vec4_eq);
 				state.RegisterField("__unm", vec4_unm);
-
+				state.Pop();
+				
 				state.Register("vec4", construct_vec4);
-
+				
 				// Setup metatable
 				state.NewMetatable("vec3");
+				state.RegisterField("__name", "vec3");
 				state.RegisterField("__index", vec3_index);
 				state.RegisterField("__add", vec3_add);
 				state.RegisterField("__sub", vec3_sub);
@@ -878,11 +894,13 @@ namespace blaze
 				state.RegisterField("__div", vec3_div);
 				state.RegisterField("__eq", vec3_eq);
 				state.RegisterField("__unm", vec3_unm);
-
+				state.Pop();
+				
 				state.Register("vec3", construct_vec3);
-
+				
 				// Setup metatable
 				state.NewMetatable("vec2");
+				state.RegisterField("__name", "vec2");
 				state.RegisterField("__index", vec2_index);
 				state.RegisterField("__add", vec2_add);
 				state.RegisterField("__sub", vec2_sub);
@@ -890,7 +908,8 @@ namespace blaze
 				state.RegisterField("__div", vec2_div);
 				state.RegisterField("__eq", vec2_eq);
 				state.RegisterField("__unm", vec2_unm);
-
+				state.Pop();
+				
 				state.Register("vec2", construct_vec2);
 				
 				state.Register("log", logFuncs);

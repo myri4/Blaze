@@ -50,3 +50,7 @@ declare IsKeyPressed: (number) -> boolean
 declare vec2: (x: number?, y: number?) -> vec2
 declare vec3: (x: number?, y: number?, z: number?) -> vec3
 declare vec4: (x: number?, y: number?, z: number?, w: number?) -> vec4
+
+declare normalize: (v: vec2) -> vec2
+declare normalize: (v: vec3) -> vec3
+declare normalize: (v: vec4) -> vec4

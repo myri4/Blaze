@@ -267,17 +267,23 @@ namespace blaze
 			SetGlobal(funcName);
 		}
 
-		//@TODO: Maybe this should be a templated function
-		void RegisterField(const std::string& funcName, lua_CFunction f, int idx = -2)
+		template<typename T>
+		void RegisterField(const std::string& funcName, T value, int idx = -2)
 		{
-			PushCFunction(f, funcName);
-			SetField(funcName.c_str(), idx);
-		}
+			if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>)
+				PushInt(value);
+			else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>)
+				PushNumber(value);
+			else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, std::string>)
+				PushString(value);
+			else if constexpr (std::is_same_v<T, bool>)
+				PushBool(value);
+			else if constexpr (std::is_same_v<T, lua_CFunction>)
+				PushCFunction(value, funcName);
+			else
+				static_assert("Unsupported type for Lua");
 
-		void RegisterField(const std::string& name, double number, int idx = -2)
-		{
-			PushNumber(number);
-			SetField(name.c_str(), idx);
+			SetField(funcName.c_str(), idx);
 		}
 
 		auto PCall(int nargs, int nresults, int errfunc) { return lua_pcall(L, nargs, nresults, errfunc); }
