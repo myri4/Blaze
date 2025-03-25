@@ -130,8 +130,6 @@ void EditorInstance::Create()
 	};
 
 	m_Renderer.CreateScreen(Globals.window.GetSize());
-
-	SoundContext.InitializeContext();
 }
 
 void EditorInstance::Resize(glm::vec2 size)
@@ -923,11 +921,12 @@ void EditorInstance::UI_Entities()
 		}
 
 		gui::Spacing();
-		//WC_INFO(entityFilter);
-		//TODO - Implement search
+
+
 		// Display entities
+		//TODO - Implement search
 		{
-			if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered() && gui::IsWindowFocused())	m_Scene.SelectedEntity = flecs::entity::null();
+			if (gui::IsMouseClicked(0) && !gui::IsAnyItemHovered() && gui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) m_Scene.SelectedEntity = flecs::entity::null();
 
 			if (gui::BeginChild("##ShowEntities", { 0, 0 }, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
 			{
@@ -950,24 +949,38 @@ void EditorInstance::UI_Entities()
 			gui::EndChild();
 		}
 
+		static bool focus = true;
 		if (showPopup)
 		{
 			gui::OpenPopup("Add Entity");
-			showPopup = false;
+			//showPopup = false;
+		}
+		else
+		{
+			//WC_INFO("closed popup");
+			focus = true;
 		}
 
 		ui::CenterNextWindow();
 		gui::PopStyleVar();
-		if (gui::BeginPopupModal("Add Entity", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+		if (gui::BeginPopupModal("Add Entity", &showPopup, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 		{
-			ImVec2 center = gui::GetMainViewport()->GetCenter();
-			ImVec2 windowSize = gui::GetWindowSize();
-			ImVec2 windowPos = ImVec2(center.x - windowSize.x * 0.5f, center.y - windowSize.y * 0.5f);
-			gui::SetWindowPos(windowPos, ImGuiCond_Once);
+
+
+
+
 
 			static std::string name = "Entity";
-			if (!gui::IsAnyItemHovered())gui::SetKeyboardFocusHere();
+			if (focus)
+			{
+				gui::SetKeyboardFocusHere();
+				focus = false;
+			}
 			gui::InputText("Name", &name, ImGuiInputTextFlags_AutoSelectAll);
+
+			static int entTemplate = 0;
+			const char* templates[] = { "None", "Camera", "Layer", "Platform", "Circle" };
+			gui::Combo("Template", &entTemplate, templates, IM_ARRAYSIZE(templates));
 
 			const float widgetSize = gui::GetItemRectSize().x;
 
@@ -975,8 +988,44 @@ void EditorInstance::UI_Entities()
 			if (gui::Button("Create") || ui::IsKeyPressedDissabled(ImGuiKey_Enter))
 			{
 				m_Scene.SelectedEntity = m_Scene.AddEntity(name);
+				flecs::entity ent = m_Scene.SelectedEntity;
+				switch (entTemplate)
+				{
+					/* None */ //case 0: break;
+				/* Camera */ case 1:
+				{
+					WC_INFO("Implement Camera Template");
+					break;
+				}
+				/* Layer */ case 2:
+				{
+					WC_INFO("Implement Layer Template");
+					break;
+				}
+				/* Platform */ case 3:
+				{
+					//Platform
+					ent.add<TransformComponent>().set<TransformComponent>({ {0, 0, 0}, {5, 1, 1} });
+					ent.add<SpriteRendererComponent>().set<SpriteRendererComponent>({ {0, 0.5f, 0.5f, 1}, 0 });
+					ent.add<RigidBodyComponent>();
+					//ent.get_ref<RigidBodyComponent>()->Type = BodyType::Static; // default is static
+					ent.add<BoxCollider2DComponent>().set<BoxCollider2DComponent>({ {0, 0}, {5, 1} });
+					break;
+				}
+				/* Circle */ case 4:
+				{
+					ent.add<TransformComponent>();
+					ent.add<SpriteRendererComponent>().set<SpriteRendererComponent>({ {0.5f, 0.5f, 0, 1}, 0 });
+					ent.add<RigidBodyComponent>();
+					//ent.get_ref<RigidBodyComponent>()->Type = BodyType::Static; // default is static
+					ent.add<CircleCollider2DComponent>();
+					break;
+				}
+				}
+				entTemplate = 0;
 				name = "Entity";
-				gui::CloseCurrentPopup();
+				showPopup = false;
+				//gui::CloseCurrentPopup();
 			}
 			gui::EndDisabled();
 			if (name.empty()) gui::SetItemTooltip("Name cannot be empty");
@@ -986,8 +1035,10 @@ void EditorInstance::UI_Entities()
 			gui::SetCursorPosX(widgetSize);
 			if (gui::Button("Cancel") || gui::IsKeyPressed(ImGuiKey_Escape))
 			{
+				entTemplate = 0;
 				name = "Entity";
-				gui::CloseCurrentPopup();
+				showPopup = false;
+				//gui::CloseCurrentPopup();
 			}
 			gui::EndPopup();
 		}
@@ -1518,12 +1569,15 @@ void EditorInstance::UI_Console()
 	gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 	if (gui::Begin("Console", &showConsole, ImGuiWindowFlags_MenuBar))
 	{
+		static bool scrollToBottom;
+
 		static bool showDebug = true;
 		static bool showInfo = true;
 		static bool showWarn = true;
 		static bool showError = true;
 		static bool showCritical = true;
 
+		gui::PopStyleVar();
 		if (gui::BeginMenuBar())
 		{
 			if (gui::MenuItem("Clear"))
@@ -1554,13 +1608,30 @@ void EditorInstance::UI_Console()
 				gui::EndMenu();
 			}
 
+			if (gui::BeginMenu("Settings"))
+			{
+				gui::MenuItem("Scroll To Bottom", nullptr, &scrollToBottom);
+
+				gui::EndMenu();
+			}
+
 			gui::EndMenuBar();
 		}
+		gui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 
 		if (!Log::GetConsoleSink()->messages.empty())
 		{
-			if (gui::BeginTable("ConsoleTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit))
+			ImGuiTableFlags window_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
+			if (!scrollToBottom) window_flags |= ImGuiTableFlags_RowBg;
+
+			if (gui::BeginTable("ConsoleTable", 4, window_flags))
 			{
+				if (scrollToBottom)
+				{
+					gui::SetScrollY(gui::GetScrollMaxY());
+				}
+
+				ImGui::TableSetupScrollFreeze(3, 1); // Make top row always visible
 				ImGui::TableSetupColumn("");
 				ImGui::TableSetupColumn("Level");
 				ImGui::TableSetupColumn("Time");
@@ -1607,7 +1678,7 @@ void EditorInstance::UI_Console()
 
 						gui::PushFont(Globals.f_Default.Menu);
 						gui::TableSetColumnIndex(0);
-						gui::ImageWithBg(texture, { 20, 20 }, { 0, 0 }, { 1, 1 }, ImVec4(0, 0, 0, 0),color); gui::SameLine();
+						gui::ImageWithBg(texture, { 20, 20 }, { 0, 0 }, { 1, 1 }, ImVec4(0, 0, 0, 0), color); gui::SameLine();
 						/*gui::SetItemTooltip(prefix.c_str());*/
 
 						gui::TableSetColumnIndex(1);

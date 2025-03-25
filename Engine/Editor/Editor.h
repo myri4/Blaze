@@ -73,10 +73,6 @@ struct EditorInstance
     Texture t_Error;
     Texture t_Critical;
 
-
-	Audio::SoundContext SoundContext;
-
-
 	bool allowInput = true;
 
 	bool showEditor = true;
