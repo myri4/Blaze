@@ -2,6 +2,8 @@
 #include "ScriptBase.h"
 #include "../Utils/Window.h"
 #include "glm/glm.hpp"
+#include "../Sound/SoundEngine.h"
+#include "../Globals.h"
 
 static int lua_Log(lua_State* L, spdlog::level::level_enum level)
 {
@@ -36,20 +38,48 @@ static int lua_IsKeyPressed(lua_State* L)
 
 static bool isVec2(lua_State* L, int index)
 {
-	bool res = true;
+	blaze::ScriptState state(L);
 
-	// TODO: Code
+	if (!state.IsTable(index)) return false;
 
-	return res;
+	if (!state.GetMetatable(index)) return false;
+
+	// Get the name of the metatable
+	state.GetField(index, "__name");
+	if (state.IsString())
+	{
+		auto name = state.ToString();
+		if (name != "vec2") return false;
+	}
+	else
+	{
+		WC_ERROR("__name is not a string!")
+	}
+
+	return true;
 }
 
 static bool isVec3(lua_State* L, int index)
 {
-	bool res = true;
+	blaze::ScriptState state(L);
 
-	// TODO: Code
+	if (!state.IsTable(index)) return false;
 
-	return res;
+	if (!state.GetMetatable(index)) return false;
+
+	// Get the name of the metatable
+	state.GetField(index, "__name");
+	if (state.IsString())
+	{
+		auto name = state.ToString();
+		if (name != "vec3") return false;
+	}
+	else
+	{
+		WC_ERROR("__name is not a string!")
+	}
+
+	return true;
 }
 
 static bool isVec4(lua_State* L, int index)
@@ -81,6 +111,90 @@ static bool isVec4(lua_State* L, int index)
 	}*/
 
 	return true;
+}
+
+// Get a SoundID from the stack
+static void pushSoundID(lua_State* L, const Audio::SoundID& value)
+{
+	blaze::ScriptState state(L);
+	state.CreateTable(0, 2);
+
+	state.RegisterField("name", value.name);
+	state.RegisterField("id", (double)value.id);
+
+	// Set metatable
+	state.GetMetatable("SoundID");
+	state.SetMetatable(-2);
+}
+
+static Audio::SoundID toSoundID(lua_State* L, int index)
+{
+	blaze::ScriptState state(L);
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	Audio::SoundID result;
+	bool success = true;
+
+	state.GetField(index, "name");
+	if (state.IsString())
+	{
+		result.name = (std::string)state.ToString();
+		state.Pop();
+	}
+
+	state.GetField(index, "id");
+	if (state.IsNumber())
+	{
+		result.id = (uint32_t)state.ToNumber();
+		state.Pop();
+	}
+
+	if (!success)
+	{
+		state.RaiseError("Invalid SoundID table format");
+		result.name = "";
+		result.id = 0;
+		return result;
+	}
+
+	return result;
+}
+
+static int construct_SoundID(lua_State* L)
+{
+	int nargs = lua_gettop(L);
+	Audio::SoundID result;
+
+	if (nargs == 0)
+	{
+		result.name = "";
+		result.id = 0;
+		pushSoundID(L, result);
+	}
+	else
+	{
+		result.name = (std::string)lua_tostring(L, 1);
+		result.id = (uint32_t)lua_tonumber(L, 2);
+		pushSoundID(L, result);
+	}
+
+	return 1;
+}
+
+static int SoundID_index(lua_State* L)
+{
+	const char* key = luaL_checkstring(L, 2);
+
+	lua_getmetatable(L, 1);
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 2);
+	lua_pushnil(L);
+	return 1;
 }
 
 // Get a vec4 from the stack
@@ -655,32 +769,29 @@ static int vec2_unm(lua_State* L)
 
 static int lua_normalize(lua_State* L)
 {
-	WC_INFO("{}", isVec4(L, 1))
-	/*if (isVec2(L, 1) && isVec2(L, 2))
+	if (isVec2(L, 1) && isVec2(L, 2))
 	{
 		glm::vec2 a = toVec2(L, 1);
 
 		pushVec2(L, glm::normalize(a));
 	}
-
 	else if (isVec3(L, 1) && isVec3(L, 2))
 	{
 		glm::vec3 a = toVec3(L, 1);
 
 		pushVec3(L, glm::normalize(a));
 	}
-
 	else
 	{
 		glm::vec4 a = toVec4(L, 1);
 
 		pushVec4(L, glm::normalize(a));
-	}*/
+	}
 	
 	return 1;
 }
 
-static int min(lua_State* L)
+static int lua_min(lua_State* L)
 {
 	if (isVec2(L, 1) && isVec2(L, 2))
 	{
@@ -707,7 +818,7 @@ static int min(lua_State* L)
 	return 1;
 }
 
-static int max(lua_State* L)
+static int lua_max(lua_State* L)
 {
 	if (isVec2(L, 1) && isVec2(L, 2))
 	{
@@ -734,7 +845,7 @@ static int max(lua_State* L)
 	return 1;
 }
 
-static int length(lua_State* L)
+static int lua_length(lua_State* L)
 {
 	if (isVec2(L, 1) && isVec2(L, 2))
 	{
@@ -758,7 +869,7 @@ static int length(lua_State* L)
 	return 1;
 }
 
-static int distance(lua_State* L)
+static int lua_distance(lua_State* L)
 {
 	if (isVec2(L, 1) && isVec2(L, 2))
 	{
@@ -785,7 +896,7 @@ static int distance(lua_State* L)
 	return 1;
 }
 
-static int cross(lua_State* L)
+static int lua_cross(lua_State* L)
 {
 	glm::vec3 a = toVec3(L, 1);
 	glm::vec3 b = toVec3(L, 2);
@@ -794,7 +905,7 @@ static int cross(lua_State* L)
 	return 1;
 }
 
-static int dot(lua_State* L)
+static int lua_dot(lua_State* L)
 {
 	if (isVec2(L, 1) && isVec2(L, 2))
 	{
@@ -819,6 +930,71 @@ static int dot(lua_State* L)
 	}
 
 	return 1;
+}
+
+// Sound Engine bindings
+
+static int lua_LoadSound(lua_State* L)
+{
+	lua_pushnumber(L, wc::Globals.SoundContext.LoadSound((std::string)lua_tostring(L, 1)));
+
+	return 1;
+}
+
+static int lua_UnloadSound(lua_State* L)
+{
+	wc::Globals.SoundContext.UnloadSound((uint32_t)lua_tonumber(L, 1));
+
+	return 0;
+}
+
+static int lua_ReloadSound(lua_State* L)
+{
+	wc::Globals.SoundContext.ReloadSound((uint32_t)lua_tonumber(L, 1), (std::string)lua_tostring(L, 2));
+
+	return 0;
+}
+
+static int lua_InitializeSoundInstance(lua_State* L)
+{
+	pushSoundID(L, wc::Globals.SoundContext.InitializeSoundInstance((uint32_t)lua_tonumber(L, 1)));
+
+	return 1;
+}
+
+static int lua_UninitializeSoundInstance(lua_State* L)
+{
+	wc::Globals.SoundContext.UninitializeSoundInstance(toSoundID(L, 1));
+
+	return 0;
+}
+
+static int lua_UninitializeSound(lua_State* L)
+{
+	wc::Globals.SoundContext.UninitializeSound((uint32_t)lua_tonumber(L, 1));
+
+	return 0;
+}
+
+static int lua_ReloadSoundInstance(lua_State* L)
+{
+	wc::Globals.SoundContext.ReloadSoundInstance(toSoundID(L, 1));
+
+	return 0;
+}
+
+static int lua_PlaySound(lua_State* L)
+{
+	wc::Globals.SoundContext.PlaySound(toSoundID(L, 1));
+
+	return 0;
+}
+
+static int lua_PauseSound(lua_State* L)
+{
+	wc::Globals.SoundContext.PauseSound(toSoundID(L, 1));
+
+	return 0;
 }
 
 static int lua_Print(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::trace); }
@@ -863,12 +1039,20 @@ namespace blaze
 				state.Register("IsKeyPressed", lua_IsKeyPressed);
 
 				state.Register("normalize", lua_normalize);
-				state.Register("min", min);
-				state.Register("max", max);
-				state.Register("length", length);
-				state.Register("distance", distance);
-				state.Register("cross", cross);
-				state.Register("dot", dot);
+				state.Register("min", lua_min);
+				state.Register("max", lua_max);
+				state.Register("length", lua_length);
+				state.Register("distance", lua_distance);
+				state.Register("cross", lua_cross);
+				state.Register("dot", lua_dot);
+
+				// Setup metatable
+				state.NewMetatable("SoundID");
+				state.RegisterField("__name", "SoundID");
+				state.RegisterField("__index", SoundID_index);
+				state.Pop();
+
+				state.Register("SoundID", construct_SoundID);
 
 				// Setup metatable
 				state.NewMetatable("vec4");
@@ -911,6 +1095,16 @@ namespace blaze
 				state.Pop();
 				
 				state.Register("vec2", construct_vec2);
+
+				state.Register("LoadSound", lua_LoadSound);
+				state.Register("UnloadSound", lua_UnloadSound);
+				state.Register("ReloadSound", lua_ReloadSound);
+				state.Register("InitializeSoundInstance", lua_InitializeSoundInstance);
+				state.Register("UninitializeSoundInstance", lua_UninitializeSoundInstance);
+				state.Register("UninitializeSound", lua_UninitializeSound);
+				state.Register("ReloadSoundInstance", lua_ReloadSoundInstance);
+				state.Register("PlaySound", lua_PlaySound);
+				state.Register("PauseSound", lua_PauseSound);
 				
 				state.Register("log", logFuncs);
 			}

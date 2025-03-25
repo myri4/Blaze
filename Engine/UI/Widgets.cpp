@@ -179,15 +179,15 @@ namespace wc
 						std::string part = filter.substr(start);
 						part.erase(part.begin(), std::find_if(part.begin(), part.end(), [](int ch) { return !std::isspace(ch); }));
 						part.erase(std::find_if(part.rbegin(), part.rend(), [](int ch) { return !std::isspace(ch); }).base(), part.end());
-						if (!part.empty())
-							filterParts.push_back(part);
+						if (!part.empty()) filterParts.push_back(part);
 
 						// Check if any filter is .*
 						bool allowAll = std::any_of(filterParts.begin(), filterParts.end(), [](const std::string& part) { return part == ".*"; });
 
 						// Display entries
-						for (const auto& entry : fileEntries)
+						for (int i = 0; i < fileEntries.size(); i++)
 						{
+							const auto& entry = fileEntries[i];
 							const bool isDirectory = entry.is_directory();
 							std::string filename = entry.path().filename().string();
 
