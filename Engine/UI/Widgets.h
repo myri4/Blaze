@@ -19,6 +19,27 @@
 
 namespace gui = ImGui;
 
+ImVec2  operator*(const ImVec2& lhs, const float rhs);
+ImVec2  operator/(const ImVec2& lhs, const float rhs);
+ImVec2  operator+(const ImVec2& lhs, const ImVec2& rhs);
+ImVec2  operator-(const ImVec2& lhs, const ImVec2& rhs);
+ImVec2  operator*(const ImVec2& lhs, const ImVec2& rhs);
+ImVec2  operator/(const ImVec2& lhs, const ImVec2& rhs);
+ImVec2  operator-(const ImVec2& lhs);
+ImVec2& operator*=(ImVec2& lhs, const float rhs);
+ImVec2& operator/=(ImVec2& lhs, const float rhs);
+ImVec2& operator+=(ImVec2& lhs, const ImVec2& rhs);
+ImVec2& operator-=(ImVec2& lhs, const ImVec2& rhs);
+ImVec2& operator*=(ImVec2& lhs, const ImVec2& rhs);
+ImVec2& operator/=(ImVec2& lhs, const ImVec2& rhs);
+bool    operator==(const ImVec2& lhs, const ImVec2& rhs);
+bool    operator!=(const ImVec2& lhs, const ImVec2& rhs);
+ImVec4  operator+(const ImVec4& lhs, const ImVec4& rhs);
+ImVec4  operator-(const ImVec4& lhs, const ImVec4& rhs);
+ImVec4  operator*(const ImVec4& lhs, const ImVec4& rhs);
+bool    operator==(const ImVec4& lhs, const ImVec4& rhs);
+bool    operator!=(const ImVec4& lhs, const ImVec4& rhs);
+
 namespace wc
 {
 	namespace conv

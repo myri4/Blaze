@@ -151,9 +151,7 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 				childrenData.push_back(childData);
 			}
 			else
-			{
 				WC_ERROR("Could not find entity with name '{}'", name.c_str());
-			}
 		}
 
 		if (childrenData.size() != 0)
@@ -268,7 +266,9 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 			if (componentData)
 			{
 				ScriptComponent component;
-				component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(componentData["Path"].as<std::string>())]);
+				auto path = componentData["Path"].as<std::string>();
+				component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(path)]);
+				component.ScriptInstance.Name = path;
 
 				entity.set<ScriptComponent>(component);
 			}
@@ -301,9 +301,7 @@ YAML::Node toYAML(const Scene& scene)
 			entitiesData.push_back(SerializeEntity(scene, entity));
 		}
 		else
-		{
 			WC_ERROR("Could not find entity with name '{}'", name.c_str());
-		}
 	}
 
 	if (scene.PhysicsWorld.IsValid())

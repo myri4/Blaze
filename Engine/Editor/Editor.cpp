@@ -1451,12 +1451,13 @@ void EditorInstance::UI_Properties()
 									const char* scriptPath = static_cast<const char*>(payload->Data);
 
 									component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(scriptPath)]);
+									component.ScriptInstance.Name = scriptPath;
 								}
 								gui::EndDragDropTarget();
 							}
 						}
 					}
-
+					ImVec2 vec = gui::GetStyle().WindowPadding + ImVec2(2, 2);
 					gui::SameLine();
 					if (gui::Button("Reload script"))
 						component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(component.ScriptInstance.Name, true)]);
