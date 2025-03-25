@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include "Utils/Window.h"
 #include "Utils/Time.h"
+#include "Sound/SoundEngine.h"
 
 namespace wc
 {
@@ -21,6 +22,7 @@ namespace wc
 	struct GlobalVariables
 	{
 		Window window; // @TODO: maybe rename to main window
+		Audio::SoundContext SoundContext;
 
 		// Change size if needed
         AppFont f_Display = {};

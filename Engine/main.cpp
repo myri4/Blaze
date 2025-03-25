@@ -59,6 +59,8 @@ void Resize()
 //----------------------------------------------------------------------------------------------------------------------
 bool InitApp()
 {
+	Globals.SoundContext.InitializeContext();
+
 	WindowCreateInfo windowInfo =
 	{
 		.Width = 1280,
@@ -386,6 +388,7 @@ void UpdateAppFrame()
 //----------------------------------------------------------------------------------------------------------------------
 void DeinitApp()
 {
+	Globals.SoundContext.UninitializeContext();
 	VulkanContext::GetLogicalDevice().WaitIdle();
 	glfwWaitEvents();
 
