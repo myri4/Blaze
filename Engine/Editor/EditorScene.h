@@ -43,6 +43,7 @@ namespace Editor
 		Scene m_TempScene;
 
 		std::string Path;
+		std::string basePath;
 
 		float snapStrength = 1.0f;
 
@@ -84,7 +85,7 @@ namespace Editor
 
 		void Save(const std::string& filepath);
 
-		bool Load(const std::string& filepath, const bool clear = true);
+		bool Load(const std::string& filepath, const std::string& bPath, const bool clear = true);
 
 		// Undo/Redo
 		template<typename T>

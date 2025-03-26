@@ -360,16 +360,14 @@ void EditorInstance::UI_Editor()
 						//WC_CORE_INFO("Save scene before changing");
 						//WC_INFO("Opening scene: {}", scene);
 						m_Scene.Save();
-						m_Scene.Path = scene;
-						m_Scene.Load(scene);
+						m_Scene.Load(scene, ProjectRootPath);
 						gui::CloseCurrentPopup();
 					}
 					gui::SameLine(0, spacing);
 					if (gui::Button("No", { textSize * 0.3f, 0 }))
 					{
 						//WC_INFO("Opening scene: {}", scene);
-						m_Scene.Path = scene;
-						m_Scene.Load(scene);
+						m_Scene.Load(scene, ProjectRootPath);
 						gui::CloseCurrentPopup();
 					}
 					gui::SameLine(0, spacing);
@@ -402,7 +400,7 @@ void EditorInstance::UI_Editor()
 						if (!savedProjectScenes.empty())
 						{
 							m_Scene.Path = savedProjectScenes.front();
-							m_Scene.Load(m_Scene.Path);
+							m_Scene.Load(m_Scene.Path, ProjectRootPath);
 						}
 						else
 						{
@@ -1782,7 +1780,7 @@ void EditorInstance::UI_Assets()
 						//load new scene
 						AddSceneToList(filePath.string());
 						m_Scene.SelectedEntity = flecs::entity::null();
-						m_Scene.Load(filePath.string());
+						m_Scene.Load(filePath.string(), ProjectRootPath);
 					}
 					gui::CloseCurrentPopup();
 				}
@@ -2943,7 +2941,7 @@ void EditorInstance::UI()
 					}
 					else
 					{
-						WC_CORE_WARN("Project path does not exist: {0}", project);
+						WC_CORE_WARN("Project path does not exist: {}", project);
 					}
 
 					if (showPopup)
@@ -3110,7 +3108,7 @@ void EditorInstance::UI()
 					std::string sOpenPath = ui::FileDialog("Open Scene", ".scene", ProjectRootPath, true);
 					if (!sOpenPath.empty())
 					{
-						m_Scene.Load(m_Scene.Path);
+						m_Scene.Load(m_Scene.Path, ProjectRootPath);
 						gui::CloseCurrentPopup();
 					}
 
@@ -3316,7 +3314,7 @@ bool EditorInstance::LoadProject(const std::string& filepath)
 				auto path = openedScene.as<std::string>();
 				AddSceneToList(scenesPath + '/' + path);
 			}
-			m_Scene.Load(savedProjectScenes.front());
+			m_Scene.Load(savedProjectScenes.front(), ProjectRootPath);
 		}
 	}
 	catch (std::exception ex)

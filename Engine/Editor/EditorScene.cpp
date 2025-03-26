@@ -1,8 +1,9 @@
 #include "EditorScene.h"
+#include <filesystem>
 
 using namespace Editor;
 
-YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
+YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity, const std::string& basePath)
 {
 	YAML::Node entityData;
 
@@ -27,7 +28,7 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 		{
 			if (fontID == component->FontID)
 			{
-				componentData["Font"] = name;
+				componentData["Font"] = std::filesystem::relative(name, basePath).string();
 				break;
 			}
 		}
@@ -48,7 +49,9 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 		{
 			if (texID == component->Texture)
 			{
-				componentData["Texture"] = name;
+				auto fName = name;
+				if (name != "None") fName = std::filesystem::relative(name, basePath).string();;
+				componentData["Texture"] = fName;
 				break;
 			}
 		}
@@ -124,7 +127,7 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 	{
 		auto component = entity.get_ref<ScriptComponent>();
 		YAML::Node componentData;
-		componentData["Path"] = component->ScriptInstance.Name;
+		componentData["Path"] = std::filesystem::relative(component->ScriptInstance.Name, basePath).string();
 
 		entityData["ScriptComponent"] = componentData;
 	}
@@ -146,7 +149,7 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 
 			if (child)
 			{
-				YAML::Node childData = SerializeEntity(scene, child);
+				YAML::Node childData = SerializeEntity(scene, child, basePath);
 
 				childrenData.push_back(childData);
 			}
@@ -161,7 +164,7 @@ YAML::Node SerializeEntity(const Scene& scene, const flecs::entity& entity)
 	return entityData;
 }
 
-flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
+flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData, const std::string& basePath)
 {
 	flecs::entity entity;
 	std::string name = entityData["Name"].as<std::string>();
@@ -192,7 +195,7 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 				component.Kerning = componentData["Kerning"].as<float>();
 				component.LineSpacing = componentData["LineSpacing"].as<float>();
 
-				if (componentData["Font"]) component.FontID = assetManager.LoadFont(componentData["Font"].as<std::string>());
+				if (componentData["Font"]) component.FontID = assetManager.LoadFont(basePath + componentData["Font"].as<std::string>());
 
 				entity.set<TextRendererComponent>(component);
 			}
@@ -204,7 +207,10 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 			{
 				SpriteRendererComponent component;
 				component.Color = componentData["Color"].as<glm::vec4>();
-				component.Texture = assetManager.LoadTexture(componentData["Texture"].as<std::string>());
+				auto name = componentData["Texture"].as<std::string>();
+				if (name != "None") name = basePath + name;
+
+				component.Texture = assetManager.LoadTexture(name);
 
 				entity.set<SpriteRendererComponent>(component);
 			}
@@ -266,7 +272,7 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 			if (componentData)
 			{
 				ScriptComponent component;
-				auto path = componentData["Path"].as<std::string>();
+				auto path = basePath + componentData["Path"].as<std::string>();
 				component.ScriptInstance.Load(ScriptBinaries[LoadScriptBinary(path)]);
 				component.ScriptInstance.Name = path;
 
@@ -277,7 +283,7 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 		auto childEntities = entityData["Children"];
 		if (childEntities)
 			for (const auto& child : childEntities)
-				scene.SetChild(entity, DeserializeEntity(scene, child), false);
+				scene.SetChild(entity, DeserializeEntity(scene, child, basePath), false);
 	}
 	catch (std::exception ex)
 	{
@@ -287,7 +293,7 @@ flecs::entity DeserializeEntity(Scene& scene, const YAML::Node& entityData)
 	return entity;
 }
 
-YAML::Node toYAML(const Scene& scene)
+YAML::Node toYAML(const Scene& scene, const std::string& basePath)
 {
 	YAML::Node metaData;
 	YAML::Node entitiesData;
@@ -298,7 +304,7 @@ YAML::Node toYAML(const Scene& scene)
 
 		if (entity)
 		{
-			entitiesData.push_back(SerializeEntity(scene, entity));
+			entitiesData.push_back(SerializeEntity(scene, entity, basePath));
 		}
 		else
 			WC_ERROR("Could not find entity with name '{}'", name.c_str());
@@ -315,20 +321,20 @@ YAML::Node toYAML(const Scene& scene)
 	return metaData;
 }
 
-void fromYAML(Scene& scene, const YAML::Node& data)
+void fromYAML(Scene& scene, const YAML::Node& data, const std::string& basePath)
 {
 	auto entities = data["Entities"];
 	if (entities)
 	{
 		for (const auto& entity : entities)
-			DeserializeEntity(scene, entity);
+			DeserializeEntity(scene, entity, basePath);
 	}
 }
 
-void CopyScene(const Scene& srcScene, Scene& dstScene)
+void CopyScene(const Scene& srcScene, Scene& dstScene, const std::string& basePath)
 {
 	dstScene.DeleteAllEntities();
-	fromYAML(dstScene, toYAML(srcScene));
+	fromYAML(dstScene, toYAML(srcScene, basePath), basePath);
 }
 
 void EditorScene::CreatePhysicsWorld() { m_Scene.CreatePhysicsWorld(); }
@@ -378,7 +384,7 @@ void EditorScene::SetState(SceneState newState)
 
 	if (newState == SceneState::Play || newState == SceneState::Simulate)
 	{
-		CopyScene(m_Scene, m_TempScene);
+		CopyScene(m_Scene, m_TempScene, basePath);
 
 		CreatePhysicsWorld();
 
@@ -397,7 +403,7 @@ void EditorScene::SetState(SceneState newState)
 			});
 		m_Scene.PhysicsWorld.Destroy();
 
-		CopyScene(m_TempScene, m_Scene);
+		CopyScene(m_TempScene, m_Scene, basePath);
 	}
 
 	if (SelectedEntity != flecs::entity::null()) SelectedEntity = m_Scene.EntityWorld.lookup(selectedEntityName.c_str());
@@ -410,14 +416,14 @@ void EditorScene::Update()
 		m_Scene.Update();
 }
 
-YAML::Node EditorScene::ExportEntity(const flecs::entity& entity) { return SerializeEntity(m_Scene, entity); }
-flecs::entity EditorScene::LoadEntity(const YAML::Node& entityData) { return DeserializeEntity(m_Scene, entityData); } // bruh :: is absolutely not required, thanks clang
+YAML::Node EditorScene::ExportEntity(const flecs::entity& entity) { return SerializeEntity(m_Scene, entity, basePath); }
+flecs::entity EditorScene::LoadEntity(const YAML::Node& entityData) { return DeserializeEntity(m_Scene, entityData, basePath); } // bruh :: is absolutely not required, thanks clang
 flecs::entity EditorScene::LoadEntity(const std::string& path) { return LoadEntity(YAML::LoadFile(path)); }
 
 void EditorScene::Save()
 {
-	YAML::Node data = toYAML(m_Scene);
-	data["CameraFocalPoint"] = camera.FocalPoint; // @TODO: Camera loading doesnt work
+	YAML::Node data = toYAML(m_Scene, basePath);
+	data["CameraFocalPoint"] = camera.FocalPoint; // @TODO: Camera loading doesn't work
 	data["CameraYaw"] = camera.Yaw;
 	data["CameraPitch"] = camera.Pitch;
 	data["CameraDistance"] = camera.m_Distance;
@@ -430,9 +436,10 @@ void EditorScene::Save(const std::string& filepath)
 	Save();
 }
 
-bool EditorScene::Load(const std::string& filepath, const bool clear)
+bool EditorScene::Load(const std::string& filepath, const std::string& bPath, const bool clear)
 {
 	Path = filepath;
+	basePath = bPath + '/';
 
 	if (clear) m_Scene.DeleteAllEntities();
 	if (!std::filesystem::exists(Path))
@@ -443,7 +450,7 @@ bool EditorScene::Load(const std::string& filepath, const bool clear)
 
 	YAML::Node data = YAML::LoadFile(Path);
 
-	fromYAML(m_Scene, data);
+	fromYAML(m_Scene, data, basePath);
 
 	if (data["CameraFocalPoint"]) camera.FocalPoint = data["CameraFocalPoint"].as<glm::vec3>();
 	if (data["CameraYaw"]) camera.Yaw = data["CameraYaw"].as<float>();
