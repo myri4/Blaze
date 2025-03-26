@@ -1,5 +1,6 @@
 #pragma once
 #define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_INCLUDE_NONE
 #undef min
 #undef max
 

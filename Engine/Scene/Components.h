@@ -77,7 +77,7 @@ namespace blaze
 	{
 		if (type == BodyType::Static) return b2_staticBody;
 		if (type == BodyType::Dynamic) return b2_dynamicBody;
-		if (type == BodyType::Kinematic) return b2_kinematicBody;
+		return b2_kinematicBody;
 	}
 
 	struct RigidBodyComponent

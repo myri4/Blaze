@@ -382,7 +382,7 @@ void EditorScene::SetState(SceneState newState)
 
 		CreatePhysicsWorld();
 
-		m_Scene.EntityWorld.each([this](ScriptComponent& script)
+		m_Scene.EntityWorld.each([](ScriptComponent& script)
 			{
 				if (script.ScriptInstance)
 					script.ScriptInstance.state.Execute("Create");
@@ -390,7 +390,7 @@ void EditorScene::SetState(SceneState newState)
 	}
 	else if (newState == SceneState::Edit)
 	{
-		m_Scene.EntityWorld.each([this](ScriptComponent& script)
+		m_Scene.EntityWorld.each([](ScriptComponent& script)
 			{
 				if (script.ScriptInstance)
 					script.ScriptInstance.state.Execute("Destroy");
@@ -468,7 +468,7 @@ T* EditorScene::PushCommand()
 	if ((int32_t)CommandIndex < int32_t(CommandBuffer.size()) - 1)
 	{
 		for (size_t i = CommandIndex; i < CommandBuffer.size(); i++)
-			delete CommandBuffer[i];
+			free(CommandBuffer[i]);
 
 		CommandBuffer[CommandIndex] = cmd;
 		CommandBuffer.resize(CommandIndex + 1);

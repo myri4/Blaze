@@ -262,7 +262,7 @@ namespace wc
 		void Reset()
 		{
 			for (auto& cmd : encode_buffer)
-				delete cmd;
+				free(cmd);
 			encode_buffer.clear();
 		}
 

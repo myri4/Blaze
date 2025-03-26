@@ -35,7 +35,7 @@ namespace blaze
 		return fileContents.str();
 	}
 
-	static int lua_enum_freeze_error(lua_State* L)
+	static inline int lua_enum_freeze_error(lua_State* L)
 	{
 		luaL_error(L, "attempt to modify a frozen enum table");
 		return LUA_ERRRUN;

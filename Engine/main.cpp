@@ -5,10 +5,7 @@
 
 #pragma warning( push )
 #pragma warning( disable : 4702) // Disable unreachable code
-#define GLFW_INCLUDE_NONE
 //#define GLM_FORCE_PURE
-#define GLM_FORCE_CTOR_INIT
-#define GLM_FORCE_SILENT_WARNINGS
 
 #define MSDFGEN_PUBLIC // ???
 
@@ -127,14 +124,15 @@ bool InitApp()
 //----------------------------------------------------------------------------------------------------------------------
 void UpdateApp()
 {
-	auto r = vk::SyncContext::GetRenderFence().Wait();
+	//auto r = 
+	vk::SyncContext::GetRenderFence().Wait();
 
 	//WC_CORE_INFO("Acquire result: {}, {}", magic_enum::enum_name(r), (int)r);
 
 	Globals.UpdateTime();
 	editor.Update();
 
-	auto extent = Globals.window.GetExtent();
+	//auto extent = Globals.window.GetExtent();
 
 	//if (extent.width > 0 && extent.height > 0)
 	{

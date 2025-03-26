@@ -290,7 +290,7 @@ namespace blaze
 
 		AccumulatedTime += wc::Globals.deltaTime;
 
-		EntityWorld.each([this](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
+		EntityWorld.each([](RigidBodyComponent& p, TransformComponent& pc) { // @TODO: Maybe optimize this?
 			if (!p.body.IsValid())
 			{
 				WC_CORE_ERROR("Body is invalid!");
@@ -310,7 +310,7 @@ namespace blaze
 
 		float alpha = AccumulatedTime / SimulationTime;
 
-		EntityWorld.each([this, &alpha](RigidBodyComponent& p, TransformComponent& pc)
+		EntityWorld.each([&alpha](RigidBodyComponent& p, TransformComponent& pc)
 			{
 				if (!p.body.IsValid())
 				{
@@ -321,7 +321,7 @@ namespace blaze
 
 				float start = p.previousRotation;
 				float end = p.body.GetAngle();
-				auto diff = end - start;
+				//auto diff = end - start;
 
 				pc.Rotation.z = glm::mix(start, end, alpha);
 			});
@@ -329,7 +329,7 @@ namespace blaze
 
 	void Scene::Update()
 		{
-			EntityWorld.each([this](ScriptComponent& script)
+			EntityWorld.each([](ScriptComponent& script)
 				{
 					if (script.ScriptInstance)
 						script.ScriptInstance.state.Execute("Update");
