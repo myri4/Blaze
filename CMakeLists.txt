@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+
 set(OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}")
 set(VENDOR "vendor/")
 
@@ -19,13 +22,13 @@ file(GLOB IMGUI_SOURCES
 )
 
 # Check if we're inside CLion
-if (NOT DEFINED ENV{CLION_IDE})
-    if (MSVC)
-        add_definitions(-DMSVC)
-    endif()
-else()
-    add_definitions(-DCLION)
-endif()
+#if (NOT DEFINED ENV{CLION_IDE})
+#    if (MSVC)
+#        add_definitions(-DMSVC)
+#    endif()
+#else()
+#    add_definitions(-DCLION)
+#endif()
 
 add_executable("Blaze-Editor"
     ${SOURCES}

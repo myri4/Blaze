@@ -328,13 +328,13 @@ namespace blaze
 	}
 
 	void Scene::Update()
-		{
-			EntityWorld.each([](ScriptComponent& script)
-				{
-					if (script.ScriptInstance)
-						script.ScriptInstance.state.Execute("Update");
-				});
+	{
+		EntityWorld.each([](ScriptComponent& script)
+			{
+				if (script.ScriptInstance)
+					script.ScriptInstance.state.Execute("Update");
+			});
 
-			UpdatePhysics();
-		}
+		UpdatePhysics();
+	}
 }

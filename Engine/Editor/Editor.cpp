@@ -746,9 +746,9 @@ void EditorInstance::DisplayEntity(const flecs::entity& entity)
 		auto& entityOrder = entity.get<EntityOrderComponent>()->EntityOrder;
 		for (const auto& childName : entityOrder)
 		{
-			std::string fullChildName = std::string(entity.name()) + "::" + childName;
+			auto fullChildName = std::string(entity.name()) + "::" + childName;
 
-			flecs::entity childEntity = entity;
+			auto childEntity = entity;
 			while (childEntity.parent() != flecs::entity::null())
 			{
 				childEntity = childEntity.parent();
@@ -822,7 +822,7 @@ void EditorInstance::DisplayEntity(const flecs::entity& entity)
 	// Bond
 	if (gui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = gui::AcceptDragDropPayload("ENTITY"))
+		if (const auto* payload = gui::AcceptDragDropPayload("ENTITY"))
 		{
 			IM_ASSERT(payload->DataSize == sizeof(flecs::entity));
 			flecs::entity droppedEntity = *static_cast<const flecs::entity*>(payload->Data);
@@ -872,7 +872,7 @@ void EditorInstance::DisplayEntity(const flecs::entity& entity)
 	}
 	else
 		EntityReorderSeparator(entity);
-};
+}
 
 void EditorInstance::UI_Entities()
 {
@@ -963,10 +963,6 @@ void EditorInstance::UI_Entities()
 		gui::PopStyleVar();
 		if (gui::BeginPopupModal("Add Entity", &showPopup, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 		{
-
-
-
-
 
 			static std::string name = "Entity";
 			if (focus)
@@ -1120,13 +1116,13 @@ void EditorInstance::UI_Properties()
 			if (showAddComponent)
 			{
 				{
-					ImVec2 popupPos = gui::GetItemRectMin();
+					auto popupPos = gui::GetItemRectMin();
 					popupPos.y = gui::GetItemRectMax().y + 5;
-					ImVec2 popupSize = { 200, 150 };
+					auto popupSize = ImVec2{ 200, 150 };
 
 					const ImGuiViewport* viewport = gui::GetWindowViewport();
-					ImVec2 viewportMin = viewport->Pos;
-					ImVec2 viewportMax = { viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
+					auto viewportMin = viewport->Pos;
+					auto viewportMax = ImVec2{ viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y };
 
 					popupPos.x = std::clamp(popupPos.x, viewportMin.x, viewportMax.x - popupSize.x);
 					popupPos.y = std::clamp(popupPos.y, viewportMin.y, viewportMax.y - popupSize.y);
@@ -2446,11 +2442,11 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 		// You can pass in a reference ImGuiStyle structure to compare to, revert to and save to
 		// (without a reference style pointer, we will use one compared locally as a reference)
 
-		ImGuiStyle& style = gui::GetStyle();
+		auto& style = gui::GetStyle();
 		static ImGuiStyle ref_saved_style;
 
 		// Default to using internal storage as reference
-		static bool init = true;
+		static auto init = true;
 		if (init && ref == NULL)
 			ref_saved_style = style;
 		init = false;
@@ -2470,7 +2466,7 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 
 				if (file.is_open())
 				{
-					ImGuiStyle finalStyle = gui::GetStyle();
+					auto finalStyle = gui::GetStyle();
 					//LastStyle = std::filesystem::relative(filepath).string();
 					file.write((const char*)&finalStyle, sizeof(finalStyle));
 					file.close();
@@ -2487,7 +2483,7 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 				std::ifstream file(filepath, std::ios::binary);
 				if (file.is_open())
 				{
-					ImGuiStyle& loadStyle = gui::GetStyle();
+					auto& loadStyle = gui::GetStyle();
 					//LastStyle = std::filesystem::relative(filepath).string();
 					file.read((char*)&loadStyle, sizeof(loadStyle));
 					file.close();
@@ -2498,11 +2494,11 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 		// Simplified Settings (expose floating-pointer border sizes as boolean representing 0.0f or 1.0f)
 		if (ui::Slider("Frame rounding", style.FrameRounding, 0.0f, 12.0f, "%.0f"))
 			style.GrabRounding = style.FrameRounding; // Make GrabRounding always the same value as FrameRounding
-		{ bool border = (style.WindowBorderSize > 0.0f); if (ui::Checkbox("WindowBorder", border)) { style.WindowBorderSize = border ? 1.0f : 0.0f; } }
+		{ auto border = (style.WindowBorderSize > 0.0f); if (ui::Checkbox("WindowBorder", border)) { style.WindowBorderSize = border ? 1.0f : 0.0f; } }
 		gui::SameLine();
-		{ bool border = (style.FrameBorderSize > 0.0f);  if (ui::Checkbox("FrameBorder", border)) { style.FrameBorderSize = border ? 1.0f : 0.0f; } }
+		{ auto border = (style.FrameBorderSize > 0.0f);  if (ui::Checkbox("FrameBorder", border)) { style.FrameBorderSize = border ? 1.0f : 0.0f; } }
 		gui::SameLine();
-		{ bool border = (style.PopupBorderSize > 0.0f);  if (ui::Checkbox("PopupBorder", border)) { style.PopupBorderSize = border ? 1.0f : 0.0f; } }
+		{ auto border = (style.PopupBorderSize > 0.0f);  if (ui::Checkbox("PopupBorder", border)) { style.PopupBorderSize = border ? 1.0f : 0.0f; } }
 
 
 		ui::Separator();
@@ -2598,7 +2594,7 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 				gui::PushItemWidth(gui::GetFontSize() * -12);
 				for (int i = 0; i < ImGuiCol_COUNT; i++)
 				{
-					const char* name = gui::GetStyleColorName(i);
+					const auto* name = gui::GetStyleColorName(i);
 					if (!filter.PassFilter(name))
 						continue;
 					gui::PushID(i);
@@ -2638,14 +2634,14 @@ void EditorInstance::UI_StyleEditor(ImGuiStyle* ref)
 
 				// When editing the "Circle Segment Max Error" value, draw a preview of its effect on auto-tessellated circles.
 				ui::Drag("Circle Tessellation Max Error", style.CircleTessellationMaxError, 0.005f, 0.10f, 5.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				const bool show_samples = gui::IsItemActive();
+				const auto show_samples = gui::IsItemActive();
 				if (show_samples)
 					gui::SetNextWindowPos(gui::GetCursorScreenPos());
 				if (show_samples && gui::BeginTooltip())
 				{
 					gui::TextUnformatted("(R = radius, N = number of segments)");
 					gui::Spacing();
-					ImDrawList* draw_list = gui::GetWindowDrawList();
+					auto* draw_list = gui::GetWindowDrawList();
 					const float min_widget_width = gui::CalcTextSize("N: MMM\nR: MMM").x;
 					for (int n = 0; n < 8; n++)
 					{
@@ -3011,10 +3007,10 @@ void EditorInstance::UI()
 			gui::PopStyleVar(4);
 			windowFlags |= ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBackground;
 
-			ImGuiIO& io = gui::GetIO();
+			auto& io = gui::GetIO();
 			if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 			{
-				ImGuiID dockspace_id = gui::GetID("MainDockSpace");
+				auto dockspace_id = gui::GetID("MainDockSpace");
 				gui::DockSpace(dockspace_id, ImVec2(0.f, 0.f));
 			}
 

@@ -3,6 +3,7 @@
 #include "../Utils/Window.h"
 #include "glm/glm.hpp"
 #include "../Sound/SoundEngine.h"
+#include "../Scene/Components.h"
 
 using namespace blaze;
 
@@ -1012,6 +1013,80 @@ static int lua_PauseSound(lua_State* L)
 	wc::Globals.SoundContext.PauseSound(toSoundID(L, 1));
 
 	return 0;
+}
+
+// Component bindings
+
+static void pushTransformComponent(lua_State* L, const TransformComponent& value)
+{
+	blaze::ScriptState state(L);
+	state.CreateTable(0, 3);
+
+	pushVec3(L, value.Translation);
+	state.SetField("Translation", -2);
+
+	pushVec3(L, value.Scale);
+	state.SetField("Scale", -2);
+
+	pushVec3(L, value.Rotation);
+	state.SetField("Rotation", -2);
+
+	// Set metatable
+	state.GetMetatable("TransformComponent");
+	state.SetMetatable(-2);
+}
+
+static TransformComponent toTransformComponent(lua_State* L, int index)
+{
+	blaze::ScriptState state(L);
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	TransformComponent value;
+
+	state.GetField(index, "Translation");
+	if (isVec3(L, index)) value.Translation = toVec3(L, -1);
+
+	state.GetField(index, "Scale");
+	if (isVec3(L, index)) value.Scale = toVec3(L, -1);
+
+	state.GetField(index, "Rotation");
+	if (isVec3(L, index)) value.Rotation = toVec3(L, -1);
+
+	return value;
+}
+
+// Component bindings
+
+static void pushSpriteRendererComponent(lua_State* L, const SpriteRendererComponent& value)
+{
+	blaze::ScriptState state(L);
+	state.CreateTable(0, 2);
+
+	pushVec4(L, value.Color);
+	state.SetField("Color", -2);
+
+	state.Push((double)value.Texture);
+	state.SetField("Texture", -2);
+
+	// Set metatable
+	state.GetMetatable("SpriteRendererComponent");
+	state.SetMetatable(-2);
+}
+
+static SpriteRendererComponent toSpriteRendererComponent(lua_State* L, int index)
+{
+	blaze::ScriptState state(L);
+	luaL_checktype(L, index, LUA_TTABLE);
+
+	SpriteRendererComponent value;
+
+	state.GetField(index, "Color");
+	if (isVec4(L, index)) value.Color = toVec4(L, -1);
+
+	state.GetField(index, "Texture");
+	if (state.IsNumber(index)) value.Texture = state.ToNumber();
+
+	return value;
 }
 
 static int lua_Print(lua_State* L) { return lua_Log(L, spdlog::level::level_enum::trace); }

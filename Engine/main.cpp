@@ -114,7 +114,7 @@ bool InitApp()
 	ImGui_ImplVulkan_Init(swapchain.RenderPass);
 	ImGui_ImplVulkan_CreateFontsTexture();
 
-	ImGuiStyle& style = ImGui::GetStyle();
+	auto& style = ImGui::GetStyle();
 	style = ui::SoDark(0.0f);
 	editor.Create();
 
